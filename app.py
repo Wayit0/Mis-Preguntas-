@@ -2,7 +2,6 @@ import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
 import sqlite3
-import bcrypt
 import hashlib
 import json
 import anthropic
@@ -104,9 +103,8 @@ init_db()
 # AUTH HELPERS
 # ─────────────────────────────────────────────
 
-def _preparar_password(password: str) -> bytes:
-    """SHA-256 del password para que bcrypt reciba siempre 64 bytes ASCII."""
-    return hashlib.sha256(password.encode("utf-8")).hexdigest().encode("ascii")
+def _preparar_password(password: str) -> str:
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 def cambiar_password_usuario(user_id, password_actual, password_nueva):
     conn = get_conn()
@@ -115,12 +113,12 @@ def cambiar_password_usuario(user_id, password_actual, password_nueva):
     if row is None:
         return False, "Usuario no encontrado."
     try:
-        if not bcrypt.checkpw(_preparar_password(password_actual), row[0].encode("utf-8")):
+        if _preparar_password(password_actual) != row[0]:
             return False, "La contraseña actual es incorrecta."
     except Exception:
         return False, "Error al verificar la contraseña actual."
     try:
-        hashed = bcrypt.hashpw(_preparar_password(password_nueva), bcrypt.gensalt()).decode("utf-8")
+        hashed = _preparar_password(password_nueva)
         conn = get_conn()
         conn.execute("UPDATE usuarios SET password_hash=? WHERE id=?", (hashed, user_id))
         conn.commit()
@@ -131,7 +129,7 @@ def cambiar_password_usuario(user_id, password_actual, password_nueva):
 
 def registrar_usuario(nombre, email, password):
     try:
-        hashed = bcrypt.hashpw(_preparar_password(password), bcrypt.gensalt()).decode("utf-8")
+        hashed = _preparar_password(password)
     except Exception as e:
         return False, f"Error al procesar la contraseña: {e}"
     try:
@@ -152,7 +150,7 @@ def autenticar(email, password):
         return None, "Correo no encontrado."
     uid, nombre, hashed = row
     try:
-        coincide = bcrypt.checkpw(_preparar_password(password), hashed.encode("utf-8"))
+        coincide = _preparar_password(password) == hashed
     except Exception:
         return None, "Error al verificar la contraseña. Contacta al administrador."
     if coincide:
