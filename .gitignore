@@ -7,3 +7,6 @@ uploads/
 *.egg-info/
 .pytest_cache/
 .superpowers/
+.playwright-mcp/
+*.log
+smoke-postgres-dashboard.png
