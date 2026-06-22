@@ -5,3 +5,6 @@ PyMuPDF
 python-docx
 reportlab
 matplotlib
+SQLAlchemy
+psycopg[binary]
+python-dotenv
