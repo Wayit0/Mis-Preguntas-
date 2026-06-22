@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import pandas as pd
-import sqlite3
+from sqlalchemy.exc import IntegrityError
 import hashlib
 import json
 import anthropic
@@ -21,83 +21,17 @@ from PIL import Image as PILImage
 
 st.set_page_config(page_title="Banco de Preguntas", layout="wide")
 
-DB = "banco.db"
+import db
+from db import read_df, execute, execute_returning, fetchone, fetchall
 
 # ─────────────────────────────────────────────
 # BASE DE DATOS
 # ─────────────────────────────────────────────
-
-def get_conn():
-    return sqlite3.connect(DB, check_same_thread=False)
-
-def init_db():
-    conn = get_conn()
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS usuarios (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS preguntas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            asignatura TEXT NOT NULL,
-            materia TEXT,
-            contenido TEXT,
-            nivel TEXT,
-            pregunta TEXT NOT NULL,
-            A TEXT, B TEXT, C TEXT, D TEXT, E TEXT,
-            correcta TEXT,
-            explicacion TEXT,
-            compartida INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES usuarios(id)
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS textos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            asignatura TEXT NOT NULL,
-            titulo TEXT NOT NULL,
-            contenido TEXT NOT NULL,
-            compartida INTEGER DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES usuarios(id)
-        )
-    """)
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS colaboraciones (
-            from_user_id INTEGER NOT NULL,
-            to_user_id INTEGER NOT NULL,
-            PRIMARY KEY (from_user_id, to_user_id),
-            FOREIGN KEY (from_user_id) REFERENCES usuarios(id),
-            FOREIGN KEY (to_user_id) REFERENCES usuarios(id)
-        )
-    """)
-    conn.commit()
-    # Migraciones
-    cols = [r[1] for r in c.execute("PRAGMA table_info(preguntas)").fetchall()]
-    if "nivel" not in cols:
-        c.execute("ALTER TABLE preguntas ADD COLUMN nivel TEXT")
-    for col in ["imagen_pregunta", "imagen_A", "imagen_B", "imagen_C", "imagen_D", "imagen_E"]:
-        if col not in cols:
-            c.execute(f"ALTER TABLE preguntas ADD COLUMN {col} TEXT")
-    if "tipo" not in cols:
-        c.execute("ALTER TABLE preguntas ADD COLUMN tipo TEXT DEFAULT 'seleccion_multiple'")
-    if "texto_id" not in cols:
-        c.execute("ALTER TABLE preguntas ADD COLUMN texto_id INTEGER")
-    conn.commit()
-    conn.close()
+# El esquema y la conexión viven en db.py (PostgreSQL).
 
 os.makedirs("uploads", exist_ok=True)
 
-init_db()
+db.init_db()
 
 # ─────────────────────────────────────────────
 # AUTH HELPERS
@@ -107,9 +41,8 @@ def _preparar_password(password: str) -> str:
     return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
 def cambiar_password_usuario(user_id, password_actual, password_nueva):
-    conn = get_conn()
-    row = conn.execute("SELECT password_hash FROM usuarios WHERE id=?", (user_id,)).fetchone()
-    conn.close()
+    row = fetchone("SELECT password_hash FROM usuarios WHERE id=:id",
+                   {"id": user_id})
     if row is None:
         return False, "Usuario no encontrado."
     try:
@@ -119,13 +52,12 @@ def cambiar_password_usuario(user_id, password_actual, password_nueva):
         return False, "Error al verificar la contraseña actual."
     try:
         hashed = _preparar_password(password_nueva)
-        conn = get_conn()
-        conn.execute("UPDATE usuarios SET password_hash=? WHERE id=?", (hashed, user_id))
-        conn.commit()
-        conn.close()
+        execute("UPDATE usuarios SET password_hash=:h WHERE id=:id",
+                {"h": hashed, "id": user_id})
         return True, None
     except Exception as e:
         return False, f"Error al guardar la nueva contraseña: {e}"
+
 
 def registrar_usuario(nombre, email, password):
     try:
@@ -133,19 +65,20 @@ def registrar_usuario(nombre, email, password):
     except Exception as e:
         return False, f"Error al procesar la contraseña: {e}"
     try:
-        conn = get_conn()
-        conn.execute("INSERT INTO usuarios (nombre, email, password_hash) VALUES (?,?,?)",
-                     (nombre, email, hashed))
-        conn.commit()
-        conn.close()
+        execute(
+            "INSERT INTO usuarios (nombre, email, password_hash) "
+            "VALUES (:n, :e, :h)",
+            {"n": nombre, "e": email, "h": hashed},
+        )
         return True, None
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return False, "Ya existe una cuenta con ese correo."
 
+
 def autenticar(email, password):
-    conn = get_conn()
-    row = conn.execute("SELECT id, nombre, password_hash FROM usuarios WHERE email=?", (email,)).fetchone()
-    conn.close()
+    row = fetchone(
+        "SELECT id, nombre, password_hash FROM usuarios WHERE email=:e",
+        {"e": email})
     if row is None:
         return None, "Correo no encontrado."
     uid, nombre, hashed = row
@@ -180,156 +113,161 @@ def mostrar_imagen(nombre_archivo, width=300):
             st.image(path, width=width)
 
 def guardar_texto(user_id, asignatura, titulo, contenido, compartida=0):
-    conn = get_conn()
-    cur = conn.execute(
-        "INSERT INTO textos (user_id, asignatura, titulo, contenido, compartida) VALUES (?,?,?,?,?)",
-        (user_id, asignatura, titulo, contenido, int(compartida))
+    return execute_returning(
+        "INSERT INTO textos (user_id, asignatura, titulo, contenido, compartida) "
+        "VALUES (:uid, :asig, :tit, :cont, :comp) RETURNING id",
+        {"uid": user_id, "asig": asignatura, "tit": titulo,
+         "cont": contenido, "comp": int(compartida)},
     )
-    texto_id = cur.lastrowid
-    conn.commit()
-    conn.close()
-    return texto_id
+
 
 def cargar_textos_propios(user_id, asignatura):
-    conn = get_conn()
-    df = pd.read_sql_query(
-        "SELECT * FROM textos WHERE user_id=? AND asignatura=? ORDER BY created_at DESC",
-        conn, params=(user_id, asignatura)
+    return read_df(
+        "SELECT * FROM textos WHERE user_id=:uid AND asignatura=:asig "
+        "ORDER BY created_at DESC",
+        {"uid": user_id, "asig": asignatura},
     )
-    conn.close()
-    return df
+
 
 def cargar_preguntas_de_texto(texto_id):
-    conn = get_conn()
-    df = pd.read_sql_query(
-        "SELECT * FROM preguntas WHERE texto_id=? ORDER BY id",
-        conn, params=(texto_id,)
+    return read_df(
+        "SELECT * FROM preguntas WHERE texto_id=:tid ORDER BY id",
+        {"tid": texto_id},
     )
-    conn.close()
-    return df
+
 
 def eliminar_texto(texto_id, user_id):
-    conn = get_conn()
-    conn.execute("UPDATE preguntas SET texto_id=NULL WHERE texto_id=?", (texto_id,))
-    conn.execute("DELETE FROM textos WHERE id=? AND user_id=?", (texto_id, user_id))
-    conn.commit()
-    conn.close()
+    execute("UPDATE preguntas SET texto_id=NULL WHERE texto_id=:tid",
+            {"tid": texto_id})
+    execute("DELETE FROM textos WHERE id=:tid AND user_id=:uid",
+            {"tid": texto_id, "uid": user_id})
 
 def guardar_pregunta(user_id, asignatura, materia, contenido, nivel, pregunta, a, b, c, d, e, correcta, explicacion, compartida, img_preg=None, img_a=None, img_b=None, img_c=None, img_d=None, img_e=None, tipo="seleccion_multiple"):
-    conn = get_conn()
-    conn.execute("""
-        INSERT INTO preguntas (user_id, asignatura, materia, contenido, nivel, pregunta, A, B, C, D, E, correcta, explicacion, compartida, imagen_pregunta, imagen_A, imagen_B, imagen_C, imagen_D, imagen_E, tipo)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-    """, (user_id, asignatura, materia, contenido, nivel, pregunta, a, b, c, d, e, correcta, explicacion, int(compartida), img_preg, img_a, img_b, img_c, img_d, img_e, tipo))
-    conn.commit()
-    conn.close()
+    execute(
+        """
+        INSERT INTO preguntas
+            (user_id, asignatura, materia, contenido, nivel, pregunta,
+             "A", "B", "C", "D", "E", correcta, explicacion, compartida,
+             "imagen_pregunta", "imagen_A", "imagen_B", "imagen_C",
+             "imagen_D", "imagen_E", tipo)
+        VALUES
+            (:uid, :asig, :mat, :cont, :niv, :preg,
+             :a, :b, :c, :d, :e, :correcta, :expl, :comp,
+             :img_preg, :img_a, :img_b, :img_c, :img_d, :img_e, :tipo)
+        """,
+        {"uid": user_id, "asig": asignatura, "mat": materia, "cont": contenido,
+         "niv": nivel, "preg": pregunta, "a": a, "b": b, "c": c, "d": d, "e": e,
+         "correcta": correcta, "expl": explicacion, "comp": int(compartida),
+         "img_preg": img_preg, "img_a": img_a, "img_b": img_b, "img_c": img_c,
+         "img_d": img_d, "img_e": img_e, "tipo": tipo},
+    )
 
 def cargar_preguntas_propias(user_id, asignatura):
-    conn = get_conn()
-    df = pd.read_sql_query(
-        "SELECT * FROM preguntas WHERE user_id=? AND asignatura=?",
-        conn, params=(user_id, asignatura)
+    return read_df(
+        "SELECT * FROM preguntas WHERE user_id=:uid AND asignatura=:asig",
+        {"uid": user_id, "asig": asignatura},
     )
-    conn.close()
-    return df
+
 
 def cargar_banco_compartido(asignatura, user_id):
     """Preguntas compartidas: públicas (compartida=2) o de colaboradores (compartida=1)."""
-    conn = get_conn()
-    df = pd.read_sql_query("""
+    return read_df(
+        """
         SELECT p.*, u.nombre as profesor
         FROM preguntas p
         JOIN usuarios u ON p.user_id = u.id
-        WHERE p.asignatura=? AND p.user_id != ? AND (
+        WHERE p.asignatura=:asig AND p.user_id != :uid AND (
             p.compartida=2
             OR (p.compartida=1 AND EXISTS (
                 SELECT 1 FROM colaboraciones c
-                WHERE c.from_user_id=p.user_id AND c.to_user_id=?
+                WHERE c.from_user_id=p.user_id AND c.to_user_id=:uid
             ))
         )
         ORDER BY u.nombre, p.id
-    """, conn, params=(asignatura, user_id, user_id))
-    conn.close()
-    return df
+        """,
+        {"asig": asignatura, "uid": user_id},
+    )
 
 def cargar_colaboradores(user_id):
     """Colegas a los que he invitado (pueden ver mis preguntas compartidas)."""
-    conn = get_conn()
-    rows = conn.execute("""
+    return fetchall(
+        """
         SELECT u.id, u.nombre, u.email FROM usuarios u
         JOIN colaboraciones c ON c.to_user_id = u.id
-        WHERE c.from_user_id=?
+        WHERE c.from_user_id=:uid
         ORDER BY u.nombre
-    """, (user_id,)).fetchall()
-    conn.close()
-    return rows
+        """,
+        {"uid": user_id},
+    )
+
 
 def cargar_quienes_me_invitaron(user_id):
     """Profesores que me han dado acceso a sus preguntas."""
-    conn = get_conn()
-    rows = conn.execute("""
+    return fetchall(
+        """
         SELECT u.id, u.nombre, u.email FROM usuarios u
         JOIN colaboraciones c ON c.from_user_id = u.id
-        WHERE c.to_user_id=?
+        WHERE c.to_user_id=:uid
         ORDER BY u.nombre
-    """, (user_id,)).fetchall()
-    conn.close()
-    return rows
+        """,
+        {"uid": user_id},
+    )
+
 
 def agregar_colaborador(from_user_id, to_user_id):
-    conn = get_conn()
     try:
-        conn.execute("INSERT INTO colaboraciones (from_user_id, to_user_id) VALUES (?,?)", (from_user_id, to_user_id))
-        conn.commit()
+        execute(
+            "INSERT INTO colaboraciones (from_user_id, to_user_id) "
+            "VALUES (:f, :t)",
+            {"f": from_user_id, "t": to_user_id},
+        )
         return True
-    except sqlite3.IntegrityError:
+    except IntegrityError:
         return False
-    finally:
-        conn.close()
+
 
 def eliminar_colaborador(from_user_id, to_user_id):
-    conn = get_conn()
-    conn.execute("DELETE FROM colaboraciones WHERE from_user_id=? AND to_user_id=?", (from_user_id, to_user_id))
-    conn.commit()
-    conn.close()
+    execute(
+        "DELETE FROM colaboraciones WHERE from_user_id=:f AND to_user_id=:t",
+        {"f": from_user_id, "t": to_user_id},
+    )
+
 
 def buscar_usuario_por_email(email, exclude_id):
-    conn = get_conn()
-    row = conn.execute("SELECT id, nombre, email FROM usuarios WHERE email=? AND id!=?", (email, exclude_id)).fetchone()
-    conn.close()
-    return row
+    return fetchone(
+        "SELECT id, nombre, email FROM usuarios WHERE email=:e AND id!=:x",
+        {"e": email, "x": exclude_id},
+    )
+
 
 def todos_los_usuarios(exclude_id):
-    conn = get_conn()
-    rows = conn.execute("SELECT id, nombre, email FROM usuarios WHERE id!=? ORDER BY nombre", (exclude_id,)).fetchall()
-    conn.close()
-    return rows
+    return fetchall(
+        "SELECT id, nombre, email FROM usuarios WHERE id!=:x ORDER BY nombre",
+        {"x": exclude_id},
+    )
 
 def eliminar_pregunta(pregunta_id, user_id):
-    conn = get_conn()
-    conn.execute("DELETE FROM preguntas WHERE id=? AND user_id=?", (pregunta_id, user_id))
-    conn.commit()
-    conn.close()
+    execute("DELETE FROM preguntas WHERE id=:pid AND user_id=:uid",
+            {"pid": pregunta_id, "uid": user_id})
+
 
 def actualizar_pregunta(pregunta_id, user_id, materia, contenido, nivel, pregunta, a, b, c, d, e, correcta, explicacion, compartida, img_preg=None, img_a=None, img_b=None, img_c=None, img_d=None, img_e=None):
-    conn = get_conn()
-    # Solo actualizar imágenes si se proporcionan nuevas, si no mantener las existentes
-    campos = "materia=?, contenido=?, nivel=?, pregunta=?, A=?, B=?, C=?, D=?, E=?, correcta=?, explicacion=?, compartida=?"
-    vals = [materia, contenido, nivel, pregunta, a, b, c, d, e, correcta, explicacion, int(compartida)]
-    for col, val in [("imagen_pregunta", img_preg), ("imagen_A", img_a), ("imagen_B", img_b), ("imagen_C", img_c), ("imagen_D", img_d), ("imagen_E", img_e)]:
-        if val is not None:
-            campos += f", {col}=?"
-            vals.append(val)
-    vals += [pregunta_id, user_id]
-    conn.execute(f"UPDATE preguntas SET {campos} WHERE id=? AND user_id=?", vals)
-    conn.commit()
-    conn.close()
+    imagenes = {
+        "imagen_pregunta": img_preg, "imagen_A": img_a, "imagen_B": img_b,
+        "imagen_C": img_c, "imagen_D": img_d, "imagen_E": img_e,
+    }
+    sql, params = db.build_pregunta_update(
+        materia, contenido, nivel, pregunta, a, b, c, d, e, correcta,
+        explicacion, compartida, pregunta_id, user_id, imagenes,
+    )
+    execute(sql, params)
+
 
 def toggle_compartida(pregunta_id, user_id, valor):
-    conn = get_conn()
-    conn.execute("UPDATE preguntas SET compartida=? WHERE id=? AND user_id=?", (int(valor), pregunta_id, user_id))
-    conn.commit()
-    conn.close()
+    execute(
+        "UPDATE preguntas SET compartida=:v WHERE id=:pid AND user_id=:uid",
+        {"v": int(valor), "pid": pregunta_id, "uid": user_id},
+    )
 
 # ─────────────────────────────────────────────
 # PDF
@@ -1049,14 +987,26 @@ elif st.session_state.pagina == "Mis Textos":
                         if not tp_preg.strip():
                             st.warning("Escribe la pregunta.")
                         else:
-                            conn = get_conn()
-                            conn.execute("""
-                                INSERT INTO preguntas (user_id, asignatura, materia, contenido, nivel, pregunta, A, B, C, D, E, correcta, explicacion, compartida, tipo, texto_id)
-                                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                            """, (usuario["id"], asignatura, tp_materia, tp_contenido, tp_nivel, tp_preg.strip(),
-                                  tp_a, tp_b, tp_c, tp_d, tp_e, tp_correcta, tp_explic, 0, tp_tipo, tid))
-                            conn.commit()
-                            conn.close()
+                            execute(
+                                """
+                                INSERT INTO preguntas
+                                    (user_id, asignatura, materia, contenido,
+                                     nivel, pregunta, "A", "B", "C", "D", "E",
+                                     correcta, explicacion, compartida, tipo,
+                                     texto_id)
+                                VALUES
+                                    (:uid, :asig, :mat, :cont, :niv, :preg,
+                                     :a, :b, :c, :d, :e, :correcta, :expl,
+                                     :comp, :tipo, :tid)
+                                """,
+                                {"uid": usuario["id"], "asig": asignatura,
+                                 "mat": tp_materia, "cont": tp_contenido,
+                                 "niv": tp_nivel, "preg": tp_preg.strip(),
+                                 "a": tp_a, "b": tp_b, "c": tp_c, "d": tp_d,
+                                 "e": tp_e, "correcta": tp_correcta,
+                                 "expl": tp_explic, "comp": 0, "tipo": tp_tipo,
+                                 "tid": tid},
+                            )
                             st.success("✅ Pregunta agregada.")
                             st.rerun()
 
@@ -1169,21 +1119,22 @@ elif st.session_state.pagina == "Crear Prueba":
     boton_volver()
     st.header(f"📝 Crear Prueba — {asignatura}")
 
-    conn = get_conn()
-    df = pd.read_sql_query("""
+    df = read_df(
+        """
         SELECT p.*, u.nombre as profesor
         FROM preguntas p
         JOIN usuarios u ON p.user_id = u.id
-        WHERE p.asignatura=? AND (
-            p.user_id=?
+        WHERE p.asignatura=:asig AND (
+            p.user_id=:uid
             OR p.compartida=2
             OR (p.compartida=1 AND EXISTS (
                 SELECT 1 FROM colaboraciones c
-                WHERE c.from_user_id=p.user_id AND c.to_user_id=?
+                WHERE c.from_user_id=p.user_id AND c.to_user_id=:uid
             ))
         )
-    """, conn, params=(asignatura, usuario["id"], usuario["id"]))
-    conn.close()
+        """,
+        {"asig": asignatura, "uid": usuario["id"]},
+    )
 
     if df.empty:
         st.warning("No hay preguntas disponibles. Agrega preguntas o espera a que tus colegas compartan.")
