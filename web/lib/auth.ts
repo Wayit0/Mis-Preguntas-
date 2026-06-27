@@ -27,6 +27,10 @@ export const auth = betterAuth({
   user: { fields: { name: 'nombre' } },
   emailAndPassword: {
     enabled: true,
+    // El MVP permitía contraseñas de 6+ caracteres; el default de better-auth es
+    // 8. Lo bajamos a 6 para mantener paridad con el copy de la UI ("La
+    // contraseña debe tener al menos 6 caracteres").
+    minPasswordLength: 6,
     password: { hash: hashPw, verify: verifyPw },
   },
   // Rehash de credenciales legacy: tras un signIn exitoso, si la contraseña del
