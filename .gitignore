@@ -2,7 +2,7 @@ venv/
 __pycache__/
 *.pyc
 banco.db
-uploads/
+/uploads/
 .env
 *.egg-info/
 .pytest_cache/
