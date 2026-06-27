@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
 import { getDashboardStats } from '@/lib/queries/dashboard'
 import { buttonVariants } from '@/components/ui/button'
@@ -24,8 +25,12 @@ export default async function DashboardPage({
 }) {
   const { asignatura } = await searchParams
   const session = await getSession()
-  const nombre = session?.user.name ?? 'Profesor'
-  const userId = Number(session?.user.id)
+  // El layout (app) ya protege la ruta, pero guardamos aquí también: sin esto, la
+  // página se renderiza concurrentemente con el redirect del layout y alcanza a
+  // disparar getDashboardStats(NaN) → error 22P02 en Postgres (int inválido).
+  if (!session) redirect('/login')
+  const nombre = session.user.name ?? 'Profesor'
+  const userId = Number(session.user.id)
 
   const stats = await getDashboardStats(userId, asignatura)
 
