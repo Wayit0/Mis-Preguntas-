@@ -1,6 +1,6 @@
 import { Readable } from 'node:stream'
 import { getSession } from '@/lib/get-session'
-import { getImageStream } from '@/lib/storage/blob'
+import { getImageStream, safeImageResponseHeaders } from '@/lib/storage/blob'
 
 export const runtime = 'nodejs'
 
@@ -31,9 +31,6 @@ export async function GET(
   ) as unknown as ReadableStream<Uint8Array>
 
   return new Response(body, {
-    headers: {
-      'Content-Type': image.contentType,
-      'Cache-Control': 'private, max-age=3600',
-    },
+    headers: safeImageResponseHeaders(image.contentType),
   })
 }
