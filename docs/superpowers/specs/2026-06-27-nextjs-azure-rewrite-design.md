@@ -162,12 +162,19 @@ Nuevo Resource Group (ej. `rg-mispreguntas-prod`), todo en Bicep:
 | **PostgreSQL Flexible Server** | SKU Burstable (ej. B1ms) + base `mispreguntas`; firewall/Private |
 | **App Service Plan (Linux)** + **Web App (Node)** | SKU B1; corre `next build`/`start` |
 | **Storage Account + contenedor Blob** | imágenes |
-| *(opcional)* **Key Vault** | secretos |
+| **Key Vault** | secretos (DATABASE_URL, BETTER_AUTH_SECRET, ANTHROPIC_API_KEY, storage connection) |
 | *(opcional)* **Application Insights** | logs/monitoring |
 
-**App settings (env):** `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`
-(= URL de la Web App o dominio custom), `ANTHROPIC_API_KEY`,
-`AZURE_STORAGE_CONNECTION_STRING`, `BLOB_CONTAINER`, `NODE_ENV=production`.
+**Secretos vía Key Vault:** la Web App tiene **managed identity** (system-assigned)
+con rol *Key Vault Secrets User*. Las app settings de secretos se definen como
+**Key Vault references** (`@Microsoft.KeyVault(SecretUri=...)`); la app las lee como
+`process.env.*` normal y Azure las resuelve en runtime. Ningún secreto en texto plano
+en la config ni en el repo.
+
+**App settings (env):** `DATABASE_URL`*, `BETTER_AUTH_SECRET`*, `BETTER_AUTH_URL`
+(= URL de la Web App o dominio custom), `ANTHROPIC_API_KEY`*,
+`AZURE_STORAGE_CONNECTION_STRING`*, `BLOB_CONTAINER`, `NODE_ENV=production`.
+(*) = Key Vault reference.
 
 ### CI/CD y deploy
 - **GitHub Actions** con OIDC (federated credentials) para build + deploy a App Service.
