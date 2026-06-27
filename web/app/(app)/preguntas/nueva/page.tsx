@@ -1,11 +1,15 @@
-import { SectionPlaceholder } from '@/components/shell/section-placeholder'
+import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/get-session'
+import { FormularioPregunta } from '@/components/preguntas/formulario-pregunta'
 
-// TODO Fase 5: reemplazar stub (formulario de creación de pregunta).
 export default async function NuevaPreguntaPage({
   searchParams,
 }: {
   searchParams: Promise<{ asignatura?: string }>
 }) {
   const { asignatura } = await searchParams
-  return <SectionPlaceholder titulo="Agregar Pregunta" asignatura={asignatura} />
+  const session = await getSession()
+  if (!session) redirect('/login')
+
+  return <FormularioPregunta asignaturaInicial={asignatura} />
 }
