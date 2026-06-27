@@ -8,6 +8,13 @@
       "when": 1782553081372,
       "tag": "0000_soft_smiling_tiger",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1782574074803,
+      "tag": "0001_eager_northstar",
+      "breakpoints": true
     }
   ]
 }

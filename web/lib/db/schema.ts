@@ -19,7 +19,11 @@ export const usuarios = pgTable('usuarios', {
   id: serial('id').primaryKey(),
   nombre: text('nombre').notNull(),
   email: text('email').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
+  // NULLABLE con default '' (antes NOT NULL). Con better-auth la contraseña
+  // vive en `accounts.password`; los usuarios creados vía signUp no escriben
+  // esta columna, así que el NOT NULL original rompía el alta. Se conserva por
+  // compatibilidad con el origen (Render/SQLite) pero ya no es obligatoria.
+  passwordHash: text('password_hash').default(''),
   createdAt: timestamp('created_at').defaultNow(),
   // Columnas añadidas para better-auth (Task 1.2).
   emailVerified: boolean('email_verified').default(false).notNull(),
