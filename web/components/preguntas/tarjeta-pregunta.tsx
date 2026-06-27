@@ -24,7 +24,17 @@ function alternativaImagen(p: Pregunta, letra: string): string | null {
   return p[clave] ?? null
 }
 
-export function TarjetaPregunta({ p }: { p: Pregunta }) {
+export function TarjetaPregunta({
+  p,
+  autor,
+  soloLectura = false,
+}: {
+  p: Pregunta
+  /** Nombre del autor; se muestra en el modo solo lectura (Banco Compartido). */
+  autor?: string
+  /** En modo solo lectura se ocultan las acciones de edición/compartir/eliminar. */
+  soloLectura?: boolean
+}) {
   const compartida = (p.compartida ?? 0) > 0
   const tipo = (p.tipo ?? 'seleccion_multiple') as TipoPregunta
   const esSeleccion = tipo === 'seleccion_multiple'
@@ -41,14 +51,22 @@ export function TarjetaPregunta({ p }: { p: Pregunta }) {
       <CardContent className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
           <Badge variant="secondary">{badge}</Badge>
-          <span
-            className={cn(
-              'shrink-0 text-xs font-medium',
-              compartida ? 'text-accent' : 'text-muted-foreground',
-            )}
-          >
-            {compartida ? '● Compartida' : 'Privada'}
-          </span>
+          {soloLectura ? (
+            autor ? (
+              <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                Publicado por {autor}
+              </span>
+            ) : null
+          ) : (
+            <span
+              className={cn(
+                'shrink-0 text-xs font-medium',
+                compartida ? 'text-accent' : 'text-muted-foreground',
+              )}
+            >
+              {compartida ? '● Compartida' : 'Privada'}
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -105,32 +123,36 @@ export function TarjetaPregunta({ p }: { p: Pregunta }) {
           </ul>
         ) : null}
 
-        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-          <Link
-            href={hrefEditar}
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
-          >
-            ✏️ Editar
-          </Link>
-
-          <form action={toggleCompartida.bind(null, p.id, compartida ? 0 : 1)}>
-            <button
-              type="submit"
-              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+        {soloLectura ? null : (
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+            <Link
+              href={hrefEditar}
+              className={buttonVariants({ variant: 'outline', size: 'sm' })}
             >
-              {compartida ? '🔒 Hacer privada' : '🌐 Compartir'}
-            </button>
-          </form>
+              ✏️ Editar
+            </Link>
 
-          <form action={eliminarPregunta.bind(null, p.id)}>
-            <button
-              type="submit"
-              className={buttonVariants({ variant: 'destructive', size: 'sm' })}
+            <form
+              action={toggleCompartida.bind(null, p.id, compartida ? 0 : 1)}
             >
-              🗑 Eliminar
-            </button>
-          </form>
-        </div>
+              <button
+                type="submit"
+                className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+              >
+                {compartida ? '🔒 Hacer privada' : '🌐 Compartir'}
+              </button>
+            </form>
+
+            <form action={eliminarPregunta.bind(null, p.id)}>
+              <button
+                type="submit"
+                className={buttonVariants({ variant: 'destructive', size: 'sm' })}
+              >
+                🗑 Eliminar
+              </button>
+            </form>
+          </div>
+        )}
       </CardContent>
     </Card>
   )
