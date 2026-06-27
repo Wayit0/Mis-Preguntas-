@@ -12,7 +12,7 @@ export default async function CuentaPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-sm flex-col justify-center gap-4 px-4 py-10">
+    <div className="mx-auto flex w-full max-w-sm flex-col gap-4">
       <ChangePasswordForm />
       <Link
         href="/dashboard"
@@ -20,6 +20,6 @@ export default async function CuentaPage() {
       >
         Volver al panel
       </Link>
-    </main>
+    </div>
   )
 }

@@ -25,8 +25,9 @@ test('registro → dashboard → cerrar sesión → login → dashboard', async 
     page.getByRole('heading', { name: `Hola, ${nombre}` }),
   ).toBeVisible()
 
-  // 2. Cerrar sesión → vuelve a /login.
-  await page.getByRole('button', { name: 'Cerrar sesión' }).click()
+  // 2. Cerrar sesión (ahora vive en el menú de perfil del topbar) → /login.
+  await page.getByRole('button', { name: 'Abrir menú de perfil' }).click()
+  await page.getByRole('menuitem', { name: 'Cerrar sesión' }).click()
   await expect(page).toHaveURL(/\/login$/)
 
   // 3. Iniciar sesión con esas credenciales → /dashboard de nuevo.
