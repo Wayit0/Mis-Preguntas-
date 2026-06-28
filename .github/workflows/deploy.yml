@@ -48,9 +48,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Lee la versión de pnpm desde el campo packageManager de package.json.
+      # Lee la versión de pnpm desde packageManager de web/package.json (la acción
+      # mira la raíz por defecto; defaults.working-directory no aplica a actions).
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
+        with:
+          package_json_file: web/package.json
 
       - name: Setup Node
         uses: actions/setup-node@v4
