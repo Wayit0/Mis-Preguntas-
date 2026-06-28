@@ -26,7 +26,7 @@
 # ===========================================================================
 set -euo pipefail
 
-LOCATION="${LOCATION:-eastus2}"
+LOCATION="${LOCATION:-westus3}"  # patrocinio: Postgres Flexible restringido en eastus2/eastus
 NAME_PREFIX="${NAME_PREFIX:-mispreguntas}"
 TEMPLATE="$(cd "$(dirname "$0")" && pwd)/main.bicep"
 DEPLOYMENT_NAME="mispreguntas-infra-$(date +%Y%m%d%H%M%S)"

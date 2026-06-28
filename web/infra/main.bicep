@@ -27,8 +27,8 @@
 
 targetScope = 'subscription'
 
-@description('Región de Azure para todos los recursos.')
-param location string = 'eastus2'
+@description('Región de Azure para todos los recursos. westus3: la suscripción de patrocinio restringe PostgreSQL Flexible en eastus2/eastus.')
+param location string = 'westus3'
 
 @description('Prefijo de nombres para los recursos.')
 param namePrefix string = 'mispreguntas'
