@@ -1,49 +1,20 @@
 # ===========================================================================
 # Deploy de "Mis Preguntas" (Next.js, carpeta web/) a Azure App Service.
 #
-# Build con pnpm + deploy vía OIDC (federated credentials): sin secretos de
-# cliente de larga vida; GitHub obtiene un token de Azure AD por ejecución.
+# Build standalone de Next 16 + deploy vía PUBLISH PROFILE.
 #
-# ---------------------------------------------------------------------------
-# SECRETS requeridos (Settings -> Secrets and variables -> Actions -> Secrets):
-#   AZURE_CLIENT_ID         appId de la App Registration (federated credential)
-#   AZURE_TENANT_ID         tenant de Azure AD (disso.ai)
-#   AZURE_SUBSCRIPTION_ID   suscripción "Patrocinio de Microsoft Azure"
+# SECRET requerido (Settings -> Secrets and variables -> Actions -> Secrets):
+#   AZURE_WEBAPP_PUBLISH_PROFILE   perfil de publicación del App Service
+#     az webapp deployment list-publishing-profiles -g rg-mispreguntas-prod \
+#       -n app-mispreguntas-ecupwarmwaeb6 --xml
 #
-# VARIABLES requeridas (Settings -> Secrets and variables -> Actions -> Variables):
-#   AZURE_WEBAPP_NAME       nombre de la Web App (output `appHostName` del Bicep,
-#                           sin el sufijo .azurewebsites.net). P. ej.
-#                           app-mispreguntas-<uniqueSuffix>.
-#
-# ---------------------------------------------------------------------------
-# Setup ÚNICO en Azure (se hace en Fase 8B; aquí sólo se documenta). Con `az`
-# autenticado y la suscripción seleccionada:
-#
-#   # 1) App Registration + service principal
-#   APP_ID=$(az ad app create --display-name "github-mispreguntas-deploy" \
-#     --query appId -o tsv)
-#   az ad sp create --id "$APP_ID"
-#
-#   # 2) Federated credential para este repo/rama (OIDC, sin secreto)
-#   az ad app federated-credential create --id "$APP_ID" --parameters '{
-#     "name": "github-nextjs-azure-rewrite",
-#     "issuer": "https://token.actions.githubusercontent.com",
-#     "subject": "repo:<OWNER>/<REPO>:ref:refs/heads/feature/nextjs-azure-rewrite",
-#     "audiences": ["api://AzureADTokenExchange"]
-#   }'
-#   # Para deploys desde un Environment de GitHub, el subject sería
-#   #   "repo:<OWNER>/<REPO>:environment:<NOMBRE_ENV>"
-#
-#   # 3) Permiso para desplegar a la Web App (alcance acotado al RG)
-#   SP_OBJ=$(az ad sp show --id "$APP_ID" --query id -o tsv)
-#   az role assignment create --assignee-object-id "$SP_OBJ" \
-#     --assignee-principal-type ServicePrincipal \
-#     --role "Website Contributor" \
-#     --scope "/subscriptions/<SUB_ID>/resourceGroups/rg-mispreguntas-prod"
-#
-# Luego registrar en GitHub: AZURE_CLIENT_ID=$APP_ID, AZURE_TENANT_ID=$(az account
-# show --query tenantId -o tsv), AZURE_SUBSCRIPTION_ID=<SUB_ID> y la variable
-# AZURE_WEBAPP_NAME.
+# Notas de build (aprendidas en el despliegue inicial):
+#   - next.config usa output:'standalone'; hay que copiar .next/static, public y
+#     el binario nativo de sharp (node_modules/@img) dentro de .next/standalone.
+#   - El runner ubuntu-latest es linux-x64, así que sharp trae el binario correcto
+#     de forma nativa (sin emulación).
+#   - SCM_DO_BUILD_DURING_DEPLOYMENT=false en la Web App (no build de Oryx) y el
+#     startup command 'HOSTNAME=0.0.0.0 node server.js' ya están configurados.
 # ===========================================================================
 name: Deploy a Azure App Service
 
@@ -56,24 +27,20 @@ on:
       - '.github/workflows/deploy.yml'
   workflow_dispatch:
 
-# OIDC: 'id-token: write' permite a azure/login pedir el token federado.
 permissions:
-  id-token: write
   contents: read
 
-# Evita despliegues solapados sobre la misma Web App.
 concurrency:
   group: deploy-azure-${{ github.ref }}
   cancel-in-progress: false
 
 env:
   NODE_VERSION: '22'
-  PNPM_VERSION: '10'
+  AZURE_WEBAPP_NAME: app-mispreguntas-ecupwarmwaeb6
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment: production
     defaults:
       run:
         working-directory: web
@@ -81,10 +48,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Lee la versión de pnpm desde el campo packageManager de package.json.
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -96,33 +62,32 @@ jobs:
       - name: Install deps
         run: pnpm install --frozen-lockfile
 
-      - name: Build
+      - name: Build (standalone)
         run: pnpm build
         env:
           # Placeholders SÓLO para el build: algunos módulos leen process.env al
-          # importarse (cliente postgres, better-auth). En runtime, App Service
-          # inyecta los valores reales vía Key Vault references. Las páginas que
-          # consultan la BD deben ser dinámicas (no se prerenderan en build).
+          # importarse (cliente postgres, better-auth). En runtime App Service
+          # inyecta los valores reales vía Key Vault references.
           DATABASE_URL: postgres://build:build@localhost:5432/build
           BETTER_AUTH_SECRET: build-time-placeholder-not-a-real-secret-000000000000
           BETTER_AUTH_URL: http://localhost:3000
+          NEXT_TELEMETRY_DISABLED: '1'
           NODE_ENV: production
 
-      - name: Azure login (OIDC)
-        uses: azure/login@v2
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Ensamblar bundle standalone
+        run: |
+          set -e
+          cp -r .next/static .next/standalone/.next/static
+          if [ -d public ]; then cp -r public .next/standalone/public; fi
+          # sharp: incluir el binario nativo (@img) que el tracer de Next no copia
+          rm -rf .next/standalone/node_modules/@img
+          cp -r node_modules/@img .next/standalone/node_modules/@img
+          test -f .next/standalone/server.js
+          test -d .next/standalone/node_modules/@img
 
-      - name: Deploy a Azure Web App
+      - name: Deploy a Azure Web App (publish profile)
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
-          # Se despliega la carpeta web/ ya construida. App Service arranca con
-          # `npm run start` (next start) según el Bicep (infra/appservice.bicep).
-          # Si se prefiere build en el servidor, poner
-          # SCM_DO_BUILD_DURING_DEPLOYMENT=true en la Web App; alternativa de
-          # empaquetado más liviano: output 'standalone' de Next 16 + startup
-          # 'node server.js' (ver infra/deploy.sh).
-          package: web
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: web/.next/standalone
