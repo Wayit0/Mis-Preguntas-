@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { crearPregunta, actualizarPregunta } from '@/lib/actions/preguntas'
+import type { ResultadoPregunta } from '@/lib/actions/pregunta-fields'
 import {
   TIPOS_PREGUNTA,
   ETIQUETA_TIPO,
@@ -88,9 +89,22 @@ function nivelInicial(nivel: string | null | undefined): {
 export function FormularioPregunta({
   pregunta,
   asignaturaInicial,
+  accionActualizar,
+  hrefVolver,
 }: {
   pregunta?: Pregunta
   asignaturaInicial?: string
+  /**
+   * Action de edición a usar (default: actualizarPregunta, con guard de
+   * propiedad). El banco del colegio la sustituye por editarPreguntaColegio
+   * (guard "mismo colegio + school_admin"). Sólo aplica en modo edición.
+   */
+  accionActualizar?: (
+    id: number,
+    formData: FormData,
+  ) => Promise<ResultadoPregunta>
+  /** Ruta a la que volver al guardar/cancelar (default: /preguntas?asignatura=). */
+  hrefVolver?: string
 }) {
   const router = useRouter()
   const esEdicion = Boolean(pregunta)
@@ -139,10 +153,14 @@ export function FormularioPregunta({
     setError(null)
     setPendiente(true)
 
+    const destino =
+      hrefVolver ?? `/preguntas?asignatura=${encodeURIComponent(asignatura)}`
+    const editar = accionActualizar ?? actualizarPregunta
+
     const formData = new FormData(e.currentTarget)
     try {
       const resultado = pregunta
-        ? await actualizarPregunta(pregunta.id, formData)
+        ? await editar(pregunta.id, formData)
         : await crearPregunta(formData)
 
       if (resultado && 'error' in resultado) {
@@ -152,7 +170,7 @@ export function FormularioPregunta({
       }
 
       // Éxito: la lista ya fue revalidada en el servidor; navegamos a ella.
-      router.push(`/preguntas?asignatura=${encodeURIComponent(asignatura)}`)
+      router.push(destino)
       router.refresh()
     } catch {
       setError('Ocurrió un error al guardar la pregunta. Inténtalo de nuevo.')
@@ -451,7 +469,8 @@ export function FormularioPregunta({
             className="w-full sm:w-auto"
             onClick={() =>
               router.push(
-                `/preguntas?asignatura=${encodeURIComponent(asignatura)}`,
+                hrefVolver ??
+                  `/preguntas?asignatura=${encodeURIComponent(asignatura)}`,
               )
             }
           >

@@ -38,13 +38,27 @@ const GRUPOS: NavGrupo[] = [
   },
 ]
 
+// Grupo de administración: SOLO se muestra a school_admin / global_admin. La
+// visibilidad es cosmética; el acceso real a /colegio lo protege su propio guard.
+const GRUPO_ADMIN: NavGrupo = {
+  titulo: 'Administración',
+  items: [{ href: '/colegio', etiqueta: 'Mi Colegio', emoji: '🏫' }],
+}
+
+function gruposPara(puedeAdminColegio: boolean): NavGrupo[] {
+  return puedeAdminColegio ? [...GRUPOS, GRUPO_ADMIN] : GRUPOS
+}
+
 // Marca activo el ítem cuyo href coincide con la ruta. /preguntas resalta también
 // sus sub-rutas de detalle (p. ej. /preguntas/123/editar) pero NO /preguntas/nueva,
-// que es un ítem propio.
+// que es un ítem propio. /colegio resalta también sus sub-rutas.
 function esActivo(pathname: string, href: string): boolean {
   if (pathname === href) return true
   if (href === '/preguntas') {
     return pathname.startsWith('/preguntas/') && pathname !== '/preguntas/nueva'
+  }
+  if (href === '/colegio') {
+    return pathname.startsWith('/colegio/')
   }
   return false
 }
@@ -52,10 +66,12 @@ function esActivo(pathname: string, href: string): boolean {
 function SidebarNav({
   pathname,
   asignatura,
+  grupos,
   onNavegar,
 }: {
   pathname: string
   asignatura: string | null
+  grupos: NavGrupo[]
   onNavegar?: () => void
 }) {
   // Cada link preserva el contexto de asignatura actual (?asignatura=).
@@ -67,7 +83,7 @@ function SidebarNav({
 
   return (
     <nav aria-label="Secciones" className="flex flex-col gap-5 px-2 py-4">
-      {GRUPOS.map((grupo) => (
+      {grupos.map((grupo) => (
         <div key={grupo.titulo} className="flex flex-col gap-1">
           <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
             {grupo.titulo}
@@ -100,18 +116,24 @@ function SidebarNav({
   )
 }
 
-export function Sidebar() {
+export function Sidebar({
+  puedeAdminColegio = false,
+}: {
+  /** Muestra el grupo "Administración" (Mi Colegio) a school_admin/global_admin. */
+  puedeAdminColegio?: boolean
+}) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { abierto, cerrar } = useMobileNav()
 
   const asignatura = searchParams.get('asignatura')
+  const grupos = gruposPara(puedeAdminColegio)
 
   return (
     <>
       {/* Sidebar fijo en escritorio */}
       <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
-        <SidebarNav pathname={pathname} asignatura={asignatura} />
+        <SidebarNav pathname={pathname} asignatura={asignatura} grupos={grupos} />
       </aside>
 
       {/* Menú colapsable en móvil (se abre con el botón ☰ del topbar) */}
@@ -140,6 +162,7 @@ export function Sidebar() {
             <SidebarNav
               pathname={pathname}
               asignatura={asignatura}
+              grupos={grupos}
               onNavegar={cerrar}
             />
           </aside>

@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
+import { getActor } from '@/lib/authz'
 import { getDashboardStats } from '@/lib/queries/dashboard'
 import { buttonVariants } from '@/components/ui/button'
 import {
@@ -33,6 +34,13 @@ export default async function DashboardPage({
   const userId = Number(session.user.id)
 
   const stats = await getDashboardStats(userId, asignatura)
+
+  // Profesores sin colegio: ofrecer el punto de entrada para unirse.
+  const actor = await getActor()
+  const sugerirColegio =
+    actor !== null &&
+    actor.colegioId === null &&
+    actor.role !== 'global_admin'
 
   const tarjetas = [
     {
@@ -77,6 +85,26 @@ export default async function DashboardPage({
             : 'Resumen de todas tus asignaturas.'}
         </p>
       </div>
+
+      {sugerirColegio ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>🏫 ¿Tu colegio usa Mis Preguntas?</CardTitle>
+            <CardDescription>
+              Únete con el código de tu colegio o acepta una invitación para
+              compartir el banco de preguntas con tus colegas.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link
+              href="/cuenta"
+              className={buttonVariants({ size: 'sm', className: 'w-fit' })}
+            >
+              Unirse a un colegio
+            </Link>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {tarjetas.map((t) => (
