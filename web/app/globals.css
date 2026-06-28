@@ -148,8 +148,39 @@
 .animar-subir {
   animation: subir 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
+
+/* Cambio de formulario login ⇄ registro (entra desde el lado del toggle). */
+@keyframes entrar-der {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes entrar-izq {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.animar-form-der {
+  animation: entrar-der 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animar-form-izq {
+  animation: entrar-izq 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animar-subir {
+  .animar-subir,
+  .animar-form-der,
+  .animar-form-izq {
     animation: none;
   }
 }
