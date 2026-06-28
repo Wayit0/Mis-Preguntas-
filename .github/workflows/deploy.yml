@@ -62,8 +62,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: web/pnpm-lock.yaml
 
+      # node-linker=hoisted: node_modules plano para que exista node_modules/@img
+      # (el binario nativo de sharp) y el paso de ensamblado pueda copiarlo.
       - name: Install deps
-        run: pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile --config.node-linker=hoisted
 
       - name: Build (standalone)
         run: pnpm build
