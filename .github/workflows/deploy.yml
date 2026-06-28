@@ -111,12 +111,22 @@ jobs:
           cd .next/standalone
           node -e "const sharp=require('sharp'); sharp({create:{width:8,height:8,channels:3,background:'#fff'}}).png().toBuffer().then(b=>{console.log('sharp OK',b.length,'bytes');process.exit(0)}).catch(e=>{console.error('sharp FAIL\n',e&&e.stack||e);process.exit(1)})"
 
+      # Zip propio con `-y`: PRESERVA los symlinks de .next/node_modules
+      # (sharp-<hash>, @react-pdf/renderer-<hash>) que crea serverExternalPackages.
+      # Es lo que el server usa para resolver esos paquetes en runtime.
+      - name: Empaquetar bundle (zip con symlinks)
+        run: |
+          set -e
+          cd .next/standalone
+          zip -ryq ../standalone.zip .
+          unzip -l ../standalone.zip '.next/node_modules/*' | head
+
       - name: Deploy a Azure Web App (publish profile)
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: web/.next/standalone
+          package: web/.next/standalone.zip
           type: zip
           # clean=true vacía wwwroot antes de desplegar. Sin esto, el rsync de
           # Kudu no puede sobreescribir los symlinks ya existentes en
