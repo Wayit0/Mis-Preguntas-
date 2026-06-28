@@ -38,15 +38,23 @@ const GRUPOS: NavGrupo[] = [
   },
 ]
 
-// Grupo de administración: SOLO se muestra a school_admin / global_admin. La
-// visibilidad es cosmética; el acceso real a /colegio lo protege su propio guard.
-const GRUPO_ADMIN: NavGrupo = {
-  titulo: 'Administración',
-  items: [{ href: '/colegio', etiqueta: 'Mi Colegio', emoji: '🏫' }],
-}
-
-function gruposPara(puedeAdminColegio: boolean): NavGrupo[] {
-  return puedeAdminColegio ? [...GRUPOS, GRUPO_ADMIN] : GRUPOS
+// Grupo de administración. La visibilidad es cosmética; el acceso real a cada
+// ruta lo protege su propio guard de servidor:
+//  - "Administración" (/admin): SOLO admin global.
+//  - "Mi Colegio" (/colegio): school_admin o global_admin.
+function gruposPara(
+  puedeAdminColegio: boolean,
+  esGlobalAdmin: boolean,
+): NavGrupo[] {
+  const items: NavItem[] = []
+  if (esGlobalAdmin) {
+    items.push({ href: '/admin', etiqueta: 'Administración', emoji: '🛡️' })
+  }
+  if (puedeAdminColegio) {
+    items.push({ href: '/colegio', etiqueta: 'Mi Colegio', emoji: '🏫' })
+  }
+  if (items.length === 0) return GRUPOS
+  return [...GRUPOS, { titulo: 'Administración', items }]
 }
 
 // Marca activo el ítem cuyo href coincide con la ruta. /preguntas resalta también
@@ -59,6 +67,9 @@ function esActivo(pathname: string, href: string): boolean {
   }
   if (href === '/colegio') {
     return pathname.startsWith('/colegio/')
+  }
+  if (href === '/admin') {
+    return pathname.startsWith('/admin/')
   }
   return false
 }
@@ -118,16 +129,19 @@ function SidebarNav({
 
 export function Sidebar({
   puedeAdminColegio = false,
+  esGlobalAdmin = false,
 }: {
-  /** Muestra el grupo "Administración" (Mi Colegio) a school_admin/global_admin. */
+  /** Muestra "Mi Colegio" (/colegio) a school_admin/global_admin. */
   puedeAdminColegio?: boolean
+  /** Muestra "Administración" (/admin) SOLO al admin global. */
+  esGlobalAdmin?: boolean
 }) {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { abierto, cerrar } = useMobileNav()
 
   const asignatura = searchParams.get('asignatura')
-  const grupos = gruposPara(puedeAdminColegio)
+  const grupos = gruposPara(puedeAdminColegio, esGlobalAdmin)
 
   return (
     <>

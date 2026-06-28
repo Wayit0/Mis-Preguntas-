@@ -143,6 +143,13 @@ export const auth = betterAuth({
         .where(eq(accounts.id, account.id))
     }),
   },
+  // Rate limiting: por defecto better-auth lo activa en producción y aplica una
+  // regla estricta a /sign-in y /sign-up (máx. 3 por ventana de 10s e IP). Eso
+  // hace inviable un E2E que registra varias cuentas seguidas detrás de la misma
+  // IP (localhost). Sólo en ese entorno (DISABLE_RATE_LIMIT=1) lo desactivamos;
+  // en producción queda intacto (undefined => defaults de better-auth).
+  rateLimit:
+    process.env.DISABLE_RATE_LIMIT === '1' ? { enabled: false } : undefined,
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
 })

@@ -17,13 +17,16 @@ export default async function AppLayout({
   // a quien administra un colegio; el guard real vive igualmente en /colegio.
   const actor = await requireActor()
   const user = { name: actor.nombre, email: actor.email }
-  const puedeAdminColegio =
-    actor.role === 'school_admin' || actor.role === 'global_admin'
+  const esGlobalAdmin = actor.role === 'global_admin'
+  const puedeAdminColegio = actor.role === 'school_admin' || esGlobalAdmin
 
   return (
     <MobileNavProvider>
       <div className="flex min-h-svh w-full">
-        <Sidebar puedeAdminColegio={puedeAdminColegio} />
+        <Sidebar
+          puedeAdminColegio={puedeAdminColegio}
+          esGlobalAdmin={esGlobalAdmin}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar user={user} />
           <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">

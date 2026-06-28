@@ -38,5 +38,9 @@ export default defineConfig({
     timeout: 240_000,
     stdout: 'pipe',
     stderr: 'pipe',
+    // En E2E se registran varias cuentas seguidas desde la misma IP (localhost);
+    // desactivamos el rate limiting de better-auth sólo para el server de prueba
+    // (lib/auth.ts respeta DISABLE_RATE_LIMIT). Hereda el resto del entorno.
+    env: { ...process.env, DISABLE_RATE_LIMIT: '1' },
   },
 })
