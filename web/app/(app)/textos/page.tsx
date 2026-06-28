@@ -65,7 +65,7 @@ export default async function TextosPage({
       {/* Tabs (navegación por URL, server-rendered). */}
       <div
         role="tablist"
-        className="flex items-center gap-1 border-b border-border"
+        className="flex items-center gap-1 overflow-x-auto border-b border-border"
       >
         {tabs.map((t) => {
           const activo = tabActual === t.id
@@ -76,7 +76,7 @@ export default async function TextosPage({
               aria-selected={activo}
               href={hrefTab(t.id, asignatura)}
               className={cn(
-                '-mb-px border-b-2 px-3.5 py-2 text-sm font-medium transition-colors',
+                '-mb-px shrink-0 whitespace-nowrap border-b-2 px-3.5 py-2 text-sm font-medium transition-colors',
                 activo
                   ? 'border-primary text-primary'
                   : 'border-transparent text-muted-foreground hover:text-foreground',

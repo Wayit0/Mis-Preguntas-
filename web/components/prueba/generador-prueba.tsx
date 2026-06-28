@@ -237,7 +237,7 @@ export function GeneradorPrueba({
                   name="logo"
                   type="file"
                   accept="image/png,image/jpeg"
-                  className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
+                  className="max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
                   onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
                 />
               </div>
@@ -290,7 +290,9 @@ export function GeneradorPrueba({
                       key={i}
                       className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/40 px-3 py-2"
                     >
-                      <LatexText text={`$${expr}$`} className="text-sm" />
+                      <div className="min-w-0 flex-1 overflow-x-auto">
+                        <LatexText text={`$${expr}$`} className="text-sm" />
+                      </div>
                       <button
                         type="button"
                         onClick={() => quitarFormula(i)}
@@ -352,7 +354,7 @@ export function GeneradorPrueba({
                   Preguntas ({preguntasFiltradas.length})
                 </p>
                 {materias.length > 0 ? (
-                  <div className="w-48">
+                  <div className="w-full sm:w-48">
                     <Select
                       value={filtroMateria}
                       onValueChange={(v) => setFiltroMateria(v as string)}
@@ -422,8 +424,13 @@ export function GeneradorPrueba({
             </p>
           ) : null}
 
-          <div className="flex items-center gap-3">
-            <Button type="button" onClick={generar} disabled={pendiente}>
+          <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <Button
+              type="button"
+              onClick={generar}
+              disabled={pendiente}
+              className="w-full sm:w-auto"
+            >
               {pendiente ? 'Generando…' : '⬇️ Generar PDF'}
             </Button>
             <span className="text-sm text-muted-foreground">

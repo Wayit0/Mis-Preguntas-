@@ -64,7 +64,7 @@ function CampoImagen({
         name={name}
         type="file"
         accept="image/png,image/jpeg"
-        className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
+        className="max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
         onChange={(e) => {
           const f = e.target.files?.[0]
           setPreview(f ? URL.createObjectURL(f) : null)
@@ -432,8 +432,12 @@ export function FormularioPregunta({
           </p>
         ) : null}
 
-        <div className="flex items-center gap-2">
-          <Button type="submit" disabled={pendiente}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button
+            type="submit"
+            disabled={pendiente}
+            className="w-full sm:w-auto"
+          >
             {pendiente
               ? 'Guardando…'
               : esEdicion
@@ -444,6 +448,7 @@ export function FormularioPregunta({
             type="button"
             variant="outline"
             disabled={pendiente}
+            className="w-full sm:w-auto"
             onClick={() =>
               router.push(
                 `/preguntas?asignatura=${encodeURIComponent(asignatura)}`,

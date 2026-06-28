@@ -88,7 +88,7 @@ export function TarjetaPregunta({
           <img
             src={imageUrl(p.imagenPregunta)}
             alt="Imagen de la pregunta"
-            className="max-h-48 w-fit rounded-md border border-border object-contain"
+            className="max-h-48 w-fit max-w-full rounded-md border border-border object-contain"
           />
         ) : null}
 
@@ -113,7 +113,7 @@ export function TarjetaPregunta({
                     <img
                       src={imageUrl(imagen)}
                       alt={`Imagen de la alternativa ${letra}`}
-                      className="max-h-16 w-fit rounded border border-border object-contain"
+                      className="max-h-16 w-fit max-w-full rounded border border-border object-contain"
                     />
                   ) : null}
                   {correcta ? <span aria-label="correcta">✓</span> : null}
@@ -127,7 +127,11 @@ export function TarjetaPregunta({
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
             <Link
               href={hrefEditar}
-              className={buttonVariants({ variant: 'outline', size: 'sm' })}
+              className={buttonVariants({
+                variant: 'outline',
+                size: 'sm',
+                className: 'h-9 px-3 sm:h-7 sm:px-2.5',
+              })}
             >
               ✏️ Editar
             </Link>
@@ -137,7 +141,11 @@ export function TarjetaPregunta({
             >
               <button
                 type="submit"
-                className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                className={buttonVariants({
+                  variant: 'ghost',
+                  size: 'sm',
+                  className: 'h-9 px-3 sm:h-7 sm:px-2.5',
+                })}
               >
                 {compartida ? '🔒 Hacer privada' : '🌐 Compartir'}
               </button>
@@ -146,7 +154,11 @@ export function TarjetaPregunta({
             <form action={eliminarPregunta.bind(null, p.id)}>
               <button
                 type="submit"
-                className={buttonVariants({ variant: 'destructive', size: 'sm' })}
+                className={buttonVariants({
+                  variant: 'destructive',
+                  size: 'sm',
+                  className: 'h-9 px-3 sm:h-7 sm:px-2.5',
+                })}
               >
                 🗑 Eliminar
               </button>

@@ -147,14 +147,19 @@ export function FormularioTexto({
         </p>
       ) : null}
 
-      <div className="flex items-center gap-2">
-        <Button type="submit" disabled={pendiente}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <Button
+          type="submit"
+          disabled={pendiente}
+          className="w-full sm:w-auto"
+        >
           {pendiente ? 'Guardando…' : 'Guardar texto'}
         </Button>
         <Button
           type="button"
           variant="outline"
           disabled={pendiente}
+          className="w-full sm:w-auto"
           onClick={() =>
             router.push(
               `/textos?asignatura=${encodeURIComponent(asignatura)}&tab=ver`,

@@ -55,7 +55,7 @@ export default async function PreguntasPage({
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-col gap-1">
           <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
             Mis Preguntas
@@ -75,7 +75,7 @@ export default async function PreguntasPage({
         </div>
         <Link
           href={conAsignatura('/preguntas/nueva', asignatura)}
-          className={buttonVariants()}
+          className={buttonVariants({ className: 'w-full sm:w-auto' })}
         >
           ➕ Nueva pregunta
         </Link>

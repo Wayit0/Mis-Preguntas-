@@ -54,7 +54,11 @@ export function TarjetaTexto({
           <form action={eliminarTexto.bind(null, texto.id)}>
             <button
               type="submit"
-              className={buttonVariants({ variant: 'destructive', size: 'sm' })}
+              className={buttonVariants({
+                variant: 'destructive',
+                size: 'sm',
+                className: 'h-9 px-3 sm:h-7 sm:px-2.5',
+              })}
             >
               🗑 Eliminar texto
             </button>

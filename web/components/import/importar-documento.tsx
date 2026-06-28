@@ -229,7 +229,7 @@ export function ImportarDocumento({
             return (
               <Card key={p.id} className={p.incluir ? '' : 'opacity-60'}>
                 <CardContent className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                       <input
                         type="checkbox"
@@ -242,7 +242,7 @@ export function ImportarDocumento({
                       />
                       Pregunta {i + 1}
                     </label>
-                    <div className="w-48">
+                    <div className="w-full sm:w-48">
                       <Select
                         value={p.tipo}
                         onValueChange={(v) =>
@@ -383,11 +383,12 @@ export function ImportarDocumento({
           </p>
         ) : null}
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
           <Button
             type="button"
             onClick={onGuardar}
             disabled={fase === 'guardando' || seleccionadas === 0}
+            className="w-full sm:w-auto"
           >
             {fase === 'guardando'
               ? 'Guardando…'
@@ -400,6 +401,7 @@ export function ImportarDocumento({
             variant="outline"
             onClick={reiniciar}
             disabled={fase === 'guardando'}
+            className="w-full sm:w-auto"
           >
             Cancelar
           </Button>
@@ -442,7 +444,7 @@ export function ImportarDocumento({
                 name="archivo"
                 type="file"
                 accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp,image/gif"
-                className="text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
+                className="max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
               />
               <p className="text-xs text-muted-foreground">
                 Formatos aceptados: PDF, Word (DOCX) e imágenes (PNG, JPG).
@@ -465,7 +467,11 @@ export function ImportarDocumento({
             ) : null}
 
             <div>
-              <Button type="submit" disabled={fase === 'analizando'}>
+              <Button
+                type="submit"
+                disabled={fase === 'analizando'}
+                className="w-full sm:w-auto"
+              >
                 {fase === 'analizando'
                   ? 'Analizando documento…'
                   : 'Analizar documento'}

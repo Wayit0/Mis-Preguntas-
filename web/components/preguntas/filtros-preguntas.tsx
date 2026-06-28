@@ -56,7 +56,7 @@ export function FiltrosPreguntas({
       >
         <SelectTrigger
           aria-label="Filtrar por materia"
-          className="h-8 rounded-full"
+          className="h-9 rounded-full sm:h-8"
         >
           <SelectValue placeholder="Materia: Todas" />
         </SelectTrigger>
@@ -79,7 +79,7 @@ export function FiltrosPreguntas({
       >
         <SelectTrigger
           aria-label="Filtrar por nivel"
-          className="h-8 rounded-full"
+          className="h-9 rounded-full sm:h-8"
         >
           <SelectValue placeholder="Nivel: Todos" />
         </SelectTrigger>
@@ -105,7 +105,7 @@ export function FiltrosPreguntas({
               }
               aria-pressed={activo}
               className={cn(
-                'rounded-full border px-3.5 py-1 text-xs font-medium transition-colors',
+                'rounded-full border px-3.5 py-2 text-xs font-medium transition-colors sm:py-1',
                 activo
                   ? 'border-accent bg-secondary text-primary'
                   : 'border-border bg-card text-muted-foreground hover:bg-muted',
