@@ -150,18 +150,27 @@ export async function POST(request: Request) {
     })
   }
 
-  const pdf = await generarPruebaPdf({
-    titulo,
-    asignatura,
-    colegio,
-    profesor,
-    logo,
-    instrucciones,
-    formulas,
-    textos: textosPdf,
-    // Orden: primero las de textos (agrupadas), luego las sueltas.
-    preguntas: [...preguntasDeTextos, ...preguntasSueltas],
-  })
+  let pdf: Buffer
+  try {
+    pdf = await generarPruebaPdf({
+      titulo,
+      asignatura,
+      colegio,
+      profesor,
+      logo,
+      instrucciones,
+      formulas,
+      textos: textosPdf,
+      // Orden: primero las de textos (agrupadas), luego las sueltas.
+      preguntas: [...preguntasDeTextos, ...preguntasSueltas],
+    })
+  } catch (err) {
+    console.error('Error al generar la prueba PDF:', err)
+    return new Response(
+      'No se pudo generar la prueba. Inténtalo de nuevo en unos minutos.',
+      { status: 500 },
+    )
+  }
 
   return new Response(new Uint8Array(pdf), {
     status: 200,

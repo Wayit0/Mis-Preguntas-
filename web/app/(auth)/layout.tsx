@@ -22,13 +22,13 @@ export default function AuthLayout({
 
         <div className="relative z-10 max-w-md">
           <h2 className="font-heading text-3xl font-semibold leading-tight tracking-tight text-white">
-            Tu banco de preguntas, listo para imprimir.
+            Menos tiempo armando pruebas, más tiempo enseñando.
           </h2>
           <ul className="mt-6 space-y-3 text-sm text-sidebar-foreground/85">
             {[
-              'Guarda preguntas con imágenes y fórmulas',
-              'Arma pruebas en PDF en minutos',
-              'Compártelas con tu colegio',
+              'Reúne tus preguntas con imágenes y fórmulas',
+              'Genera pruebas en PDF listas para imprimir',
+              'Comparte el banco con tu colegio',
             ].map((t) => (
               <li key={t} className="flex items-center gap-3">
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-xs text-primary-foreground">
