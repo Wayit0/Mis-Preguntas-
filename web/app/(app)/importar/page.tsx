@@ -1,11 +1,15 @@
-import { SectionPlaceholder } from '@/components/shell/section-placeholder'
+import { redirect } from 'next/navigation'
+import { getSession } from '@/lib/get-session'
+import { ImportarDocumento } from '@/components/import/importar-documento'
 
-// TODO Fase 7: reemplazar stub (importación de documentos con detección por IA).
 export default async function ImportarPage({
   searchParams,
 }: {
   searchParams: Promise<{ asignatura?: string }>
 }) {
   const { asignatura } = await searchParams
-  return <SectionPlaceholder titulo="Importar Documento" asignatura={asignatura} />
+  const session = await getSession()
+  if (!session) redirect('/login')
+
+  return <ImportarDocumento asignaturaInicial={asignatura} />
 }
