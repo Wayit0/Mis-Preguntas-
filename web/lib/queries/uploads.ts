@@ -1,62 +1,58 @@
-import { and, eq, inArray, or } from 'drizzle-orm'
+import { and, eq, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { colaboraciones, preguntas } from '@/lib/db/schema'
+import { preguntas } from '@/lib/db/schema'
+import {
+  colegioIdDeUsuario,
+  preguntaCompartidaVisible,
+} from '@/lib/queries/visibilidad'
 
 /**
  * Autoriza el acceso a una imagen del Blob por su clave.
  *
  * Toda imagen servida está referenciada por una `pregunta` (se sube dentro de
  * `crearPregunta`, junto con la fila; los `textos` no tienen imágenes y el logo
- * del PDF no se almacena). El usuario puede verla si:
- *   (a) es el dueño de una pregunta que la referencia (`user_id = userId`), o
- *   (b) un colaborador le compartió una pregunta que la referencia
- *       (`compartida = 1` y existe `colaboraciones.from_user_id = autor AND
- *        to_user_id = userId`) — misma semántica que `cargarBancoCompartido`.
+ * del PDF no se almacena). El usuario puede verla si existe una pregunta que
+ * referencia la clave y además:
+ *   (a) es el dueño de esa pregunta (`user_id = userId`), o
+ *   (b) esa pregunta le es visible según la visibilidad unificada de la Parte D
+ *       ({@link preguntaCompartidaVisible}): `compartida=1` y (mismo colegio que
+ *       el autor) O (el autor me invitó como colaborador).
  *
- * Si ninguna pregunta referencia la clave, devuelve `false` (la route responde
- * 404, sin revelar la existencia del blob a usuarios no autorizados).
+ * Si ninguna pregunta referencia la clave —o ninguna de las que la referencian
+ * cumple (a) o (b)— devuelve `false` (la route responde 404, sin revelar la
+ * existencia del blob a usuarios no autorizados). Crítico: NO reintroducir el
+ * IDOR — el dueño y la visibilidad son la ÚNICA puerta de acceso.
  */
 export async function puedeVerImagen(
   key: string,
   userId: number,
 ): Promise<boolean> {
+  const colegioId = await colegioIdDeUsuario(userId)
+
+  const referenciaLaClave = or(
+    eq(preguntas.imagenPregunta, key),
+    eq(preguntas.imagenA, key),
+    eq(preguntas.imagenB, key),
+    eq(preguntas.imagenC, key),
+    eq(preguntas.imagenD, key),
+    eq(preguntas.imagenE, key),
+  )
+
   const filas = await db
-    .select({ userId: preguntas.userId, compartida: preguntas.compartida })
+    .select({ id: preguntas.id })
     .from(preguntas)
     .where(
-      or(
-        eq(preguntas.imagenPregunta, key),
-        eq(preguntas.imagenA, key),
-        eq(preguntas.imagenB, key),
-        eq(preguntas.imagenC, key),
-        eq(preguntas.imagenD, key),
-        eq(preguntas.imagenE, key),
-      ),
-    )
-
-  if (filas.length === 0) return false
-
-  // (a) dueño
-  if (filas.some((f) => f.userId === userId)) return true
-
-  // (b) compartida conmigo por un colaborador
-  const autoresCompartidos = [
-    ...new Set(
-      filas.filter((f) => (f.compartida ?? 0) === 1).map((f) => f.userId),
-    ),
-  ]
-  if (autoresCompartidos.length === 0) return false
-
-  const relacion = await db
-    .select({ from: colaboraciones.fromUserId })
-    .from(colaboraciones)
-    .where(
       and(
-        eq(colaboraciones.toUserId, userId),
-        inArray(colaboraciones.fromUserId, autoresCompartidos),
+        referenciaLaClave,
+        or(
+          // (a) dueño de la pregunta que referencia la clave.
+          eq(preguntas.userId, userId),
+          // (b) la pregunta le es visible (auto-colegio o invitación).
+          preguntaCompartidaVisible(userId, colegioId),
+        ),
       ),
     )
     .limit(1)
 
-  return relacion.length > 0
+  return filas.length > 0
 }

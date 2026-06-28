@@ -1,6 +1,10 @@
 import { and, count, eq, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { colaboraciones, preguntas, textos } from '@/lib/db/schema'
+import {
+  colegioIdDeUsuario,
+  preguntaCompartidaVisible,
+} from '@/lib/queries/visibilidad'
 
 export interface DashboardStats {
   /** Preguntas creadas por el usuario (filtradas por asignatura si se indica). */
@@ -8,9 +12,9 @@ export interface DashboardStats {
   /** Textos creados por el usuario (filtrados por asignatura si se indica). */
   misTextos: number
   /**
-   * Preguntas con `compartida=1` cuyos autores son colaboradores que me
-   * invitaron (colaboraciones con `to_user_id = userId`). Misma semántica que
-   * el banco compartido del MVP (`from_user_id = p.user_id AND to_user_id = uid`).
+   * Preguntas compartidas visibles para el usuario según la visibilidad
+   * unificada de la Parte D ({@link preguntaCompartidaVisible}): `compartida=1`
+   * y (mismo colegio que el autor) O (el autor me invitó como colaborador).
    */
   compartidasConmigo: number
   /** Colaboradores que el usuario invitó (colaboraciones con `from_user_id = userId`). */
@@ -41,10 +45,8 @@ export async function getDashboardStats(
     ? and(eq(textos.userId, userId), eq(textos.asignatura, asignatura))
     : eq(textos.userId, userId)
 
-  const compartidasConds: SQL[] = [
-    eq(colaboraciones.toUserId, userId),
-    eq(preguntas.compartida, 1),
-  ]
+  const colegioId = await colegioIdDeUsuario(userId)
+  const compartidasConds: SQL[] = [preguntaCompartidaVisible(userId, colegioId)]
   if (asignatura) {
     compartidasConds.push(eq(preguntas.asignatura, asignatura))
   }
@@ -59,10 +61,6 @@ export async function getDashboardStats(
         db
           .select({ value: count() })
           .from(preguntas)
-          .innerJoin(
-            colaboraciones,
-            eq(colaboraciones.fromUserId, preguntas.userId),
-          )
           .where(and(...compartidasConds)),
       ),
       contar(

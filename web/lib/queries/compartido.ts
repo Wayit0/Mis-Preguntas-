@@ -1,7 +1,11 @@
 import { and, asc, eq, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { colaboraciones, preguntas, usuarios } from '@/lib/db/schema'
+import { preguntas, usuarios } from '@/lib/db/schema'
 import type { Pregunta } from '@/lib/queries/preguntas'
+import {
+  colegioIdDeUsuario,
+  preguntaCompartidaVisible,
+} from '@/lib/queries/visibilidad'
 
 /**
  * Una pregunta del banco compartido junto con el nombre del autor que la
@@ -11,30 +15,28 @@ import type { Pregunta } from '@/lib/queries/preguntas'
 export type PreguntaCompartida = Pregunta & { autor: string }
 
 /**
- * Preguntas compartidas visibles para el usuario: aquellas con `compartida=1`
- * cuyos autores me invitaron como colaborador
- * (`colaboraciones.from_user_id = preguntas.user_id AND to_user_id = userId`).
+ * Preguntas compartidas visibles para el usuario, según la visibilidad
+ * unificada de la Parte D ({@link preguntaCompartidaVisible}): `compartida=1` y
+ * (auto-colegio: mismo colegio que el autor) O (invitación: el autor me invitó
+ * como colaborador). Las cuentas personales solo ven por invitación.
  *
- * Misma semántica que `getDashboardStats.compartidasConmigo`
- * (`web/lib/queries/dashboard.ts`): el `innerJoin` con `colaboraciones` ya
- * excluye las preguntas propias (no existe una colaboración conmigo mismo).
- * Si se pasa `asignatura`, la lista se acota a esa asignatura. Orden por nombre
- * de autor y luego id, igual que `cargar_banco_compartido` del MVP (app.py).
+ * Mantiene el nombre del autor uniendo `preguntas.user_id → usuarios.id`; el
+ * auto-colegio de la condición usa un alias distinto, así que no choca con este
+ * join. Si se pasa `asignatura`, la lista se acota a esa asignatura. Orden por
+ * nombre de autor y luego id, igual que `cargar_banco_compartido` del MVP.
  */
 export async function cargarBancoCompartido(
   userId: number,
   asignatura?: string,
 ): Promise<PreguntaCompartida[]> {
-  const conds: SQL[] = [
-    eq(colaboraciones.toUserId, userId),
-    eq(preguntas.compartida, 1),
-  ]
+  const colegioId = await colegioIdDeUsuario(userId)
+
+  const conds: SQL[] = [preguntaCompartidaVisible(userId, colegioId)]
   if (asignatura) conds.push(eq(preguntas.asignatura, asignatura))
 
   const filas = await db
     .select({ pregunta: preguntas, autor: usuarios.nombre })
     .from(preguntas)
-    .innerJoin(colaboraciones, eq(colaboraciones.fromUserId, preguntas.userId))
     .innerJoin(usuarios, eq(usuarios.id, preguntas.userId))
     .where(and(...conds))
     .orderBy(asc(usuarios.nombre), asc(preguntas.id))
