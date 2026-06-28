@@ -29,6 +29,48 @@ export const usuarios = pgTable('usuarios', {
   emailVerified: boolean('email_verified').default(false).notNull(),
   updatedAt: timestamp('updated_at').defaultNow(),
   image: text('image'),
+  // -------------------------------------------------------------------------
+  // Roles y colegio (Parte C.1) — ADITIVO.
+  // `role`: NOT NULL con default 'teacher' para no romper usuarios existentes
+  //   (la migración rellena las filas previas con el default).
+  //   Valores: 'global_admin' | 'school_admin' | 'teacher'.
+  // `colegioId`: nullable. NULL = cuenta personal o admin global (sin colegio).
+  // -------------------------------------------------------------------------
+  role: text('role').notNull().default('teacher'),
+  colegioId: integer('colegio_id').references(() => colegios.id),
+  // Columnas del plugin admin de better-auth (Parte C.2). Nullables: el plugin
+  // sólo las escribe al banear; un usuario normal las deja en NULL.
+  banned: boolean('banned'),
+  banReason: text('ban_reason'),
+  banExpires: timestamp('ban_expires'),
+})
+
+// ---------------------------------------------------------------------------
+// Colegios e invitaciones (Parte C.1) — tablas nuevas, ADITIVO.
+// ---------------------------------------------------------------------------
+
+export const colegios = pgTable('colegios', {
+  id: serial('id').primaryKey(),
+  nombre: text('nombre').notNull(),
+  // Logo del colegio para el encabezado del PDF. Nullable: si falta, el PDF
+  // usa el logo por defecto de la app.
+  logo: text('logo'),
+  // Código para que los profesores se unan al colegio. Único.
+  joinCode: text('join_code').notNull().unique(),
+  createdAt: timestamp('created_at').defaultNow(),
+})
+
+export const invitacionesColegio = pgTable('invitaciones_colegio', {
+  id: serial('id').primaryKey(),
+  colegioId: integer('colegio_id')
+    .notNull()
+    .references(() => colegios.id),
+  email: text('email').notNull(),
+  // Token único de la invitación (enlace por email).
+  token: text('token').notNull().unique(),
+  // Estado de la invitación: 'pendiente' | 'aceptada'.
+  estado: text('estado').notNull().default('pendiente'),
+  createdAt: timestamp('created_at').defaultNow(),
 })
 
 export const preguntas = pgTable('preguntas', {

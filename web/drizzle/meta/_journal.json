@@ -15,6 +15,13 @@
       "when": 1782574074803,
       "tag": "0001_eager_northstar",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782643964515,
+      "tag": "0002_cool_paladin",
+      "breakpoints": true
     }
   ]
 }

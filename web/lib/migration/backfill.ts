@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, isNull } from 'drizzle-orm'
 import { usuarios, accounts } from '@/lib/db/schema'
 import { LEGACY } from '@/lib/auth-password'
 // Import SÓLO de tipo: `typeof db` se borra en compilación, de modo que este
@@ -115,4 +115,32 @@ export async function backfillAccounts(
   }
 
   return { inserted: filas.length, skipped }
+}
+
+export interface BackfillRolesResult {
+  /** Cuántas filas `usuarios` recibieron role='teacher' en esta corrida. */
+  updated: number
+}
+
+/**
+ * Backfill idempotente del rol por defecto.
+ *
+ * Pone `role = 'teacher'` en todo usuario cuyo `role` sea NULL. Es DEFENSA: la
+ * columna ya nace NOT NULL con default 'teacher' (la migración rellena las filas
+ * previas), así que en condiciones normales no hay filas que actualizar y esta
+ * función no toca nada. NO modifica `colegio_id` (las cuentas existentes siguen
+ * siendo personales hasta que un admin las asigne a un colegio).
+ *
+ * Idempotente: una segunda corrida no encuentra roles NULL y devuelve 0.
+ */
+export async function backfillRoles(
+  database: Database,
+): Promise<BackfillRolesResult> {
+  const actualizados = await database
+    .update(usuarios)
+    .set({ role: 'teacher' })
+    .where(isNull(usuarios.role))
+    .returning({ id: usuarios.id })
+
+  return { updated: actualizados.length }
 }
