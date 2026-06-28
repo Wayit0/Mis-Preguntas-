@@ -84,11 +84,32 @@ jobs:
           set -e
           cp -r .next/static .next/standalone/.next/static
           if [ -d public ]; then cp -r public .next/standalone/public; fi
-          # sharp: incluir el binario nativo (@img) que el tracer de Next no copia
+          # sharp: el tracer de Next no copia el binario nativo (@img). OJO: hay
+          # DOS versiones de sharp en el árbol — la que trae Next (libvips 8.17.3,
+          # hoisteada al @img de nivel superior) y la de la app, sharp@0.35.x
+          # (libvips 8.18.3, anidada en node_modules/sharp/node_modules/@img).
+          # serverExternalPackages deja `require('sharp')` resolviendo a la de la
+          # app, así que su @img anidado DEBE viajar junto a ella o falla en
+          # runtime con: ERR_DLOPEN_FAILED libvips-cpp.so.8.18.3 (el bug de PDF).
           rm -rf .next/standalone/node_modules/@img
           cp -r node_modules/@img .next/standalone/node_modules/@img
+          if [ -d node_modules/sharp/node_modules/@img ]; then
+            mkdir -p .next/standalone/node_modules/sharp/node_modules
+            rm -rf .next/standalone/node_modules/sharp/node_modules/@img
+            cp -r node_modules/sharp/node_modules/@img \
+              .next/standalone/node_modules/sharp/node_modules/@img
+          fi
           test -f .next/standalone/server.js
           test -d .next/standalone/node_modules/@img
+
+      # Gate de runtime: carga sharp tal como lo hará el server (vía el symlink de
+      # serverExternalPackages) y genera un PNG. Si la libvips correcta no está en
+      # el bundle, esto falla AQUÍ en CI en vez de en producción.
+      - name: Smoke test (sharp carga libvips en runtime)
+        run: |
+          set -e
+          cd .next/standalone
+          node -e "const sharp=require('sharp'); sharp({create:{width:8,height:8,channels:3,background:'#fff'}}).png().toBuffer().then(b=>{console.log('sharp OK',b.length,'bytes');process.exit(0)}).catch(e=>{console.error('sharp FAIL\n',e&&e.stack||e);process.exit(1)})"
 
       - name: Deploy a Azure Web App (publish profile)
         uses: azure/webapps-deploy@v3
@@ -96,3 +117,12 @@ jobs:
           app-name: ${{ env.AZURE_WEBAPP_NAME }}
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: web/.next/standalone
+          type: zip
+          # clean=true vacía wwwroot antes de desplegar. Sin esto, el rsync de
+          # Kudu no puede sobreescribir los symlinks ya existentes en
+          # .next/node_modules (sharp/@react-pdf) y aborta con "could not make way
+          # for new symlink" (rsync code 23) -> deploy PARCIAL y código stale
+          # (de ahí los "Failed to find Server Action" y que no se guardaran
+          # textos / no aparecieran preguntas compartidas tras un cambio).
+          clean: true
+          restart: true
