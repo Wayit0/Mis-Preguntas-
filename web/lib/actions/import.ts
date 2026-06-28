@@ -71,7 +71,19 @@ export async function analizarDocumento(
   try {
     const preguntas = await detectarPreguntas(bloques, asignatura)
     return { ok: true, preguntas }
-  } catch {
+  } catch (err) {
+    // Distingue un problema de configuración (clave de Anthropic ausente o
+    // inválida → 401/403) de un fallo transitorio, para dar un mensaje accionable
+    // en vez de pedir "inténtalo de nuevo" sobre algo que nunca va a funcionar.
+    const status = (err as { status?: number } | null)?.status
+    if (status === 401 || status === 403) {
+      return {
+        ok: false,
+        error:
+          'La importación con IA no está configurada: falta o es inválida la ' +
+          'clave de Anthropic. Avísale al administrador del sitio.',
+      }
+    }
     return {
       ok: false,
       error: 'La IA no pudo procesar el documento. Inténtalo de nuevo.',
