@@ -41,7 +41,7 @@ export default function AuthLayout({
         </div>
 
         <p className="relative z-10 font-mono text-xs text-sidebar-foreground/60">
-          Para profesores · es-CL
+          Para profesores
         </p>
       </aside>
 

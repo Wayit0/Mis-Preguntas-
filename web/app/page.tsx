@@ -54,7 +54,7 @@ export default async function Home() {
           <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-5 py-16 sm:py-24 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="animar-subir flex flex-col gap-6">
               <span className="w-fit rounded-full border border-border bg-card px-3 py-1 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
-                Para profesores · es-CL
+                Para profesores
               </span>
               <h1 className="font-heading text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
                 De tus preguntas a una{" "}
@@ -254,7 +254,7 @@ export default async function Home() {
           <span className="font-heading font-semibold text-foreground">
             📚 Mis Preguntas
           </span>
-          <span>Banco de preguntas y pruebas para docentes · es-CL</span>
+          <span>Banco de preguntas y pruebas para docentes</span>
         </div>
       </footer>
     </div>
