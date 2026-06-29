@@ -2,16 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-// Declara el elemento personalizado para TypeScript/JSX
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace JSX {
-    interface IntrinsicElements {
-      'math-field': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>
-    }
-  }
-}
-
 const GRUPOS = [
   {
     titulo: 'Estructura',
@@ -56,69 +46,85 @@ const GRUPOS = [
   {
     titulo: 'Física',
     simbolos: [
-      { label: 'vec', latex: '\\vec{#0}',   title: 'Vector' },
-      { label: 'hat', latex: '\\hat{#0}',   title: 'Unitario' },
-      { label: '°',   latex: '^{\\circ}',   title: 'Grados' },
-      { label: '∞',   latex: '\\infty',     title: 'Infinito' },
+      { label: 'vec', latex: '\\vec{#0}', title: 'Vector' },
+      { label: 'hat', latex: '\\hat{#0}', title: 'Unitario' },
+      { label: '°',   latex: '^{\\circ}', title: 'Grados' },
+      { label: '∞',   latex: '\\infty',   title: 'Infinito' },
     ],
   },
 ]
-
-interface EditorEcuacionProps {
-  value: string
-  onChange: (val: string) => void
-}
 
 type MathFieldEl = HTMLElement & {
   value: string
   insert: (latex: string, opts?: Record<string, unknown>) => void
 }
 
+interface EditorEcuacionProps {
+  value: string
+  onChange: (val: string) => void
+}
+
 export function EditorEcuacion({ value, onChange }: EditorEcuacionProps) {
-  const ref = useRef<MathFieldEl>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const mfRef = useRef<MathFieldEl | null>(null)
+  const onChangeRef = useRef(onChange)
   const [listo, setListo] = useState(false)
 
-  // Carga mathlive desde CDN y espera a que el custom element quede definido
+  // Mantiene onChangeRef actualizado sin recriar el elemento
+  useEffect(() => { onChangeRef.current = onChange })
+
   useEffect(() => {
+    // Inyecta mathlive como módulo ES desde CDN (sin instalar paquete)
     const script = document.createElement('script')
     script.type = 'module'
     script.textContent = `import 'https://esm.sh/mathlive'`
     document.head.appendChild(script)
 
+    // Espera a que el custom element quede registrado
     customElements.whenDefined('math-field').then(() => {
+      const container = containerRef.current
+      if (!container || mfRef.current) return
+
+      // Crea el elemento imperativo (evita error TypeScript de JSX)
+      const mf = document.createElement('math-field') as MathFieldEl
+      Object.assign(mf.style, {
+        display: 'block',
+        width: '100%',
+        minHeight: '2.75rem',
+        padding: '0.375rem 0.75rem',
+        border: '1px solid hsl(var(--border))',
+        borderRadius: 'var(--radius)',
+        background: 'hsl(var(--background))',
+        fontSize: '1.1rem',
+        lineHeight: '1.5',
+      })
+      mf.setAttribute('virtual-keyboard-mode', 'onfocus')
+      mf.addEventListener('input', () => onChangeRef.current(mf.value ?? ''))
+
+      container.appendChild(mf)
+      mfRef.current = mf
       setListo(true)
-      const el = ref.current
-      if (!el) return
-      const onInput = () => onChange(el.value ?? '')
-      el.addEventListener('input', onInput)
     })
 
-    return () => script.remove()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      script.remove()
+      mfRef.current?.remove()
+      mfRef.current = null
+    }
   }, [])
-
-  // Reconecta el listener si onChange cambia después de que el editor ya cargó
-  useEffect(() => {
-    if (!listo) return
-    const el = ref.current
-    if (!el) return
-    const onInput = () => onChange(el.value ?? '')
-    el.addEventListener('input', onInput)
-    return () => el.removeEventListener('input', onInput)
-  }, [onChange, listo])
 
   // Limpia el campo cuando el padre resetea value a ''
   useEffect(() => {
-    const el = ref.current
-    if (el && value === '' && el.value !== '') el.value = ''
+    const mf = mfRef.current
+    if (mf && value === '' && mf.value !== '') mf.value = ''
   }, [value])
 
   function insertar(latex: string) {
-    const el = ref.current
-    if (!el?.insert) return
-    el.insert(latex, { selectionMode: 'placeholder' })
-    onChange(el.value ?? '')
-    el.focus()
+    const mf = mfRef.current
+    if (!mf?.insert) return
+    mf.insert(latex, { selectionMode: 'placeholder' })
+    onChangeRef.current(mf.value ?? '')
+    mf.focus()
   }
 
   return (
@@ -147,28 +153,15 @@ export function EditorEcuacion({ value, onChange }: EditorEcuacionProps) {
         ))}
       </div>
 
-      {/* Editor visual WYSIWYG — visible siempre; se activa cuando mathlive carga */}
+      {/* Placeholder mientras mathlive carga */}
       {!listo && (
         <div className="flex h-11 items-center rounded-md border border-dashed border-border bg-background px-3 text-sm text-muted-foreground">
           Cargando editor visual…
         </div>
       )}
-      <math-field
-        ref={ref as React.RefObject<HTMLElement>}
-        // @ts-expect-error – atributo del custom element
-        virtual-keyboard-mode="onfocus"
-        style={{
-          display: listo ? 'block' : 'none',
-          width: '100%',
-          minHeight: '2.75rem',
-          padding: '0.375rem 0.75rem',
-          border: '1px solid hsl(var(--border))',
-          borderRadius: 'var(--radius)',
-          background: 'hsl(var(--background))',
-          fontSize: '1.1rem',
-          lineHeight: '1.5',
-        }}
-      />
+
+      {/* El math-field se monta aquí imperativo, sin JSX */}
+      <div ref={containerRef} />
     </div>
   )
 }
