@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   textoBody: { fontSize: 10, marginBottom: 8, flexShrink: 1 },
-  preguntaBloque: { marginBottom: 8, width: '100%' },
+  preguntaBloque: { marginBottom: 8 },
   preguntaNum: {
     fontFamily: 'Times-Bold',
     fontSize: 11,
@@ -292,8 +292,10 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
   const lineas = lineasDesarrollo(p.tipo)
   return (
     <View style={styles.preguntaBloque}>
-      {/* Número + enunciado + imagen: nunca se cortan en páginas distintas */}
-      <View wrap={false} style={{ width: '100%' }}>
+      {/* Número + enunciado + imagen: nunca se cortan en páginas distintas.
+          Se usa ancho absoluto (AREA_UTIL) porque wrap={false} puede mover
+          el bloque a la siguiente página y perder la referencia del padre. */}
+      <View wrap={false} style={{ width: AREA_UTIL }}>
         <Text style={styles.preguntaNum}>
           {p.numero}. {p.enunciado}
         </Text>
@@ -309,7 +311,7 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
         ))
       ) : (
         p.alternativas.map((alt) => (
-          <View key={alt.letra} wrap={false} style={{ width: '100%' }}>
+          <View key={alt.letra} wrap={false} style={{ width: AREA_UTIL }}>
             <Text style={styles.alternativa}>
               <Text style={{ fontFamily: 'Times-Bold' }}>{alt.letra})</Text>{' '}
               {alt.texto}
