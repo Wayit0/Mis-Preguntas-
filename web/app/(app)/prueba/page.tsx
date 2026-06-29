@@ -5,6 +5,8 @@ import {
   cargarTextosPropios,
   contarPreguntasPorTexto,
 } from '@/lib/queries/textos'
+import { obtenerColegioPorUsuario } from '@/lib/queries/colegio'
+import { imageUrl } from '@/lib/storage/blob'
 import { GeneradorPrueba } from '@/components/prueba/generador-prueba'
 
 export default async function PruebaPage({
@@ -18,10 +20,11 @@ export default async function PruebaPage({
   if (!session) redirect('/login')
   const userId = Number(session.user.id)
 
-  const [lista, opciones, textos] = await Promise.all([
+  const [lista, opciones, textos, colegio] = await Promise.all([
     listarPreguntasPropias(userId, asignatura),
     opcionesDeFiltros(userId, asignatura),
     cargarTextosPropios(userId, asignatura),
+    obtenerColegioPorUsuario(userId),
   ])
 
   const conteos = await contarPreguntasPorTexto(textos.map((t) => t.id))
@@ -61,6 +64,8 @@ export default async function PruebaPage({
       preguntas={preguntas}
       materias={opciones.materias}
       textos={textosUtiles}
+      colegioInicial={colegio?.nombre ?? ''}
+      logoColegioUrl={colegio?.logo ? imageUrl(colegio.logo) : null}
     />
   )
 }

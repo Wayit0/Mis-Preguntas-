@@ -41,6 +41,23 @@ export interface InvitacionPendiente {
   colegioNombre: string
 }
 
+/**
+ * Lee el colegio al que pertenece un usuario (null si no tiene colegio o si el
+ * usuario no existe). Un solo JOIN evita dos queries separadas.
+ */
+export async function obtenerColegioPorUsuario(
+  userId: number,
+): Promise<Colegio | null> {
+  if (!Number.isFinite(userId)) return null
+  const [fila] = await db
+    .select({ colegio: colegios })
+    .from(colegios)
+    .innerJoin(usuarios, eq(usuarios.colegioId, colegios.id))
+    .where(eq(usuarios.id, userId))
+    .limit(1)
+  return fila?.colegio ?? null
+}
+
 /** Lee un colegio por id (null si no existe). Tolera ids no numéricos. */
 export async function obtenerColegio(
   colegioId: number,

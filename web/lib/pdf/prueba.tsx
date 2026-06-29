@@ -160,10 +160,18 @@ const AREA_UTIL         = 512           // pt — ancho del contenido
 const INDENT_ALT        = 18           // pt — marginLeft de las alternativas
 const MAX_W_ENUNCIADO   = AREA_UTIL                  // imagen ocupa todo el ancho
 const MAX_W_ALTERNATIVA = AREA_UTIL - INDENT_ALT     // igual pero descontando sangría
-const MAX_W_FORMULA     = 10 * 28.3465
+const MAX_W_FORMULA     = 160          // pt — ancho de cada fórmula (3 caben por fila)
+const MAX_H_FORMULA     = 60           // pt — alto máximo (≈ fuente 24 con subíndices)
 const MAX_W_LOGO        = 38            // alto objetivo; ancho se deriva de la proporción
 const MAX_H_ENUNCIADO   = 300           // pt — proporcional al ancho completo (16:9 ≈ 288pt)
 const MAX_H_ALTERNATIVA = 240           // pt
+
+/** Agrupa un array en sub-arrays de tamaño `n`. */
+function chunk<T>(arr: T[], n: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n))
+  return out
+}
 
 function alternativaTieneContenido(texto: string, img: ImagenPreparada | null): boolean {
   return Boolean((texto && texto.trim()) || img)
@@ -228,7 +236,7 @@ const styles = StyleSheet.create({
   headerLinea: { fontSize: 10 },
   titulo: {
     fontFamily: 'Helvetica-Bold',
-    fontSize: 15,
+    fontSize: 18,
     marginBottom: 10,
   },
   identif: { fontSize: 11, marginBottom: 12 },
@@ -239,7 +247,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   instruc: { fontSize: 10, marginBottom: 8, flexShrink: 1 },
-  formulaImg: { marginBottom: 6 },
+  formulaFila: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  formulaImg: { marginLeft: 4, marginRight: 4 },
   textoTitulo: {
     fontFamily: 'Helvetica-Bold',
     fontSize: 11,
@@ -385,8 +399,12 @@ function PruebaDocument(props: DocumentoProps) {
         {formulas.length > 0 ? (
           <>
             <Text style={styles.seccion}>Formulario</Text>
-            {formulas.map((f, i) => (
-              <ImagenPdf key={i} img={f} style={styles.formulaImg} />
+            {chunk(formulas, 3).map((fila, ri) => (
+              <View key={ri} style={styles.formulaFila}>
+                {fila.map((f, fi) => (
+                  <ImagenPdf key={fi} img={f} style={styles.formulaImg} />
+                ))}
+              </View>
             ))}
           </>
         ) : null}
@@ -445,7 +463,7 @@ export async function generarPruebaPdf(config: PruebaConfig): Promise<Buffer> {
   for (const expr of formulasInput) {
     try {
       const png = await latexToPng(expr)
-      const prep = await prepararImagen(png, MAX_W_FORMULA)
+      const prep = await prepararImagen(png, MAX_W_FORMULA, MAX_H_FORMULA)
       if (prep) formulas.push(prep)
     } catch {
       // Una fórmula que falla no debe romper la prueba completa.

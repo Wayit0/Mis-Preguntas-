@@ -254,21 +254,27 @@ function PanelVistaPrevia({
 
 // ── Componente principal ─────────────────────────────────────────────────────
 
+/* eslint-disable @next/next/no-img-element */
+
 export function GeneradorPrueba({
   asignatura,
   profesorInicial,
   preguntas,
   materias,
   textos,
+  colegioInicial = '',
+  logoColegioUrl = null,
 }: {
   asignatura: string
   profesorInicial: string
   preguntas: PreguntaSeleccionable[]
   materias: string[]
   textos: TextoSeleccionable[]
+  colegioInicial?: string | null
+  logoColegioUrl?: string | null
 }) {
   const [titulo, setTitulo] = useState('')
-  const [colegio, setColegio] = useState('')
+  const [colegio, setColegio] = useState(colegioInicial ?? '')
   const [profesor, setProfesor] = useState(profesorInicial)
   const [instrucciones, setInstrucciones] = useState('')
   const [logo, setLogo] = useState<File | null>(null)
@@ -447,6 +453,18 @@ export function GeneradorPrueba({
 
                 <div className="flex flex-col gap-1.5">
                   <Label htmlFor="logo">Logo del colegio (opcional)</Label>
+                  {logoColegioUrl && !logo ? (
+                    <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
+                      <img
+                        src={logoColegioUrl}
+                        alt="Logo guardado del colegio"
+                        className="h-10 w-auto object-contain"
+                      />
+                      <span className="text-xs text-muted-foreground">
+                        Logo guardado — se usará automáticamente. Sube uno nuevo para reemplazarlo.
+                      </span>
+                    </div>
+                  ) : null}
                   <input
                     id="logo"
                     name="logo"
@@ -455,6 +473,18 @@ export function GeneradorPrueba({
                     className="max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
                     onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
                   />
+                  {logo ? (
+                    <p className="text-xs text-muted-foreground">
+                      Archivo seleccionado: {logo.name}{' '}
+                      <button
+                        type="button"
+                        onClick={() => setLogo(null)}
+                        className="text-destructive hover:underline"
+                      >
+                        (quitar)
+                      </button>
+                    </p>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-col gap-1.5">

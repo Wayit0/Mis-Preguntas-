@@ -1,6 +1,6 @@
 import { and, eq, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { preguntas } from '@/lib/db/schema'
+import { colegios, preguntas } from '@/lib/db/schema'
 import {
   colegioIdDeUsuario,
   preguntaCompartidaVisible,
@@ -54,5 +54,17 @@ export async function puedeVerImagen(
     )
     .limit(1)
 
-  return filas.length > 0
+  if (filas.length > 0) return true
+
+  // El logo del colegio es visible para cualquier miembro de ese colegio.
+  if (colegioId !== null) {
+    const [filaColegio] = await db
+      .select({ id: colegios.id })
+      .from(colegios)
+      .where(and(eq(colegios.id, colegioId), eq(colegios.logo, key)))
+      .limit(1)
+    if (filaColegio) return true
+  }
+
+  return false
 }

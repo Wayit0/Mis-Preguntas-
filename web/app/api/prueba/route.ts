@@ -1,7 +1,13 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { preguntas as tablaPreguntas, textos as tablaTextos } from '@/lib/db/schema'
+import {
+  colegios,
+  preguntas as tablaPreguntas,
+  textos as tablaTextos,
+  usuarios,
+} from '@/lib/db/schema'
 import { getSession } from '@/lib/get-session'
+import { getImageStream, uploadImage } from '@/lib/storage/blob'
 import {
   generarPruebaPdf,
   type PreguntaPdf,
@@ -85,11 +91,46 @@ export async function POST(request: Request) {
   const idsPreguntas = idsDesde(form.getAll('pregunta'))
   const idsTextos = idsDesde(form.getAll('texto'))
 
-  // Logo (opcional).
+  // Datos del colegio del usuario (para logo automático y auto-guardado).
+  const [filaUsuario] = await db
+    .select({ colegioId: usuarios.colegioId, role: usuarios.role })
+    .from(usuarios)
+    .where(eq(usuarios.id, userId))
+    .limit(1)
+  const userColegioId = filaUsuario?.colegioId ?? null
+  const userRole = filaUsuario?.role ?? 'teacher'
+
+  // Logo: si el usuario sube uno, se usa ese; si no, se carga el del colegio.
   const logoEntry = form.get('logo')
   let logo: Buffer | null = null
   if (logoEntry instanceof File && logoEntry.size > 0) {
     logo = Buffer.from(await logoEntry.arrayBuffer())
+    // Auto-guardar el logo al colegio si el usuario es school_admin.
+    if (userColegioId && (userRole === 'school_admin' || userRole === 'global_admin')) {
+      try {
+        const key = await uploadImage(logoEntry)
+        await db.update(colegios).set({ logo: key }).where(eq(colegios.id, userColegioId))
+      } catch {
+        // El guardado falla silenciosamente; el PDF igual se genera.
+      }
+    }
+  } else if (userColegioId) {
+    // Sin logo subido: intentar usar el logo guardado del colegio.
+    const [filaColegio] = await db
+      .select({ logo: colegios.logo })
+      .from(colegios)
+      .where(eq(colegios.id, userColegioId))
+      .limit(1)
+    if (filaColegio?.logo) {
+      const img = await getImageStream(filaColegio.logo)
+      if (img) {
+        const chunks: Buffer[] = []
+        for await (const chunk of img.stream) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+        }
+        logo = Buffer.concat(chunks)
+      }
+    }
   }
 
   // Textos seleccionados (propios) y sus preguntas asociadas (propias).
