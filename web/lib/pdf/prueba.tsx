@@ -250,9 +250,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 3,
   },
-  imagenPregunta: { marginTop: 6, marginBottom: 8, alignSelf: 'flex-start' },
+  imagenPregunta: { marginTop: 6, marginBottom: 8 },
   alternativa: { fontSize: 10, marginLeft: 18, marginBottom: 3 },
-  imagenAlternativa: { marginLeft: 18, marginTop: 2, marginBottom: 6, alignSelf: 'flex-start' },
+  imagenAlternativa: { marginLeft: 18, marginTop: 2, marginBottom: 6 },
   lineaRespuesta: {
     borderBottomWidth: 1,
     borderBottomColor: '#999999',
@@ -286,9 +286,9 @@ function lineasDesarrollo(tipo: string): number {
 function BloquePregunta({ p }: { p: PreguntaPreparada }) {
   const lineas = lineasDesarrollo(p.tipo)
   return (
-    <View style={styles.preguntaBloque} wrap={false}>
-      {/* Número + enunciado + imagen del enunciado */}
-      <View>
+    <View style={styles.preguntaBloque}>
+      {/* Número + enunciado + imagen: nunca se cortan en páginas distintas */}
+      <View wrap={false}>
         <Text style={styles.preguntaNum}>
           {p.numero}. {p.enunciado}
         </Text>
@@ -297,7 +297,7 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
         ) : null}
       </View>
 
-      {/* Alternativas o líneas de desarrollo */}
+      {/* Alternativas o líneas de desarrollo: cada una queda entera */}
       {lineas > 0 ? (
         Array.from({ length: lineas }).map((_, i) => (
           <View key={i} style={styles.lineaRespuesta} wrap={false} />
