@@ -28,12 +28,15 @@ export function TarjetaPregunta({
   p,
   autor,
   soloLectura = false,
+  propia = false,
 }: {
   p: Pregunta
   /** Nombre del autor; se muestra en el modo solo lectura (Banco Compartido). */
   autor?: string
   /** En modo solo lectura se ocultan las acciones de edición/compartir/eliminar. */
   soloLectura?: boolean
+  /** Marca la tarjeta como "Tuya" (tus propias preguntas dentro del Banco Compartido). */
+  propia?: boolean
 }) {
   const compartida = (p.compartida ?? 0) > 0
   const tipo = (p.tipo ?? 'seleccion_multiple') as TipoPregunta
@@ -50,7 +53,10 @@ export function TarjetaPregunta({
     <Card>
       <CardContent className="flex flex-col gap-3">
         <div className="flex items-start justify-between gap-2">
-          <Badge variant="secondary">{badge}</Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">{badge}</Badge>
+            {propia ? <Badge>Tuya</Badge> : null}
+          </div>
           {soloLectura ? (
             autor ? (
               <span className="shrink-0 text-xs font-medium text-muted-foreground">

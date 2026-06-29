@@ -1,4 +1,4 @@
-import { and, asc, eq, type SQL } from 'drizzle-orm'
+import { and, asc, eq, or, sql, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { preguntas, usuarios } from '@/lib/db/schema'
 import type { Pregunta } from '@/lib/queries/preguntas'
@@ -31,7 +31,16 @@ export async function cargarBancoCompartido(
 ): Promise<PreguntaCompartida[]> {
   const colegioId = await colegioIdDeUsuario(userId)
 
-  const conds: SQL[] = [preguntaCompartidaVisible(userId, colegioId)]
+  // El Banco Compartido refleja todo el pool que el usuario puede ver: lo que
+  // OTROS comparten con él ({@link preguntaCompartidaVisible}, que excluye lo
+  // propio) MÁS sus PROPIAS preguntas compartidas (van marcadas "Tuya" y
+  // editables en la UI). Así "lo que comparto" también aparece aquí.
+  const visibilidad = or(
+    preguntaCompartidaVisible(userId, colegioId),
+    and(eq(preguntas.compartida, 1), eq(preguntas.userId, userId)),
+  )!
+
+  const conds: SQL[] = [visibilidad]
   if (asignatura) conds.push(eq(preguntas.asignatura, asignatura))
 
   const filas = await db
@@ -39,7 +48,8 @@ export async function cargarBancoCompartido(
     .from(preguntas)
     .innerJoin(usuarios, eq(usuarios.id, preguntas.userId))
     .where(and(...conds))
-    .orderBy(asc(usuarios.nombre), asc(preguntas.id))
+    // Las tuyas primero, luego por autor e id (orden estable).
+    .orderBy(sql`(${preguntas.userId} = ${userId}) desc`, asc(usuarios.nombre), asc(preguntas.id))
 
   return filas.map((f) => ({ ...f.pregunta, autor: f.autor }))
 }
