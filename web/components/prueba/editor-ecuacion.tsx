@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 // Declara el elemento personalizado para TypeScript/JSX
 declare global {
@@ -76,27 +76,36 @@ type MathFieldEl = HTMLElement & {
 
 export function EditorEcuacion({ value, onChange }: EditorEcuacionProps) {
   const ref = useRef<MathFieldEl>(null)
+  const [listo, setListo] = useState(false)
 
-  // Carga mathlive desde CDN (registra el custom element <math-field>)
+  // Carga mathlive desde CDN y espera a que el custom element quede definido
   useEffect(() => {
-    if (typeof window === 'undefined') return
     const script = document.createElement('script')
     script.type = 'module'
     script.textContent = `import 'https://esm.sh/mathlive'`
     document.head.appendChild(script)
-    return () => script.remove()
-  }, [])
 
-  // Conecta eventos después de que el custom element esté definido
-  useEffect(() => {
-    if (typeof customElements === 'undefined') return
     customElements.whenDefined('math-field').then(() => {
+      setListo(true)
       const el = ref.current
       if (!el) return
       const onInput = () => onChange(el.value ?? '')
       el.addEventListener('input', onInput)
     })
-  }, [onChange])
+
+    return () => script.remove()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Reconecta el listener si onChange cambia después de que el editor ya cargó
+  useEffect(() => {
+    if (!listo) return
+    const el = ref.current
+    if (!el) return
+    const onInput = () => onChange(el.value ?? '')
+    el.addEventListener('input', onInput)
+    return () => el.removeEventListener('input', onInput)
+  }, [onChange, listo])
 
   // Limpia el campo cuando el padre resetea value a ''
   useEffect(() => {
@@ -138,13 +147,18 @@ export function EditorEcuacion({ value, onChange }: EditorEcuacionProps) {
         ))}
       </div>
 
-      {/* Editor visual WYSIWYG */}
+      {/* Editor visual WYSIWYG — visible siempre; se activa cuando mathlive carga */}
+      {!listo && (
+        <div className="flex h-11 items-center rounded-md border border-dashed border-border bg-background px-3 text-sm text-muted-foreground">
+          Cargando editor visual…
+        </div>
+      )}
       <math-field
         ref={ref as React.RefObject<HTMLElement>}
         // @ts-expect-error – atributo del custom element
         virtual-keyboard-mode="onfocus"
         style={{
-          display: 'block',
+          display: listo ? 'block' : 'none',
           width: '100%',
           minHeight: '2.75rem',
           padding: '0.375rem 0.75rem',

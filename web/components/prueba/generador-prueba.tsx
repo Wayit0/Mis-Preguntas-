@@ -14,8 +14,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import dynamic from 'next/dynamic'
 import { LatexText } from '@/components/preguntas/latex-text'
-import { EditorEcuacion } from './editor-ecuacion'
+
+const EditorEcuacion = dynamic(
+  () => import('./editor-ecuacion').then((m) => m.EditorEcuacion),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border bg-card text-sm text-muted-foreground">
+        Cargando editor…
+      </div>
+    ),
+  },
+)
 
 const ETIQUETA_TIPO: Record<string, string> = {
   seleccion_multiple: 'Selección múltiple',
