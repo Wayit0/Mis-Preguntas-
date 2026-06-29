@@ -162,7 +162,7 @@ export function Sidebar({
           <aside className="absolute inset-y-0 left-0 flex w-64 flex-col bg-sidebar text-sidebar-foreground shadow-xl">
             <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-3">
               <span className="font-bold text-sidebar-foreground">
-                📚 Mis Preguntas
+                📚 EduBox
               </span>
               <button
                 type="button"

@@ -89,7 +89,7 @@ export default async function DashboardPage({
       {sugerirColegio ? (
         <Card>
           <CardHeader>
-            <CardTitle>🏫 ¿Tu colegio usa Mis Preguntas?</CardTitle>
+            <CardTitle>🏫 ¿Tu colegio usa EduBox?</CardTitle>
             <CardDescription>
               Únete con el código de tu colegio o acepta una invitación para
               compartir el banco de preguntas con tus colegas.

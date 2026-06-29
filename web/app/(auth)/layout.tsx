@@ -17,7 +17,7 @@ export default function AuthLayout({
           href="/"
           className="relative z-10 flex w-fit items-center gap-2 font-heading text-lg font-semibold text-white"
         >
-          <span aria-hidden>📚</span> Mis Preguntas
+          <span aria-hidden>📚</span> EduBox
         </Link>
 
         <div className="relative z-10 max-w-md">
@@ -53,7 +53,7 @@ export default function AuthLayout({
             href="/"
             className="mb-6 flex items-center justify-center gap-2 font-heading text-xl font-semibold tracking-tight text-foreground lg:hidden"
           >
-            <span aria-hidden>📚</span> Mis Preguntas
+            <span aria-hidden>📚</span> EduBox
           </Link>
           {children}
         </div>

@@ -13,7 +13,7 @@ export default async function Home() {
       <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-5 py-3.5">
           <span className="flex shrink-0 items-center gap-2 whitespace-nowrap font-heading text-lg font-semibold tracking-tight">
-            <span aria-hidden>📚</span> Mis Preguntas
+            <span aria-hidden>📚</span> EduBox
           </span>
           <nav className="flex items-center gap-2">
             {autenticado ? (
@@ -61,7 +61,7 @@ export default async function Home() {
                 <span className="text-primary">prueba en PDF</span>, en minutos.
               </h1>
               <p className="max-w-xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
-                Mis Preguntas reúne todas tus preguntas en un solo lugar —con
+                EduBox reúne todas tus preguntas en un solo lugar —con
                 imágenes y fórmulas— y las convierte en evaluaciones listas para
                 imprimir. Compártelas con tu colegio y deja de armar cada prueba
                 desde cero.
@@ -252,7 +252,7 @@ export default async function Home() {
       <footer className="border-t border-border">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-2 px-5 py-6 text-sm text-muted-foreground sm:flex-row">
           <span className="font-heading font-semibold text-foreground">
-            📚 Mis Preguntas
+            📚 EduBox
           </span>
           <span>Banco de preguntas y pruebas para docentes</span>
         </div>

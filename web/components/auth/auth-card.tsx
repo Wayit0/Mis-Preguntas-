@@ -141,7 +141,7 @@ export function AuthCard({ modoInicial = 'login' }: { modoInicial?: Modo }) {
             <p className="mt-1 text-sm text-muted-foreground">
               {modo === 'login'
                 ? 'Ingresa tus credenciales para acceder a tu banco.'
-                : 'Completa tus datos para empezar a usar Mis Preguntas.'}
+                : 'Completa tus datos para empezar a usar EduBox.'}
             </p>
           </div>
 

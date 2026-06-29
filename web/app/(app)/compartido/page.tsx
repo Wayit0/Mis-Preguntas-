@@ -45,7 +45,7 @@ export default async function CompartidoPage({
           <p className="mt-1 text-sm text-muted-foreground">
             {asignatura
               ? `No hay preguntas compartidas de ${asignatura} todavía.`
-              : 'Marca una pregunta como “Compartida” en Mis Preguntas y aparecerá aquí; también verás las que un colega de tu colegio (o que te haya invitado) comparta contigo.'}
+              : 'Marca una pregunta como “Compartida” en EduBox y aparecerá aquí; también verás las que un colega de tu colegio (o que te haya invitado) comparta contigo.'}
           </p>
         </div>
       ) : (

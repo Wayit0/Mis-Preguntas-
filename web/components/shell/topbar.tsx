@@ -52,7 +52,7 @@ export function Topbar({ user }: TopbarProps) {
           <span aria-hidden className="text-lg leading-none">
             📚
           </span>
-          <span className="hidden sm:inline">Mis Preguntas</span>
+          <span className="hidden sm:inline">EduBox</span>
         </Link>
       </div>
 

@@ -26,7 +26,7 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Mis Preguntas — banco de preguntas y pruebas para docentes",
+  title: "EduBox — banco de preguntas y pruebas para docentes",
   description:
     "Reúne tus preguntas, ármalas en pruebas listas para imprimir y compártelas con tu colegio.",
 };
