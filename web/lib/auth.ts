@@ -62,10 +62,18 @@ export const auth = betterAuth({
     ipAddress: { ipAddressHeaders: ['x-forwarded-for'] },
   },
   // Orígenes de confianza (CSRF / validación de origin). En producción detrás de
-  // proxy, el origin debe coincidir con la URL pública configurada.
-  trustedOrigins: process.env.BETTER_AUTH_URL
-    ? [process.env.BETTER_AUTH_URL]
-    : [],
+  // proxy, el origin debe coincidir con la URL pública. Aceptamos varios: la URL
+  // canónica (BETTER_AUTH_URL) más los extra en BETTER_AUTH_TRUSTED_ORIGINS
+  // (coma-separados) — p. ej. www y el host de Azure durante la transición.
+  trustedOrigins: (() => {
+    const origenes = new Set<string>()
+    if (process.env.BETTER_AUTH_URL) origenes.add(process.env.BETTER_AUTH_URL)
+    for (const o of (process.env.BETTER_AUTH_TRUSTED_ORIGINS ?? '').split(',')) {
+      const v = o.trim()
+      if (v) origenes.add(v)
+    }
+    return [...origenes]
+  })(),
   // `name` necesita mapeo: el adaptador drizzle resuelve los campos por la CLAVE
   // JS de la tabla (camelCase), no por el nombre de columna. La clave JS de
   // `name` en `usuarios` es `nombre`; el resto (createdAt, updatedAt,
