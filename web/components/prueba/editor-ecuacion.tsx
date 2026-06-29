@@ -62,16 +62,20 @@ type MathFieldEl = HTMLElement & {
 interface EditorEcuacionProps {
   value: string
   onChange: (val: string) => void
+  onEnter?: () => void
 }
 
-export function EditorEcuacion({ value, onChange }: EditorEcuacionProps) {
+export function EditorEcuacion({ value, onChange, onEnter }: EditorEcuacionProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const mfRef = useRef<MathFieldEl | null>(null)
   const onChangeRef = useRef(onChange)
   const [listo, setListo] = useState(false)
 
-  // Mantiene onChangeRef actualizado sin recriar el elemento
+  const onEnterRef = useRef(onEnter)
+
+  // Mantiene refs actualizados sin recriar el elemento
   useEffect(() => { onChangeRef.current = onChange })
+  useEffect(() => { onEnterRef.current = onEnter })
 
   useEffect(() => {
     // Inyecta mathlive como módulo ES desde CDN (sin instalar paquete)
@@ -100,6 +104,9 @@ export function EditorEcuacion({ value, onChange }: EditorEcuacionProps) {
       })
       mf.setAttribute('virtual-keyboard-mode', 'onfocus')
       mf.addEventListener('input', () => onChangeRef.current(mf.value ?? ''))
+      mf.addEventListener('keydown', (e: Event) => {
+        if ((e as KeyboardEvent).key === 'Enter') onEnterRef.current?.()
+      })
 
       container.appendChild(mf)
       mfRef.current = mf
