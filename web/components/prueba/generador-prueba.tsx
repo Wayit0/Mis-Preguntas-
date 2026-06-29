@@ -264,7 +264,7 @@ export function GeneradorPrueba({
                   Formulario (opcional)
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Usa los botones de símbolos o escribe directamente en LaTeX.
+                  Escribe la fórmula directamente o usa los botones. Tab para avanzar entre partes.
                 </p>
               </div>
               <EditorEcuacion

@@ -1,57 +1,65 @@
 'use client'
 
-import { useRef } from 'react'
-import 'katex/dist/katex.min.css'
-import { LatexText } from '@/components/preguntas/latex-text'
+import { useEffect, useRef } from 'react'
+
+// Declara el elemento personalizado para TypeScript/JSX
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace JSX {
+    interface IntrinsicElements {
+      'math-field': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement>
+    }
+  }
+}
 
 const GRUPOS = [
   {
     titulo: 'Estructura',
     simbolos: [
-      { label: 'a/b',  latex: '\\frac{a}{b}',  title: 'Fracción' },
-      { label: '√',    latex: '\\sqrt{x}',      title: 'Raíz cuadrada' },
-      { label: 'ⁿ√',  latex: '\\sqrt[n]{x}',   title: 'Raíz n-ésima' },
-      { label: 'xⁿ',  latex: '^{n}',            title: 'Potencia' },
-      { label: 'xₙ',  latex: '_{n}',            title: 'Subíndice' },
+      { label: 'a/b', latex: '\\frac{#0}{#1}', title: 'Fracción' },
+      { label: '√',   latex: '\\sqrt{#0}',      title: 'Raíz cuadrada' },
+      { label: 'ⁿ√', latex: '\\sqrt[#0]{#1}',  title: 'Raíz n-ésima' },
+      { label: 'xⁿ', latex: '^{#0}',            title: 'Potencia' },
+      { label: 'xₙ', latex: '_{#0}',            title: 'Subíndice' },
     ],
   },
   {
     titulo: 'Operadores',
     simbolos: [
-      { label: '±',   latex: '\\pm ',     title: 'Más/menos' },
-      { label: '·',   latex: '\\cdot ',   title: 'Producto punto' },
-      { label: '×',   latex: '\\times ',  title: 'Por' },
-      { label: '÷',   latex: '\\div ',    title: 'Dividido' },
-      { label: '≤',   latex: '\\leq ',    title: 'Menor o igual' },
-      { label: '≥',   latex: '\\geq ',    title: 'Mayor o igual' },
-      { label: '≠',   latex: '\\neq ',    title: 'Distinto' },
-      { label: '≈',   latex: '\\approx ', title: 'Aproximado' },
+      { label: '±',  latex: '\\pm',     title: 'Más/menos' },
+      { label: '·',  latex: '\\cdot',   title: 'Producto punto' },
+      { label: '×',  latex: '\\times',  title: 'Por' },
+      { label: '÷',  latex: '\\div',    title: 'Dividido' },
+      { label: '≤',  latex: '\\leq',    title: 'Menor o igual' },
+      { label: '≥',  latex: '\\geq',    title: 'Mayor o igual' },
+      { label: '≠',  latex: '\\neq',    title: 'Distinto' },
+      { label: '≈',  latex: '\\approx', title: 'Aproximado' },
     ],
   },
   {
     titulo: 'Griegas',
     simbolos: [
-      { label: 'α', latex: '\\alpha ',  title: 'alfa' },
-      { label: 'β', latex: '\\beta ',   title: 'beta' },
-      { label: 'γ', latex: '\\gamma ',  title: 'gamma' },
-      { label: 'δ', latex: '\\delta ',  title: 'delta' },
-      { label: 'θ', latex: '\\theta ',  title: 'theta' },
-      { label: 'λ', latex: '\\lambda ', title: 'lambda' },
-      { label: 'μ', latex: '\\mu ',     title: 'mu' },
-      { label: 'π', latex: '\\pi ',     title: 'pi' },
-      { label: 'σ', latex: '\\sigma ',  title: 'sigma' },
-      { label: 'ω', latex: '\\omega ',  title: 'omega' },
-      { label: 'Δ', latex: '\\Delta ',  title: 'Delta' },
-      { label: 'Σ', latex: '\\Sigma ',  title: 'Sigma' },
+      { label: 'α', latex: '\\alpha',  title: 'alfa' },
+      { label: 'β', latex: '\\beta',   title: 'beta' },
+      { label: 'γ', latex: '\\gamma',  title: 'gamma' },
+      { label: 'δ', latex: '\\delta',  title: 'delta' },
+      { label: 'θ', latex: '\\theta',  title: 'theta' },
+      { label: 'λ', latex: '\\lambda', title: 'lambda' },
+      { label: 'μ', latex: '\\mu',     title: 'mu' },
+      { label: 'π', latex: '\\pi',     title: 'pi' },
+      { label: 'σ', latex: '\\sigma',  title: 'sigma' },
+      { label: 'ω', latex: '\\omega',  title: 'omega' },
+      { label: 'Δ', latex: '\\Delta',  title: 'Delta' },
+      { label: 'Σ', latex: '\\Sigma',  title: 'Sigma' },
     ],
   },
   {
     titulo: 'Física',
     simbolos: [
-      { label: 'vec', latex: '\\vec{v}',     title: 'Vector (\\vec{v})' },
-      { label: 'hat', latex: '\\hat{a}',     title: 'Unitario (\\hat{a})' },
-      { label: '°',   latex: '^{\\circ}',    title: 'Grados' },
-      { label: '∞',   latex: '\\infty ',     title: 'Infinito' },
+      { label: 'vec', latex: '\\vec{#0}',   title: 'Vector' },
+      { label: 'hat', latex: '\\hat{#0}',   title: 'Unitario' },
+      { label: '°',   latex: '^{\\circ}',   title: 'Grados' },
+      { label: '∞',   latex: '\\infty',     title: 'Infinito' },
     ],
   },
 ]
@@ -59,31 +67,49 @@ const GRUPOS = [
 interface EditorEcuacionProps {
   value: string
   onChange: (val: string) => void
-  onEnter?: () => void
 }
 
-export function EditorEcuacion({ value, onChange, onEnter }: EditorEcuacionProps) {
-  const ref = useRef<HTMLInputElement>(null)
+type MathFieldEl = HTMLElement & {
+  value: string
+  insert: (latex: string, opts?: Record<string, unknown>) => void
+}
+
+export function EditorEcuacion({ value, onChange }: EditorEcuacionProps) {
+  const ref = useRef<MathFieldEl>(null)
+
+  // Carga mathlive desde CDN (registra el custom element <math-field>)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const script = document.createElement('script')
+    script.type = 'module'
+    script.textContent = `import 'https://esm.sh/mathlive'`
+    document.head.appendChild(script)
+    return () => script.remove()
+  }, [])
+
+  // Conecta eventos después de que el custom element esté definido
+  useEffect(() => {
+    if (typeof customElements === 'undefined') return
+    customElements.whenDefined('math-field').then(() => {
+      const el = ref.current
+      if (!el) return
+      const onInput = () => onChange(el.value ?? '')
+      el.addEventListener('input', onInput)
+    })
+  }, [onChange])
+
+  // Limpia el campo cuando el padre resetea value a ''
+  useEffect(() => {
+    const el = ref.current
+    if (el && value === '' && el.value !== '') el.value = ''
+  }, [value])
 
   function insertar(latex: string) {
     const el = ref.current
-    if (!el) { onChange(value + latex); return }
-
-    const inicio = el.selectionStart ?? value.length
-    const fin    = el.selectionEnd   ?? value.length
-    const nuevo  = value.slice(0, inicio) + latex + value.slice(fin)
-    onChange(nuevo)
-
-    // Dejar cursor dentro del primer {} si el snippet lo tiene
-    const posLlave = latex.indexOf('{')
-    const pos = posLlave !== -1
-      ? inicio + posLlave + 1
-      : inicio + latex.length
-
-    requestAnimationFrame(() => {
-      el.focus()
-      el.setSelectionRange(pos, pos)
-    })
+    if (!el?.insert) return
+    el.insert(latex, { selectionMode: 'placeholder' })
+    onChange(el.value ?? '')
+    el.focus()
   }
 
   return (
@@ -112,24 +138,23 @@ export function EditorEcuacion({ value, onChange, onEnter }: EditorEcuacionProps
         ))}
       </div>
 
-      {/* Input LaTeX */}
-      <input
-        ref={ref}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') { e.preventDefault(); onEnter?.() }
+      {/* Editor visual WYSIWYG */}
+      <math-field
+        ref={ref as React.RefObject<HTMLElement>}
+        // @ts-expect-error – atributo del custom element
+        virtual-keyboard-mode="onfocus"
+        style={{
+          display: 'block',
+          width: '100%',
+          minHeight: '2.75rem',
+          padding: '0.375rem 0.75rem',
+          border: '1px solid hsl(var(--border))',
+          borderRadius: 'var(--radius)',
+          background: 'hsl(var(--background))',
+          fontSize: '1.1rem',
+          lineHeight: '1.5',
         }}
-        placeholder="Escribe en LaTeX, ej: v^2 = v_0^2 + 2a\Delta x"
-        className="flex h-9 w-full rounded-md border border-border bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
       />
-
-      {/* Preview en tiempo real */}
-      {value.trim() && (
-        <div className="min-h-8 rounded-md bg-muted/40 px-3 py-2 text-sm">
-          <LatexText text={`$${value}$`} className="text-base" />
-        </div>
-      )}
     </div>
   )
 }
