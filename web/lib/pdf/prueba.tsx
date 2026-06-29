@@ -248,16 +248,16 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   textoBody: { fontSize: 10, marginBottom: 8, flexShrink: 1 },
-  preguntaBloque: { marginBottom: 8, width: AREA_UTIL },
-  preguntaNum: {
-    fontFamily: 'Times-Bold',
-    fontSize: 11,
-    marginTop: 12,
-    marginBottom: 3,
-    flexShrink: 1,
-  },
-  imagenPregunta: { marginTop: 6, marginBottom: 8 },
-  alternativa: { fontSize: 10, marginLeft: 18, marginBottom: 3, flexShrink: 1 },
+  preguntaBloque: { marginBottom: 8 },
+  // Fila número + enunciado: flex:1 en el texto garantiza ancho completo en react-pdf
+  preguntaFila: { flexDirection: 'row', marginTop: 12, marginBottom: 3 },
+  preguntaNumero: { fontFamily: 'Times-Bold', fontSize: 11, marginRight: 3 },
+  preguntaEnunciado: { fontFamily: 'Times-Bold', fontSize: 11, flex: 1 },
+  imagenPregunta: { marginTop: 4, marginBottom: 6 },
+  // Fila letra + texto de alternativa
+  alternativaFila: { flexDirection: 'row', marginLeft: 18, marginBottom: 3 },
+  alternativaLetra: { fontFamily: 'Times-Bold', fontSize: 10, marginRight: 3 },
+  alternativaTexto: { fontSize: 10, flex: 1 },
   imagenAlternativa: { marginLeft: 18, marginTop: 2, marginBottom: 6 },
   lineaRespuesta: {
     borderBottomWidth: 1,
@@ -293,9 +293,12 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
   const lineas = lineasDesarrollo(p.tipo)
   return (
     <View style={styles.preguntaBloque}>
-      <Text style={styles.preguntaNum}>
-        {p.numero}. {p.enunciado}
-      </Text>
+      {/* flex:1 en el enunciado dentro de un row garantiza que el texto
+          ocupe el ancho completo disponible en react-pdf v4 */}
+      <View style={styles.preguntaFila}>
+        <Text style={styles.preguntaNumero}>{p.numero}.</Text>
+        <Text style={styles.preguntaEnunciado}>{p.enunciado}</Text>
+      </View>
       {p.imagenEnunciado ? (
         <ImagenPdf img={p.imagenEnunciado} style={styles.imagenPregunta} />
       ) : null}
@@ -306,10 +309,10 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
       ) : (
         p.alternativas.map((alt) => (
           <View key={alt.letra}>
-            <Text style={styles.alternativa}>
-              <Text style={{ fontFamily: 'Times-Bold' }}>{alt.letra})</Text>{' '}
-              {alt.texto}
-            </Text>
+            <View style={styles.alternativaFila}>
+              <Text style={styles.alternativaLetra}>{alt.letra})</Text>
+              <Text style={styles.alternativaTexto}>{alt.texto}</Text>
+            </View>
             {alt.imagen ? (
               <ImagenPdf img={alt.imagen} style={styles.imagenAlternativa} />
             ) : null}
