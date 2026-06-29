@@ -94,7 +94,7 @@ export default async function Home() {
 
             {/* Firma: una pregunta real con alternativas A–E y su correcta. */}
             <div className="animar-subir relative">
-              <div className="rotate-[1.2deg] rounded-2xl border border-border bg-card p-5 shadow-xl shadow-primary/5 sm:p-6">
+              <div className="rounded-2xl border border-border bg-card p-5 shadow-xl shadow-primary/5 sm:p-6">
                 <div className="flex items-center justify-between">
                   <span className="rounded-md bg-secondary px-2 py-1 font-mono text-[11px] font-medium text-primary">
                     Física · Mecánica
