@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     paddingTop: 96,
     paddingBottom: 52,
     paddingHorizontal: 50,
-    fontFamily: 'Times-Roman',
+    fontFamily: 'Helvetica',
     fontSize: 11,
     lineHeight: 1.4,
     color: '#1a1a1a',
@@ -224,16 +224,16 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
   },
   headerLogo: { marginRight: 10 },
-  headerColegio: { fontFamily: 'Times-Bold', fontSize: 10 },
+  headerColegio: { fontFamily: 'Helvetica-Bold', fontSize: 10 },
   headerLinea: { fontSize: 10 },
   titulo: {
-    fontFamily: 'Times-Bold',
+    fontFamily: 'Helvetica-Bold',
     fontSize: 15,
     marginBottom: 10,
   },
   identif: { fontSize: 11, marginBottom: 12 },
   seccion: {
-    fontFamily: 'Times-Bold',
+    fontFamily: 'Helvetica-Bold',
     fontSize: 10,
     marginTop: 8,
     marginBottom: 4,
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   instruc: { fontSize: 10, marginBottom: 8, flexShrink: 1 },
   formulaImg: { marginBottom: 6 },
   textoTitulo: {
-    fontFamily: 'Times-Bold',
+    fontFamily: 'Helvetica-Bold',
     fontSize: 11,
     marginTop: 12,
     marginBottom: 4,
@@ -251,12 +251,12 @@ const styles = StyleSheet.create({
   preguntaBloque: { marginBottom: 8 },
   // Fila número + enunciado: flex:1 en el texto garantiza ancho completo en react-pdf
   preguntaFila: { flexDirection: 'row', marginTop: 12, marginBottom: 3 },
-  preguntaNumero: { fontFamily: 'Times-Bold', fontSize: 11, marginRight: 3 },
-  preguntaEnunciado: { fontFamily: 'Times-Bold', fontSize: 11, flex: 1 },
+  preguntaNumero: { fontFamily: 'Helvetica-Bold', fontSize: 11, marginRight: 3 },
+  preguntaEnunciado: { fontFamily: 'Helvetica-Bold', fontSize: 11, flex: 1 },
   imagenPregunta: { marginTop: 4, marginBottom: 6 },
   // Fila letra + texto de alternativa
   alternativaFila: { flexDirection: 'row', marginLeft: 18, marginBottom: 3 },
-  alternativaLetra: { fontFamily: 'Times-Bold', fontSize: 10, marginRight: 3 },
+  alternativaLetra: { fontFamily: 'Helvetica-Bold', fontSize: 10, marginRight: 3 },
   alternativaTexto: { fontSize: 10, flex: 1 },
   imagenAlternativa: { marginLeft: 18, marginTop: 2, marginBottom: 6 },
   lineaRespuesta: {
