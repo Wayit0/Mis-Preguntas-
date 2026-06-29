@@ -286,9 +286,9 @@ function lineasDesarrollo(tipo: string): number {
 function BloquePregunta({ p }: { p: PreguntaPreparada }) {
   const lineas = lineasDesarrollo(p.tipo)
   return (
-    <View style={styles.preguntaBloque}>
-      {/* Número + enunciado + imagen del enunciado: se mantienen juntos */}
-      <View wrap={false}>
+    <View style={styles.preguntaBloque} wrap={false}>
+      {/* Número + enunciado + imagen del enunciado */}
+      <View>
         <Text style={styles.preguntaNum}>
           {p.numero}. {p.enunciado}
         </Text>
