@@ -293,8 +293,11 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
   const lineas = lineasDesarrollo(p.tipo)
   return (
     <View style={styles.preguntaBloque}>
-      {/* flex:1 en el enunciado dentro de un row garantiza que el texto
-          ocupe el ancho completo disponible en react-pdf v4 */}
+      {/* Ancla el ancho del contenedor antes de cualquier texto. Sin esto,
+          yoga-layout calcula el ancho por contenido intrínseco (~350pt) en
+          vez de estirarse al ancho de la página (512pt). Un hijo con ancho
+          explícito como primer elemento fuerza el ancho correcto. */}
+      <View style={{ width: AREA_UTIL, height: 0 }} />
       <View style={styles.preguntaFila}>
         <Text style={styles.preguntaNumero}>{p.numero}.</Text>
         <Text style={styles.preguntaEnunciado}>{p.enunciado}</Text>
