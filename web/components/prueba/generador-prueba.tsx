@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { LatexText } from '@/components/preguntas/latex-text'
+import { EditorEcuacion } from './editor-ecuacion'
 
 const ETIQUETA_TIPO: Record<string, string> = {
   seleccion_multiple: 'Selección múltiple',
@@ -263,22 +264,15 @@ export function GeneradorPrueba({
                   Formulario (opcional)
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Escribe cada fórmula en notación LaTeX (sin los signos $).
+                  Usa los botones de símbolos o escribe directamente en LaTeX.
                 </p>
               </div>
-              <div className="flex items-start gap-2">
-                <Input
-                  aria-label="Nueva fórmula"
-                  value={nuevaFormula}
-                  onChange={(e) => setNuevaFormula(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      agregarFormula()
-                    }
-                  }}
-                  placeholder="Ej: v^2 = v_0^2 + 2a\Delta x"
-                />
+              <EditorEcuacion
+                value={nuevaFormula}
+                onChange={setNuevaFormula}
+                onEnter={agregarFormula}
+              />
+              <div className="flex justify-end">
                 <Button type="button" variant="secondary" onClick={agregarFormula}>
                   ＋ Agregar
                 </Button>
