@@ -237,24 +237,26 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 4,
   },
-  instruc: { fontSize: 10, marginBottom: 8 },
+  instruc: { fontSize: 10, marginBottom: 8, flexShrink: 1 },
   formulaImg: { marginBottom: 6 },
   textoTitulo: {
     fontFamily: 'Times-Bold',
     fontSize: 11,
     marginTop: 12,
     marginBottom: 4,
+    flexShrink: 1,
   },
-  textoBody: { fontSize: 10, marginBottom: 8 },
-  preguntaBloque: { marginBottom: 8 },
+  textoBody: { fontSize: 10, marginBottom: 8, flexShrink: 1 },
+  preguntaBloque: { marginBottom: 8, width: '100%' },
   preguntaNum: {
     fontFamily: 'Times-Bold',
     fontSize: 11,
     marginTop: 12,
     marginBottom: 3,
+    flexShrink: 1,
   },
   imagenPregunta: { marginTop: 6, marginBottom: 8 },
-  alternativa: { fontSize: 10, marginLeft: 18, marginBottom: 3 },
+  alternativa: { fontSize: 10, marginLeft: 18, marginBottom: 3, flexShrink: 1 },
   imagenAlternativa: { marginLeft: 18, marginTop: 2, marginBottom: 6 },
   lineaRespuesta: {
     borderBottomWidth: 1,
@@ -291,7 +293,7 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
   return (
     <View style={styles.preguntaBloque}>
       {/* Número + enunciado + imagen: nunca se cortan en páginas distintas */}
-      <View wrap={false}>
+      <View wrap={false} style={{ width: '100%' }}>
         <Text style={styles.preguntaNum}>
           {p.numero}. {p.enunciado}
         </Text>
@@ -307,7 +309,7 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
         ))
       ) : (
         p.alternativas.map((alt) => (
-          <View key={alt.letra} wrap={false}>
+          <View key={alt.letra} wrap={false} style={{ width: '100%' }}>
             <Text style={styles.alternativa}>
               <Text style={{ fontFamily: 'Times-Bold' }}>{alt.letra})</Text>{' '}
               {alt.texto}
