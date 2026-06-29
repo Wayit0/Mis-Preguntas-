@@ -58,7 +58,11 @@ export function FiltrosPreguntas({
           aria-label="Filtrar por materia"
           className="h-9 rounded-full sm:h-8"
         >
-          <SelectValue placeholder="Materia: Todas" />
+          {/* base-ui muestra el value crudo; mapeamos el centinela a una
+              etiqueta legible para que no se filtre "__todas__" a la UI. */}
+          <SelectValue placeholder="Materia: Todas">
+            {(value: string) => (value === TODAS ? 'Materia: Todas' : value)}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={TODAS}>Materia: Todas</SelectItem>
@@ -81,7 +85,9 @@ export function FiltrosPreguntas({
           aria-label="Filtrar por nivel"
           className="h-9 rounded-full sm:h-8"
         >
-          <SelectValue placeholder="Nivel: Todos" />
+          <SelectValue placeholder="Nivel: Todos">
+            {(value: string) => (value === TODAS ? 'Nivel: Todos' : value)}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectItem value={TODAS}>Nivel: Todos</SelectItem>

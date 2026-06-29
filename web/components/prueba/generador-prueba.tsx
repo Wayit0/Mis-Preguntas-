@@ -363,7 +363,11 @@ export function GeneradorPrueba({
                         aria-label="Filtrar por materia"
                         className="w-full"
                       >
-                        <SelectValue />
+                        <SelectValue>
+                          {(value: string) =>
+                            value === '__todas__' ? 'Todas las materias' : value
+                          }
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="__todas__">Todas las materias</SelectItem>
