@@ -1,3 +1,4 @@
+import React from 'react'
 import {
   Document,
   Page,
@@ -385,7 +386,11 @@ function PruebaDocument(props: DocumentoProps) {
         ) : null}
 
         {grupos.map((g, gi) => (
-          <View key={gi} style={{ width: AREA_UTIL }}>
+          // Sin View envolvente: todos los elementos son hijos directos de la
+          // página para que hereden su ancho (512pt) igual que las preguntas
+          // sueltas. Un View intermedio puede perder el contexto de ancho en
+          // react-pdf v4 y truncar el texto de las preguntas.
+          <React.Fragment key={gi}>
             <Text style={styles.textoTitulo}>{g.texto.titulo}</Text>
             {g.texto.contenido.split('\n').map((linea, i) => (
               <Text key={i} style={styles.textoBody}>
@@ -395,7 +400,7 @@ function PruebaDocument(props: DocumentoProps) {
             {g.preguntas.map((p) => (
               <BloquePregunta key={p.numero} p={p} />
             ))}
-          </View>
+          </React.Fragment>
         ))}
 
         {sueltas.map((p) => (
