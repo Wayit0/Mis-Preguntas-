@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   textoBody: { fontSize: 10, marginBottom: 8, flexShrink: 1 },
-  preguntaBloque: { marginBottom: 8 },
+  preguntaBloque: { marginBottom: 8, width: AREA_UTIL },
   preguntaNum: {
     fontFamily: 'Times-Bold',
     fontSize: 11,
@@ -385,7 +385,7 @@ function PruebaDocument(props: DocumentoProps) {
         ) : null}
 
         {grupos.map((g, gi) => (
-          <View key={gi}>
+          <View key={gi} style={{ width: AREA_UTIL }}>
             <Text style={styles.textoTitulo}>{g.texto.titulo}</Text>
             {g.texto.contenido.split('\n').map((linea, i) => (
               <Text key={i} style={styles.textoBody}>
