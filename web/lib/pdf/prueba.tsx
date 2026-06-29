@@ -292,26 +292,19 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
   const lineas = lineasDesarrollo(p.tipo)
   return (
     <View style={styles.preguntaBloque}>
-      {/* Número + enunciado + imagen: nunca se cortan en páginas distintas.
-          Se usa ancho absoluto (AREA_UTIL) porque wrap={false} puede mover
-          el bloque a la siguiente página y perder la referencia del padre. */}
-      <View wrap={false} style={{ width: AREA_UTIL }}>
-        <Text style={styles.preguntaNum}>
-          {p.numero}. {p.enunciado}
-        </Text>
-        {p.imagenEnunciado ? (
-          <ImagenPdf img={p.imagenEnunciado} style={styles.imagenPregunta} />
-        ) : null}
-      </View>
-
-      {/* Alternativas o líneas de desarrollo: cada una queda entera */}
+      <Text style={styles.preguntaNum}>
+        {p.numero}. {p.enunciado}
+      </Text>
+      {p.imagenEnunciado ? (
+        <ImagenPdf img={p.imagenEnunciado} style={styles.imagenPregunta} />
+      ) : null}
       {lineas > 0 ? (
         Array.from({ length: lineas }).map((_, i) => (
-          <View key={i} style={styles.lineaRespuesta} wrap={false} />
+          <View key={i} style={styles.lineaRespuesta} />
         ))
       ) : (
         p.alternativas.map((alt) => (
-          <View key={alt.letra} wrap={false} style={{ width: AREA_UTIL }}>
+          <View key={alt.letra}>
             <Text style={styles.alternativa}>
               <Text style={{ fontFamily: 'Times-Bold' }}>{alt.letra})</Text>{' '}
               {alt.texto}
