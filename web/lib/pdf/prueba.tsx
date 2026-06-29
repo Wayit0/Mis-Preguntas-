@@ -95,12 +95,13 @@ const PT_POR_PX = 72 / 96
 
 /**
  * Convierte un Buffer de imagen a PNG y calcula sus dimensiones en puntos,
- * limitando el ancho a `maxWidthPt` y preservando la proporción. Devuelve
- * `null` si la imagen no se puede leer (no debe romper la generación del PDF).
+ * limitando el ancho a `maxWidthPt` y el alto a `maxHeightPt` (preservando
+ * proporción). Devuelve `null` si la imagen no se puede leer.
  */
 async function prepararImagen(
   buffer: Buffer,
   maxWidthPt: number,
+  maxHeightPt?: number,
 ): Promise<ImagenPreparada | null> {
   try {
     const meta = await sharp(buffer).metadata()
@@ -110,8 +111,13 @@ async function prepararImagen(
     // react-pdf solo soporta PNG/JPG; normalizamos todo a PNG (cubre webp/gif).
     const data = meta.format === 'png' ? buffer : await sharp(buffer).png().toBuffer()
     const naturalPt = iw * PT_POR_PX
-    const width = Math.min(maxWidthPt, naturalPt)
-    const height = width * (ih / iw)
+    let width = Math.min(maxWidthPt, naturalPt)
+    let height = width * (ih / iw)
+    // Si hay límite de alto y la imagen es demasiado alta, escalar por alto.
+    if (maxHeightPt && height > maxHeightPt) {
+      height = maxHeightPt
+      width = height * (iw / ih)
+    }
     return { data, width, height }
   } catch {
     return null
@@ -122,6 +128,7 @@ async function prepararImagen(
 async function prepararImagenBlob(
   clave: string | null | undefined,
   maxWidthPt: number,
+  maxHeightPt?: number,
 ): Promise<ImagenPreparada | null> {
   if (!clave || !clave.trim()) return null
   try {
@@ -131,7 +138,7 @@ async function prepararImagenBlob(
     for await (const chunk of img.stream) {
       chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
     }
-    return prepararImagen(Buffer.concat(chunks), maxWidthPt)
+    return prepararImagen(Buffer.concat(chunks), maxWidthPt, maxHeightPt)
   } catch {
     return null
   }
@@ -146,11 +153,13 @@ interface PreguntaPreparada {
   imagenEnunciado: ImagenPreparada | null
 }
 
-// Anchos máximos (en puntos) equivalentes al MVP: 12 cm enunciado, 7 cm alt.
-const MAX_W_ENUNCIADO = 12 * 28.3465
-const MAX_W_ALTERNATIVA = 7 * 28.3465
-const MAX_W_FORMULA = 10 * 28.3465
-const MAX_W_LOGO = 38 // alto ~38pt; el ancho se deriva de la proporción
+// Página LETTER con padding 50pt c/lado → área útil = 512pt.
+const MAX_W_ENUNCIADO   = 15 * 28.3465  // 15 cm ≈ 425pt — casi todo el ancho útil
+const MAX_W_ALTERNATIVA =  8 * 28.3465  // 8 cm ≈ 227pt
+const MAX_W_FORMULA     = 10 * 28.3465
+const MAX_W_LOGO        = 38            // alto objetivo; ancho se deriva de la proporción
+const MAX_H_ENUNCIADO   = 200           // pt — evita imágenes enormes en el enunciado
+const MAX_H_ALTERNATIVA = 160           // pt
 
 function alternativaTieneContenido(texto: string, img: ImagenPreparada | null): boolean {
   return Boolean((texto && texto.trim()) || img)
@@ -161,7 +170,7 @@ async function prepararPregunta(
   numero: number,
 ): Promise<PreguntaPreparada> {
   const tipo = p.tipo || 'seleccion_multiple'
-  const imagenEnunciado = await prepararImagenBlob(p.imagen_pregunta, MAX_W_ENUNCIADO)
+  const imagenEnunciado = await prepararImagenBlob(p.imagen_pregunta, MAX_W_ENUNCIADO, MAX_H_ENUNCIADO)
 
   const alternativas: PreguntaPreparada['alternativas'] = []
   if (tipo === 'seleccion_multiple') {
@@ -171,7 +180,7 @@ async function prepararPregunta(
         | string
         | null
         | undefined
-      const imagen = await prepararImagenBlob(claveImg, MAX_W_ALTERNATIVA)
+      const imagen = await prepararImagenBlob(claveImg, MAX_W_ALTERNATIVA, MAX_H_ALTERNATIVA)
       if (alternativaTieneContenido(texto, imagen)) {
         alternativas.push({ letra, texto, imagen })
       }
@@ -241,9 +250,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     marginBottom: 3,
   },
-  imagenPregunta: { marginVertical: 4 },
-  alternativa: { fontSize: 10, marginLeft: 18, marginBottom: 2 },
-  imagenAlternativa: { marginLeft: 18, marginVertical: 2 },
+  imagenPregunta: { marginTop: 6, marginBottom: 8, alignSelf: 'flex-start' },
+  alternativa: { fontSize: 10, marginLeft: 18, marginBottom: 3 },
+  imagenAlternativa: { marginLeft: 18, marginTop: 2, marginBottom: 6, alignSelf: 'flex-start' },
   lineaRespuesta: {
     borderBottomWidth: 1,
     borderBottomColor: '#999999',
@@ -277,20 +286,25 @@ function lineasDesarrollo(tipo: string): number {
 function BloquePregunta({ p }: { p: PreguntaPreparada }) {
   const lineas = lineasDesarrollo(p.tipo)
   return (
-    <View style={styles.preguntaBloque} wrap={false}>
-      <Text style={styles.preguntaNum}>
-        {p.numero}. {p.enunciado}
-      </Text>
-      {p.imagenEnunciado ? (
-        <ImagenPdf img={p.imagenEnunciado} style={styles.imagenPregunta} />
-      ) : null}
+    <View style={styles.preguntaBloque}>
+      {/* Número + enunciado + imagen del enunciado: se mantienen juntos */}
+      <View wrap={false}>
+        <Text style={styles.preguntaNum}>
+          {p.numero}. {p.enunciado}
+        </Text>
+        {p.imagenEnunciado ? (
+          <ImagenPdf img={p.imagenEnunciado} style={styles.imagenPregunta} />
+        ) : null}
+      </View>
+
+      {/* Alternativas o líneas de desarrollo */}
       {lineas > 0 ? (
         Array.from({ length: lineas }).map((_, i) => (
-          <View key={i} style={styles.lineaRespuesta} />
+          <View key={i} style={styles.lineaRespuesta} wrap={false} />
         ))
       ) : (
         p.alternativas.map((alt) => (
-          <View key={alt.letra}>
+          <View key={alt.letra} wrap={false}>
             <Text style={styles.alternativa}>
               <Text style={{ fontFamily: 'Times-Bold' }}>{alt.letra})</Text>{' '}
               {alt.texto}
