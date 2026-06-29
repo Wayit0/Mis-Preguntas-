@@ -110,10 +110,11 @@ async function prepararImagen(
     if (!iw || !ih) return null
     // react-pdf solo soporta PNG/JPG; normalizamos todo a PNG (cubre webp/gif).
     const data = meta.format === 'png' ? buffer : await sharp(buffer).png().toBuffer()
-    const naturalPt = iw * PT_POR_PX
-    let width = Math.min(maxWidthPt, naturalPt)
+    // Siempre escala al ancho objetivo (ignora el tamaño guardado del archivo)
+    // para que la imagen cubra el ancho completo del texto en el PDF.
+    let width = maxWidthPt
     let height = width * (ih / iw)
-    // Si hay límite de alto y la imagen es demasiado alta, escalar por alto.
+    // Si hay límite de alto (imagen muy alta), escalar por alto manteniendo proporción.
     if (maxHeightPt && height > maxHeightPt) {
       height = maxHeightPt
       width = height * (iw / ih)
@@ -153,13 +154,15 @@ interface PreguntaPreparada {
   imagenEnunciado: ImagenPreparada | null
 }
 
-// Página LETTER con padding 50pt c/lado → área útil = 512pt.
-const MAX_W_ENUNCIADO   = 15 * 28.3465  // 15 cm ≈ 425pt — casi todo el ancho útil
-const MAX_W_ALTERNATIVA =  8 * 28.3465  // 8 cm ≈ 227pt
+// Página LETTER (612pt) con paddingHorizontal 50pt → área útil = 512pt.
+const AREA_UTIL         = 512           // pt — ancho del contenido
+const INDENT_ALT        = 18           // pt — marginLeft de las alternativas
+const MAX_W_ENUNCIADO   = AREA_UTIL                  // imagen ocupa todo el ancho
+const MAX_W_ALTERNATIVA = AREA_UTIL - INDENT_ALT     // igual pero descontando sangría
 const MAX_W_FORMULA     = 10 * 28.3465
 const MAX_W_LOGO        = 38            // alto objetivo; ancho se deriva de la proporción
-const MAX_H_ENUNCIADO   = 200           // pt — evita imágenes enormes en el enunciado
-const MAX_H_ALTERNATIVA = 160           // pt
+const MAX_H_ENUNCIADO   = 300           // pt — proporcional al ancho completo (16:9 ≈ 288pt)
+const MAX_H_ALTERNATIVA = 240           // pt
 
 function alternativaTieneContenido(texto: string, img: ImagenPreparada | null): boolean {
   return Boolean((texto && texto.trim()) || img)
