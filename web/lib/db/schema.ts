@@ -5,6 +5,7 @@ import {
   text,
   timestamp,
   boolean,
+  jsonb,
   primaryKey,
 } from 'drizzle-orm/pg-core'
 
@@ -108,6 +109,38 @@ export const textos = pgTable('textos', {
   contenido: text('contenido').notNull(),
   compartida: integer('compartida').default(0),
   createdAt: timestamp('created_at').defaultNow(),
+})
+
+// ---------------------------------------------------------------------------
+// Pruebas guardadas ("Mis Pruebas"). Persisten la configuración de una prueba
+// (encabezado + selección ordenada de preguntas/textos + fórmulas) para poder
+// listarla, editarla y regenerar su PDF. El PDF generado se cachea en Blob
+// (`pdfKey`); al editar la prueba se invalida (se borra el blob y se pone a
+// NULL) para que el PDF descargable siempre coincida con el contenido guardado.
+// `userId` es un entero sin FK formal, igual que en `preguntas`/`textos`.
+// ---------------------------------------------------------------------------
+
+export const pruebas = pgTable('pruebas', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  asignatura: text('asignatura').notNull(),
+  titulo: text('titulo'),
+  colegio: text('colegio'),
+  profesor: text('profesor'),
+  instrucciones: text('instrucciones'),
+  // Expresiones LaTeX del formulario.
+  formulas: jsonb('formulas').$type<string[]>().notNull().default([]),
+  // IDs de preguntas sueltas seleccionadas — el ORDEN importa (orden del PDF).
+  preguntasIds: jsonb('preguntas_ids').$type<number[]>().notNull().default([]),
+  // IDs de textos de comprensión seleccionados.
+  textosIds: jsonb('textos_ids').$type<number[]>().notNull().default([]),
+  // Clave de blob del logo del colegio (nullable).
+  logo: text('logo'),
+  // Clave de blob del PDF cacheado (NULL = sin PDF o invalidado).
+  pdfKey: text('pdf_key'),
+  pdfGeneradoEn: timestamp('pdf_generado_en'),
+  createdAt: timestamp('created_at').defaultNow(),
+  updatedAt: timestamp('updated_at').defaultNow(),
 })
 
 export const colaboraciones = pgTable(

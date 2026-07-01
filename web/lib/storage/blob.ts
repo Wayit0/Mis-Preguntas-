@@ -112,6 +112,32 @@ export async function uploadImage(file: File): Promise<string> {
 }
 
 /**
+ * Sube un PDF ya generado (Buffer) con una clave única `uuid.pdf` y content-type
+ * `application/pdf`. Se usa para cachear el PDF de una prueba en "Mis Pruebas":
+ * la clave devuelta se persiste en `pruebas.pdf_key`. A diferencia de
+ * `uploadImage`, no aplica la whitelist ráster (el contenido lo genera el
+ * servidor, no el usuario).
+ */
+export async function uploadPdf(buffer: Buffer): Promise<string> {
+  const container = await getContainerClient()
+  const key = `${randomUUID()}.pdf`
+  const blockBlob = container.getBlockBlobClient(key)
+  await blockBlob.uploadData(buffer, {
+    blobHTTPHeaders: { blobContentType: 'application/pdf' },
+  })
+  return key
+}
+
+/**
+ * Borra un blob por su clave (no falla si no existe). Se usa al regenerar,
+ * editar o eliminar una prueba para no dejar PDFs/logos huérfanos.
+ */
+export async function deleteBlob(key: string): Promise<void> {
+  const container = await getContainerClient()
+  await container.getBlockBlobClient(key).deleteIfExists()
+}
+
+/**
  * Descarga un blob por su clave. Retorna el stream y su content-type, o `null`
  * si el blob no existe.
  */

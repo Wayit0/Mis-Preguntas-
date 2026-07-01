@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { guardarPrueba, actualizarPrueba } from '@/lib/actions/pruebas'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -56,6 +58,20 @@ export interface TextoSeleccionable {
   nPreguntas: number
 }
 
+/** Prueba guardada que se carga en el editor para modificarla. */
+export interface PruebaInicial {
+  id: number
+  titulo: string
+  colegio: string
+  profesor: string
+  instrucciones: string
+  formulas: string[]
+  preguntasIds: number[]
+  textosIds: number[]
+  /** Clave de blob del logo guardado (sólo para indicar que hay uno). */
+  logo: string | null
+}
+
 const LETRAS = ['A', 'B', 'C', 'D', 'E'] as const
 
 function conAsignatura(base: string, asignatura: string): string {
@@ -72,18 +88,22 @@ function PanelVistaPrevia({
   textos,
   textosSel,
   pendiente,
+  editando,
+  asignatura,
   onMover,
   onQuitar,
-  onGenerar,
+  onGuardar,
 }: {
   preguntas: PreguntaSeleccionable[]
   seleccion: number[]
   textos: TextoSeleccionable[]
   textosSel: Set<number>
   pendiente: boolean
+  editando: boolean
+  asignatura: string
   onMover: (from: number, to: number) => void
   onQuitar: (id: number) => void
-  onGenerar: () => void
+  onGuardar: () => void
 }) {
   const [dragging, setDragging] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
@@ -241,12 +261,27 @@ function PanelVistaPrevia({
 
         <Button
           type="button"
-          onClick={onGenerar}
+          onClick={onGuardar}
           disabled={pendiente || vacio}
           className="w-full"
         >
-          {pendiente ? 'Generando…' : '⬇️ Generar PDF'}
+          {pendiente
+            ? 'Guardando…'
+            : editando
+              ? '💾 Guardar cambios'
+              : '💾 Guardar prueba'}
         </Button>
+        {editando ? (
+          <Link
+            href={conAsignatura('/mis-pruebas', asignatura)}
+            className={buttonVariants({
+              variant: 'outline',
+              className: 'w-full',
+            })}
+          >
+            Cancelar
+          </Link>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -264,6 +299,7 @@ export function GeneradorPrueba({
   textos,
   colegioInicial = '',
   logoColegioUrl = null,
+  pruebaInicial,
 }: {
   asignatura: string
   profesorInicial: string
@@ -272,20 +308,45 @@ export function GeneradorPrueba({
   textos: TextoSeleccionable[]
   colegioInicial?: string | null
   logoColegioUrl?: string | null
+  /** Si se pasa, el editor modifica esa prueba en vez de crear una nueva. */
+  pruebaInicial?: PruebaInicial
 }) {
-  const [titulo, setTitulo] = useState('')
-  const [colegio, setColegio] = useState(colegioInicial ?? '')
-  const [profesor, setProfesor] = useState(profesorInicial)
-  const [instrucciones, setInstrucciones] = useState('')
+  const router = useRouter()
+  const editando = pruebaInicial != null
+
+  const [titulo, setTitulo] = useState(pruebaInicial?.titulo ?? '')
+  const [colegio, setColegio] = useState(
+    pruebaInicial?.colegio || colegioInicial || '',
+  )
+  const [profesor, setProfesor] = useState(
+    pruebaInicial?.profesor || profesorInicial,
+  )
+  const [instrucciones, setInstrucciones] = useState(
+    pruebaInicial?.instrucciones ?? '',
+  )
   const [logo, setLogo] = useState<File | null>(null)
 
-  const [formulas, setFormulas] = useState<string[]>([])
+  const [formulas, setFormulas] = useState<string[]>(
+    pruebaInicial?.formulas ?? [],
+  )
   const [nuevaFormula, setNuevaFormula] = useState('')
 
   const [filtroMateria, setFiltroMateria] = useState<string>('__todas__')
-  // Array ordenado de IDs seleccionados (el orden importa para el PDF)
-  const [seleccion, setSeleccion] = useState<number[]>([])
-  const [textosSel, setTextosSel] = useState<Set<number>>(new Set())
+  // Array ordenado de IDs seleccionados (el orden importa para el PDF). Al
+  // editar, se conservan sólo los IDs que aún existen (los borrados se ignoran).
+  const [seleccion, setSeleccion] = useState<number[]>(() =>
+    (pruebaInicial?.preguntasIds ?? []).filter((id) =>
+      preguntas.some((p) => p.id === id),
+    ),
+  )
+  const [textosSel, setTextosSel] = useState<Set<number>>(
+    () =>
+      new Set(
+        (pruebaInicial?.textosIds ?? []).filter((id) =>
+          textos.some((t) => t.id === id),
+        ),
+      ),
+  )
 
   const [pendiente, setPendiente] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -336,7 +397,7 @@ export function GeneradorPrueba({
     setFormulas((prev) => prev.filter((_, idx) => idx !== i))
   }
 
-  async function generar() {
+  async function guardar() {
     setError(null)
     if (seleccion.length === 0 && textosSel.size === 0) {
       setError('Selecciona al menos una pregunta o un texto.')
@@ -356,26 +417,21 @@ export function GeneradorPrueba({
       for (const id of textosSel) fd.append('texto', String(id))
       if (logo) fd.set('logo', logo)
 
-      const res = await fetch('/api/prueba', { method: 'POST', body: fd })
-      if (!res.ok) {
-        const msg = await res.text().catch(() => '')
-        setError(msg || 'No se pudo generar el PDF. Inténtalo de nuevo.')
+      const resultado = pruebaInicial
+        ? await actualizarPrueba(pruebaInicial.id, fd)
+        : await guardarPrueba(fd)
+
+      if ('error' in resultado) {
+        setError(resultado.error)
         setPendiente(false)
         return
       }
 
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `prueba_${asignatura || 'general'}.pdf`
-      document.body.appendChild(a)
-      a.click()
-      a.remove()
-      URL.revokeObjectURL(url)
+      // Éxito: la lista ya fue revalidada en el servidor; vamos a "Mis Pruebas".
+      router.push(conAsignatura('/mis-pruebas', asignatura))
+      router.refresh()
     } catch {
-      setError('Ocurrió un error al generar el PDF. Inténtalo de nuevo.')
-    } finally {
+      setError('Ocurrió un error al guardar la prueba. Inténtalo de nuevo.')
       setPendiente(false)
     }
   }
@@ -384,7 +440,7 @@ export function GeneradorPrueba({
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-5">
       <div className="flex flex-col gap-1">
         <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
-          Crear Prueba
+          {editando ? 'Editar Prueba' : 'Crear Prueba'}
           {asignatura ? (
             <span className="font-semibold text-muted-foreground">
               {' — '}
@@ -393,7 +449,8 @@ export function GeneradorPrueba({
           ) : null}
         </h1>
         <p className="text-sm text-muted-foreground">
-          Selecciona preguntas, ajusta el encabezado y descarga la prueba en PDF.
+          Selecciona preguntas, ajusta el encabezado y guarda la prueba. El PDF se
+          genera y descarga desde «Mis Pruebas».
         </p>
       </div>
 
@@ -483,6 +540,11 @@ export function GeneradorPrueba({
                       >
                         (quitar)
                       </button>
+                    </p>
+                  ) : pruebaInicial?.logo ? (
+                    <p className="text-xs text-muted-foreground">
+                      Esta prueba ya tiene un logo guardado. Sube uno nuevo sólo si
+                      quieres reemplazarlo.
                     </p>
                   ) : null}
                 </div>
@@ -691,9 +753,11 @@ export function GeneradorPrueba({
               textos={textos}
               textosSel={textosSel}
               pendiente={pendiente}
+              editando={editando}
+              asignatura={asignatura}
               onMover={mover}
               onQuitar={quitar}
-              onGenerar={generar}
+              onGuardar={guardar}
             />
           </div>
         </div>

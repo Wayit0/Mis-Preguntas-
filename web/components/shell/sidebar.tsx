@@ -27,6 +27,7 @@ const GRUPOS: NavGrupo[] = [
       { href: '/preguntas/nueva', etiqueta: 'Agregar Pregunta', emoji: '➕' },
       { href: '/textos', etiqueta: 'Mis Textos', emoji: '📰' },
       { href: '/prueba', etiqueta: 'Crear Prueba', emoji: '📝' },
+      { href: '/mis-pruebas', etiqueta: 'Mis Pruebas', emoji: '🗂️' },
     ],
   },
   {
@@ -64,6 +65,9 @@ function esActivo(pathname: string, href: string): boolean {
   if (pathname === href) return true
   if (href === '/preguntas') {
     return pathname.startsWith('/preguntas/') && pathname !== '/preguntas/nueva'
+  }
+  if (href === '/mis-pruebas') {
+    return pathname.startsWith('/mis-pruebas/')
   }
   if (href === '/colegio') {
     return pathname.startsWith('/colegio/')

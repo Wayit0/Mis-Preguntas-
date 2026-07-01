@@ -84,6 +84,11 @@ jobs:
           set -e
           cp -r .next/static .next/standalone/.next/static
           if [ -d public ]; then cp -r public .next/standalone/public; fi
+          # Migraciones Drizzle (SQL + meta/_journal.json): las aplica el
+          # migrate-on-boot de instrumentation.ts. No son módulos importados, así
+          # que el tracer de Next NO las incluye; se copian a la raíz de ejecución
+          # (cwd del server), donde runMigrations() las busca en ./drizzle.
+          cp -r drizzle .next/standalone/drizzle
           # sharp: el tracer de Next no copia el binario nativo (@img). OJO: hay
           # DOS versiones de sharp en el árbol — la que trae Next (libvips 8.17.3,
           # hoisteada al @img de nivel superior) y la de la app, sharp@0.35.x
@@ -101,6 +106,7 @@ jobs:
           fi
           test -f .next/standalone/server.js
           test -d .next/standalone/node_modules/@img
+          test -f .next/standalone/drizzle/meta/_journal.json
 
       # Gate de runtime: carga sharp tal como lo hará el server (vía el symlink de
       # serverExternalPackages) y genera un PNG. Si la libvips correcta no está en
