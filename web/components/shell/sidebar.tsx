@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useSearchParams } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useMobileNav } from './mobile-nav'
+import { SubjectSwitcher } from './subject-switcher'
 
 interface NavItem {
   href: string
@@ -80,24 +81,25 @@ function esActivo(pathname: string, href: string): boolean {
 
 function SidebarNav({
   pathname,
-  asignatura,
+  asignaturaActual,
   grupos,
   onNavegar,
 }: {
   pathname: string
-  asignatura: string | null
+  asignaturaActual: string
   grupos: NavGrupo[]
   onNavegar?: () => void
 }) {
-  // Cada link preserva el contexto de asignatura actual (?asignatura=).
-  function hrefCon(base: string): string {
-    return asignatura
-      ? `${base}?asignatura=${encodeURIComponent(asignatura)}`
-      : base
-  }
-
   return (
     <nav aria-label="Secciones" className="flex flex-col gap-5 px-2 py-4">
+      {/* Selector global de asignatura (contexto persistente en cookie). */}
+      <div className="px-1">
+        <div className="px-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
+          Asignatura
+        </div>
+        <SubjectSwitcher asignaturaActual={asignaturaActual} />
+      </div>
+
       {grupos.map((grupo) => (
         <div key={grupo.titulo} className="flex flex-col gap-1">
           <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/45">
@@ -108,7 +110,7 @@ function SidebarNav({
             return (
               <Link
                 key={item.href}
-                href={hrefCon(item.href)}
+                href={item.href}
                 onClick={onNavegar}
                 aria-current={activo ? 'page' : undefined}
                 className={cn(
@@ -134,24 +136,29 @@ function SidebarNav({
 export function Sidebar({
   puedeAdminColegio = false,
   esGlobalAdmin = false,
+  asignaturaActual = '',
 }: {
   /** Muestra "Mi Colegio" (/colegio) a school_admin/global_admin. */
   puedeAdminColegio?: boolean
   /** Muestra "Administración" (/admin) SOLO al admin global. */
   esGlobalAdmin?: boolean
+  /** Asignatura activa (cookie o más usada), resuelta en el servidor. */
+  asignaturaActual?: string
 }) {
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const { abierto, cerrar } = useMobileNav()
 
-  const asignatura = searchParams.get('asignatura')
   const grupos = gruposPara(puedeAdminColegio, esGlobalAdmin)
 
   return (
     <>
       {/* Sidebar fijo en escritorio */}
       <aside className="hidden w-60 shrink-0 flex-col bg-sidebar text-sidebar-foreground md:flex">
-        <SidebarNav pathname={pathname} asignatura={asignatura} grupos={grupos} />
+        <SidebarNav
+          pathname={pathname}
+          asignaturaActual={asignaturaActual}
+          grupos={grupos}
+        />
       </aside>
 
       {/* Menú colapsable en móvil (se abre con el botón ☰ del topbar) */}
@@ -179,7 +186,7 @@ export function Sidebar({
             </div>
             <SidebarNav
               pathname={pathname}
-              asignatura={asignatura}
+              asignaturaActual={asignaturaActual}
               grupos={grupos}
               onNavegar={cerrar}
             />

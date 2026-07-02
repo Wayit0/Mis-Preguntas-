@@ -1,6 +1,7 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ChevronDown } from 'lucide-react'
 import {
   DropdownMenu,
@@ -9,43 +10,57 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ASIGNATURAS } from './subjects'
+import { ASIGNATURAS, COOKIE_ASIGNATURA } from './subjects'
 
 const TODAS = '📚 Todas las asignaturas'
 
-// Selector global de asignatura. Al elegir una, actualiza el searchParam
-// `?asignatura=` conservando la ruta actual (y el resto de params).
-export function SubjectSwitcher() {
+// Selector global de asignatura, en el menú lateral. Persiste la elección en una
+// cookie de un año (la última seleccionada se mantiene entre navegaciones y
+// recargas) y refresca los server components para que las listas y formularios
+// tomen la nueva asignatura. El valor actual llega ya resuelto desde el servidor
+// (`asignaturaActual`): cookie o, en su defecto, la asignatura más usada.
+export function SubjectSwitcher({
+  asignaturaActual,
+}: {
+  asignaturaActual: string
+}) {
   const router = useRouter()
-  const pathname = usePathname()
-  const searchParams = useSearchParams()
+  // Estado optimista: refleja la elección al instante. Se resincroniza con el
+  // valor del servidor ajustando el estado DURANTE el render (patrón recomendado
+  // por React), no en un efecto, para evitar renders en cascada.
+  const [sel, setSel] = useState(asignaturaActual)
+  const [prev, setPrev] = useState(asignaturaActual)
+  if (asignaturaActual !== prev) {
+    setPrev(asignaturaActual)
+    setSel(asignaturaActual)
+  }
 
-  const actual = searchParams.get('asignatura')
-  const activa = ASIGNATURAS.find((a) => a.nombre === actual)
+  const activa = ASIGNATURAS.find((a) => a.nombre === sel)
 
   function seleccionar(nombre: string | null) {
-    const params = new URLSearchParams(searchParams.toString())
+    setSel(nombre ?? '')
     if (nombre) {
-      params.set('asignatura', nombre)
+      document.cookie = `${COOKIE_ASIGNATURA}=${encodeURIComponent(
+        nombre,
+      )}; path=/; max-age=31536000; samesite=lax`
     } else {
-      params.delete('asignatura')
+      document.cookie = `${COOKIE_ASIGNATURA}=; path=/; max-age=0; samesite=lax`
     }
-    const qs = params.toString()
-    router.push(qs ? `${pathname}?${qs}` : pathname)
+    router.refresh()
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label="Cambiar asignatura"
-        className="inline-flex max-w-[14rem] items-center gap-1.5 rounded-lg border border-border bg-secondary px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-muted aria-expanded:bg-muted"
+        className="inline-flex w-full items-center justify-between gap-1.5 rounded-lg border border-sidebar-border bg-sidebar-accent/40 px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent aria-expanded:bg-sidebar-accent"
       >
         <span className="truncate">
           {activa ? `${activa.emoji} ${activa.nombre}` : TODAS}
         </span>
         <ChevronDown className="size-4 shrink-0 opacity-60" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-60">
+      <DropdownMenuContent align="start" className="w-56">
         <div className="px-1.5 py-1 text-xs font-medium text-muted-foreground">
           Asignatura
         </div>

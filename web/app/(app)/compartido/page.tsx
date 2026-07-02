@@ -1,19 +1,17 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
+import { resolverAsignatura } from '@/lib/asignatura'
 import { cargarBancoCompartido } from '@/lib/queries/compartido'
 import { TarjetaPregunta } from '@/components/preguntas/tarjeta-pregunta'
 
-export default async function CompartidoPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ asignatura?: string }>
-}) {
-  const { asignatura } = await searchParams
-
+export default async function CompartidoPage() {
   // Guard explícito (además del layout) para no consultar con un userId inválido.
   const session = await getSession()
   if (!session) redirect('/login')
   const userId = Number(session.user.id)
+
+  // La asignatura es contexto global (cookie), no viene de la URL.
+  const asignatura = await resolverAsignatura(userId)
 
   const lista = await cargarBancoCompartido(userId, asignatura)
 

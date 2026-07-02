@@ -13,7 +13,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { SubjectSwitcher } from './subject-switcher'
 import { useMobileNav } from './mobile-nav'
 
 interface TopbarProps {
@@ -57,8 +56,6 @@ export function Topbar({ user }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
-        <SubjectSwitcher />
-
         <DropdownMenu>
           <DropdownMenuTrigger
             aria-label="Abrir menú de perfil"

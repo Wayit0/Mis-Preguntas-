@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
+import { resolverAsignatura } from '@/lib/asignatura'
 import {
   cargarTextosPropios,
   contarPreguntasPorTexto,
@@ -26,9 +27,9 @@ function hrefTab(tab: Tab, asignatura?: string): string {
 export default async function TextosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ asignatura?: string; tab?: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
-  const { asignatura, tab } = await searchParams
+  const { tab } = await searchParams
   const tabActual = normalizarTab(tab)
 
   // Guard explícito (además del layout) para no ejecutar queries con un userId
@@ -36,6 +37,9 @@ export default async function TextosPage({
   const session = await getSession()
   if (!session) redirect('/login')
   const userId = Number(session.user.id)
+
+  // La asignatura es contexto global (cookie), no viene de la URL.
+  const asignatura = await resolverAsignatura(userId)
 
   const textosPropios = await cargarTextosPropios(userId, asignatura)
   const conteos = await contarPreguntasPorTexto(textosPropios.map((t) => t.id))
@@ -89,7 +93,7 @@ export default async function TextosPage({
       </div>
 
       {tabActual === 'crear' ? (
-        <FormularioTexto asignaturaInicial={asignatura} />
+        <FormularioTexto asignaturaInicial={asignatura || undefined} />
       ) : textosPropios.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <p className="text-base font-medium text-foreground">

@@ -1,6 +1,22 @@
-import { and, desc, eq, gt, ilike, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, gt, ilike, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { preguntas } from '@/lib/db/schema'
+
+/**
+ * La asignatura con más preguntas del usuario. Alimenta el default del contexto
+ * de asignatura cuando el usuario aún no ha elegido una (no hay cookie). Devuelve
+ * `null` si el usuario no tiene ninguna pregunta.
+ */
+export async function asignaturaMasUsada(userId: number): Promise<string | null> {
+  const filas = await db
+    .select({ asignatura: preguntas.asignatura, n: count() })
+    .from(preguntas)
+    .where(eq(preguntas.userId, userId))
+    .groupBy(preguntas.asignatura)
+    .orderBy(desc(count()))
+    .limit(1)
+  return filas[0]?.asignatura ?? null
+}
 
 /** Una fila de la tabla `preguntas` tal cual se lee de la base. */
 export type Pregunta = typeof preguntas.$inferSelect

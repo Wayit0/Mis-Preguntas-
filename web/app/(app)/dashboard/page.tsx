@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
 import { getActor } from '@/lib/authz'
+import { resolverAsignatura } from '@/lib/asignatura'
 import { getDashboardStats } from '@/lib/queries/dashboard'
 import { buttonVariants } from '@/components/ui/button'
 import {
@@ -19,12 +20,7 @@ function hrefCon(base: string, asignatura?: string): string {
     : base
 }
 
-export default async function DashboardPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ asignatura?: string }>
-}) {
-  const { asignatura } = await searchParams
+export default async function DashboardPage() {
   const session = await getSession()
   // El layout (app) ya protege la ruta, pero guardamos aquí también: sin esto, la
   // página se renderiza concurrentemente con el redirect del layout y alcanza a
@@ -32,6 +28,9 @@ export default async function DashboardPage({
   if (!session) redirect('/login')
   const nombre = session.user.name ?? 'Profesor'
   const userId = Number(session.user.id)
+
+  // La asignatura es contexto global (cookie), no viene de la URL.
+  const asignatura = await resolverAsignatura(userId)
 
   const stats = await getDashboardStats(userId, asignatura)
 

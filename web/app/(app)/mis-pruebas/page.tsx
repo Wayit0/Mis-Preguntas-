@@ -1,27 +1,18 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
+import { resolverAsignatura } from '@/lib/asignatura'
 import { listarPruebasPropias } from '@/lib/queries/pruebas'
 import { buttonVariants } from '@/components/ui/button'
 import { TarjetaPrueba } from '@/components/pruebas/tarjeta-prueba'
 
-/** Construye un href preservando la asignatura actual (?asignatura=). */
-function conAsignatura(base: string, asignatura?: string): string {
-  return asignatura
-    ? `${base}?asignatura=${encodeURIComponent(asignatura)}`
-    : base
-}
-
-export default async function MisPruebasPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ asignatura?: string }>
-}) {
-  const { asignatura } = await searchParams
-
+export default async function MisPruebasPage() {
   const session = await getSession()
   if (!session) redirect('/login')
   const userId = Number(session.user.id)
+
+  // La asignatura es contexto global (cookie), no viene de la URL.
+  const asignatura = await resolverAsignatura(userId)
 
   const pruebas = await listarPruebasPropias(userId, asignatura)
 
@@ -43,7 +34,7 @@ export default async function MisPruebasPage({
           </p>
         </div>
         <Link
-          href={conAsignatura('/prueba', asignatura)}
+          href="/prueba"
           className={buttonVariants()}
         >
           ➕ Nueva prueba
@@ -60,7 +51,7 @@ export default async function MisPruebasPage({
             su PDF.
           </p>
           <Link
-            href={conAsignatura('/prueba', asignatura)}
+            href="/prueba"
             className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
           >
             ➕ Crear una prueba

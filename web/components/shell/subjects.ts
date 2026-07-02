@@ -1,3 +1,10 @@
+/**
+ * Nombre de la cookie del contexto de asignatura. Vive aquí (módulo sin imports
+ * de servidor) para poder compartirlo entre el selector cliente y el helper de
+ * servidor `lib/asignatura.ts` sin filtrar `next/headers` al bundle del cliente.
+ */
+export const COOKIE_ASIGNATURA = 'asignatura'
+
 export interface Asignatura {
   /** Nombre visible y, a la vez, valor del searchParam `?asignatura=`. */
   nombre: string

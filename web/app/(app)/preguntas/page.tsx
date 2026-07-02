@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
+import { resolverAsignatura } from '@/lib/asignatura'
 import {
   listarPreguntasPropias,
   opcionesDeFiltros,
@@ -28,20 +29,22 @@ export default async function PreguntasPage({
   searchParams,
 }: {
   searchParams: Promise<{
-    asignatura?: string
     materia?: string
     nivel?: string
     estado?: string
     busqueda?: string
   }>
 }) {
-  const { asignatura, materia, nivel, estado, busqueda } = await searchParams
+  const { materia, nivel, estado, busqueda } = await searchParams
 
   // Guard explícito (además del layout) para no ejecutar queries con un userId
   // inválido si la página se renderiza junto al redirect del layout.
   const session = await getSession()
   if (!session) redirect('/login')
   const userId = Number(session.user.id)
+
+  // La asignatura es contexto global (cookie), no viene de la URL.
+  const asignatura = await resolverAsignatura(userId)
 
   const filtros = {
     materia,
