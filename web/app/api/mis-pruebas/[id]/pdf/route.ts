@@ -91,14 +91,17 @@ export async function POST(
   const prueba = await cargarPruebaPorId(Number(id), userId)
   if (!prueba) return new Response('No encontrado', { status: 404 })
 
-  // Logo: el guardado en la prueba si tiene; si no, cae al logo del colegio del
-  // usuario (misma lógica que la generación puntual en /api/prueba). Resuelto a
-  // bytes desde el blob.
+  // Logo: primero intenta el logo guardado en la prueba; si el blob no se
+  // encuentra (borrado o nunca subido), cae al logo del colegio del usuario.
   let logo: Buffer | null = null
-  const logoKey = prueba.logo ?? (await obtenerColegioPorUsuario(userId))?.logo ?? null
-  if (logoKey) {
-    const blob = await getImageStream(logoKey)
-    if (blob) logo = await streamABuffer(blob.stream)
+  const colegioLogo = (await obtenerColegioPorUsuario(userId))?.logo ?? null
+  for (const key of [prueba.logo, colegioLogo]) {
+    if (!key) continue
+    const blob = await getImageStream(key)
+    if (blob) {
+      logo = await streamABuffer(blob.stream)
+      break
+    }
   }
 
   let pdf: Buffer
