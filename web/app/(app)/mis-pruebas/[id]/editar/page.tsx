@@ -24,8 +24,6 @@ export default async function EditarPruebaPage({
     obtenerColegioPorUsuario(userId),
   ])
 
-  const esAdmin = actor.role === 'school_admin' || actor.role === 'global_admin'
-
   return (
     <GeneradorPrueba
       asignatura={prueba.asignatura}
@@ -35,7 +33,6 @@ export default async function EditarPruebaPage({
       textos={textos}
       colegioInicial={colegio?.nombre ?? prueba.colegio ?? ''}
       logoColegioUrl={colegio?.logo ? imageUrl(colegio.logo) : null}
-      esAdmin={esAdmin}
       pruebaInicial={{
         id: prueba.id,
         titulo: prueba.titulo ?? '',

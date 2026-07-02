@@ -3,9 +3,9 @@
 import { and, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { pruebas } from '@/lib/db/schema'
+import { colegios, pruebas, usuarios } from '@/lib/db/schema'
 import { getSession } from '@/lib/get-session'
-import { deleteBlob } from '@/lib/storage/blob'
+import { deleteBlob, uploadImage } from '@/lib/storage/blob'
 import { idsDesde } from '@/lib/pdf/construir'
 import {
   extraerCamposPrueba,
@@ -20,6 +20,28 @@ export type ResultadoPrueba = { error: string } | { id: number }
 function oNull(valor: string): string | null {
   const limpio = valor.trim()
   return limpio.length > 0 ? limpio : null
+}
+
+/**
+ * Guarda la clave del logo en `colegios` para cualquier usuario que pertenezca
+ * a un colegio, de modo que el logo quede compartido en todos los PDFs.
+ */
+async function guardarLogoEnColegio(userId: number, logoKey: string): Promise<void> {
+  try {
+    const [fila] = await db
+      .select({ colegioId: usuarios.colegioId })
+      .from(usuarios)
+      .where(eq(usuarios.id, userId))
+      .limit(1)
+    if (fila?.colegioId) {
+      await db
+        .update(colegios)
+        .set({ logo: logoKey })
+        .where(eq(colegios.id, fila.colegioId))
+    }
+  } catch {
+    // No bloquea la operación principal.
+  }
 }
 
 /** Extrae la selección (fórmulas + ids de preguntas/textos) del FormData. */
@@ -50,6 +72,12 @@ export async function guardarPrueba(
   if (!parsed.success) return { error: primerErrorPrueba(parsed.error) }
   const data = parsed.data
   const seleccion = extraerSeleccion(formData)
+
+  const logoEntry = formData.get('logo')
+  if (logoEntry instanceof File && logoEntry.size > 0) {
+    const logoKey = await uploadImage(logoEntry)
+    await guardarLogoEnColegio(userId, logoKey)
+  }
 
   const [fila] = await db
     .insert(pruebas)
@@ -95,6 +123,12 @@ export async function actualizarPrueba(
   if (!parsed.success) return { error: primerErrorPrueba(parsed.error) }
   const data = parsed.data
   const seleccion = extraerSeleccion(formData)
+
+  const logoEntry = formData.get('logo')
+  if (logoEntry instanceof File && logoEntry.size > 0) {
+    const logoKey = await uploadImage(logoEntry)
+    await guardarLogoEnColegio(userId, logoKey)
+  }
 
   // Invalidar el PDF cacheado: borrar el blob previo (si existía).
   if (existente.pdfKey) await deleteBlob(existente.pdfKey)

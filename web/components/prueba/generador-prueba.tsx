@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { guardarPrueba, actualizarPrueba } from '@/lib/actions/pruebas'
@@ -297,7 +297,6 @@ export function GeneradorPrueba({
   textos,
   colegioInicial = '',
   logoColegioUrl = null,
-  esAdmin = false,
   pruebaInicial,
 }: {
   asignatura: string
@@ -307,7 +306,6 @@ export function GeneradorPrueba({
   textos: TextoSeleccionable[]
   colegioInicial?: string | null
   logoColegioUrl?: string | null
-  esAdmin?: boolean
   /** Si se pasa, el editor modifica esa prueba en vez de crear una nueva. */
   pruebaInicial?: PruebaInicial
 }) {
@@ -348,6 +346,7 @@ export function GeneradorPrueba({
 
   const [pendiente, setPendiente] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const logoRef = useRef<HTMLInputElement>(null)
 
   const preguntasFiltradas = useMemo(() => {
     if (filtroMateria === '__todas__') return preguntas
@@ -409,6 +408,8 @@ export function GeneradorPrueba({
       fd.set('colegio', colegio)
       fd.set('profesor', profesor)
       fd.set('instrucciones', instrucciones)
+      const logoFile = logoRef.current?.files?.[0]
+      if (logoFile) fd.set('logo', logoFile)
       for (const expr of formulas) fd.append('formula', expr)
       // El orden del array determina el orden en el PDF
       for (const id of seleccion) fd.append('pregunta', String(id))
@@ -506,43 +507,31 @@ export function GeneradorPrueba({
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label>Logo del colegio</Label>
+                  <Label htmlFor="logo">Logo del colegio</Label>
                   {logoColegioUrl ? (
-                    <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
+                    <div className="mb-1 flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
                       <img
                         src={logoColegioUrl}
                         alt="Logo del colegio"
                         className="h-10 w-auto object-contain"
                       />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs text-muted-foreground">
-                          Se incluye automáticamente en el PDF.
-                        </p>
-                      </div>
-                      {esAdmin ? (
-                        <a
-                          href="/colegio?tab=config"
-                          className="shrink-0 text-xs text-primary hover:underline"
-                        >
-                          Cambiar
-                        </a>
-                      ) : null}
+                      <p className="text-xs text-muted-foreground">
+                        Logo actual — se incluye en el PDF.
+                      </p>
                     </div>
-                  ) : (
-                    <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                      {esAdmin ? (
-                        <>
-                          Sin logo.{' '}
-                          <a href="/colegio?tab=config" className="text-primary hover:underline">
-                            Súbelo en Configuración del colegio
-                          </a>{' '}
-                          para que aparezca en todos tus PDFs.
-                        </>
-                      ) : (
-                        'Sin logo configurado. El administrador del colegio puede subir uno desde la configuración.'
-                      )}
-                    </p>
-                  )}
+                  ) : null}
+                  <input
+                    ref={logoRef}
+                    id="logo"
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="text-sm text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-secondary file:px-2 file:py-1 file:text-xs file:font-medium file:text-foreground"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {logoColegioUrl
+                      ? 'Sube un archivo para reemplazar el logo del colegio en todos los PDFs.'
+                      : 'Se usará en todos los PDFs del colegio.'}
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
