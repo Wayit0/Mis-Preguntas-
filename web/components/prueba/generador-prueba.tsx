@@ -68,8 +68,6 @@ export interface PruebaInicial {
   formulas: string[]
   preguntasIds: number[]
   textosIds: number[]
-  /** Clave de blob del logo guardado (sólo para indicar que hay uno). */
-  logo: string | null
 }
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E'] as const
@@ -299,6 +297,7 @@ export function GeneradorPrueba({
   textos,
   colegioInicial = '',
   logoColegioUrl = null,
+  esAdmin = false,
   pruebaInicial,
 }: {
   asignatura: string
@@ -308,6 +307,7 @@ export function GeneradorPrueba({
   textos: TextoSeleccionable[]
   colegioInicial?: string | null
   logoColegioUrl?: string | null
+  esAdmin?: boolean
   /** Si se pasa, el editor modifica esa prueba en vez de crear una nueva. */
   pruebaInicial?: PruebaInicial
 }) {
@@ -324,8 +324,6 @@ export function GeneradorPrueba({
   const [instrucciones, setInstrucciones] = useState(
     pruebaInicial?.instrucciones ?? '',
   )
-  const [logo, setLogo] = useState<File | null>(null)
-
   const [formulas, setFormulas] = useState<string[]>(
     pruebaInicial?.formulas ?? [],
   )
@@ -415,7 +413,6 @@ export function GeneradorPrueba({
       // El orden del array determina el orden en el PDF
       for (const id of seleccion) fd.append('pregunta', String(id))
       for (const id of textosSel) fd.append('texto', String(id))
-      if (logo) fd.set('logo', logo)
 
       const resultado = pruebaInicial
         ? await actualizarPrueba(pruebaInicial.id, fd)
@@ -509,44 +506,43 @@ export function GeneradorPrueba({
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="logo">Logo del colegio (opcional)</Label>
-                  {logoColegioUrl && !logo ? (
+                  <Label>Logo del colegio</Label>
+                  {logoColegioUrl ? (
                     <div className="flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
                       <img
                         src={logoColegioUrl}
-                        alt="Logo guardado del colegio"
+                        alt="Logo del colegio"
                         className="h-10 w-auto object-contain"
                       />
-                      <span className="text-xs text-muted-foreground">
-                        Logo guardado — se usará automáticamente. Sube uno nuevo para reemplazarlo.
-                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs text-muted-foreground">
+                          Se incluye automáticamente en el PDF.
+                        </p>
+                      </div>
+                      {esAdmin ? (
+                        <a
+                          href="/colegio?tab=config"
+                          className="shrink-0 text-xs text-primary hover:underline"
+                        >
+                          Cambiar
+                        </a>
+                      ) : null}
                     </div>
-                  ) : null}
-                  <input
-                    id="logo"
-                    name="logo"
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    className="max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
-                    onChange={(e) => setLogo(e.target.files?.[0] ?? null)}
-                  />
-                  {logo ? (
-                    <p className="text-xs text-muted-foreground">
-                      Archivo seleccionado: {logo.name}{' '}
-                      <button
-                        type="button"
-                        onClick={() => setLogo(null)}
-                        className="text-destructive hover:underline"
-                      >
-                        (quitar)
-                      </button>
+                  ) : (
+                    <p className="rounded-md border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                      {esAdmin ? (
+                        <>
+                          Sin logo.{' '}
+                          <a href="/colegio?tab=config" className="text-primary hover:underline">
+                            Súbelo en Configuración del colegio
+                          </a>{' '}
+                          para que aparezca en todos tus PDFs.
+                        </>
+                      ) : (
+                        'Sin logo configurado. El administrador del colegio puede subir uno desde la configuración.'
+                      )}
                     </p>
-                  ) : pruebaInicial?.logo ? (
-                    <p className="text-xs text-muted-foreground">
-                      Esta prueba ya tiene un logo guardado. Sube uno nuevo sólo si
-                      quieres reemplazarlo.
-                    </p>
-                  ) : null}
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1.5">

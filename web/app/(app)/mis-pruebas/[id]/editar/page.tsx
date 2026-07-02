@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation'
-import { getSession } from '@/lib/get-session'
+import { getActor } from '@/lib/authz'
 import { cargarPruebaPorId, cargarDatosGenerador } from '@/lib/queries/pruebas'
+import { obtenerColegioPorUsuario } from '@/lib/queries/colegio'
+import { imageUrl } from '@/lib/storage/blob'
 import { GeneradorPrueba } from '@/components/prueba/generador-prueba'
 
 export default async function EditarPruebaPage({
@@ -10,27 +12,30 @@ export default async function EditarPruebaPage({
 }) {
   const { id } = await params
 
-  const session = await getSession()
-  if (!session) redirect('/login')
-  const userId = Number(session.user.id)
+  const actor = await getActor()
+  if (!actor) redirect('/login')
+  const userId = actor.userId
 
-  // Guard de propiedad: cargarPruebaPorId sólo devuelve la prueba si es del
-  // usuario. 404 si no existe o no le pertenece.
   const prueba = await cargarPruebaPorId(Number(id), userId)
   if (!prueba) notFound()
 
-  const { preguntas, materias, textos } = await cargarDatosGenerador(
-    userId,
-    prueba.asignatura,
-  )
+  const [{ preguntas, materias, textos }, colegio] = await Promise.all([
+    cargarDatosGenerador(userId, prueba.asignatura),
+    obtenerColegioPorUsuario(userId),
+  ])
+
+  const esAdmin = actor.role === 'school_admin' || actor.role === 'global_admin'
 
   return (
     <GeneradorPrueba
       asignatura={prueba.asignatura}
-      profesorInicial={session.user.name ?? ''}
+      profesorInicial={actor.nombre}
       preguntas={preguntas}
       materias={materias}
       textos={textos}
+      colegioInicial={colegio?.nombre ?? prueba.colegio ?? ''}
+      logoColegioUrl={colegio?.logo ? imageUrl(colegio.logo) : null}
+      esAdmin={esAdmin}
       pruebaInicial={{
         id: prueba.id,
         titulo: prueba.titulo ?? '',
@@ -40,7 +45,6 @@ export default async function EditarPruebaPage({
         formulas: prueba.formulas ?? [],
         preguntasIds: prueba.preguntasIds ?? [],
         textosIds: prueba.textosIds ?? [],
-        logo: prueba.logo ?? null,
       }}
     />
   )
