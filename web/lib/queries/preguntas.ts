@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, type SQL } from 'drizzle-orm'
+import { and, desc, eq, gt, ilike, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { preguntas } from '@/lib/db/schema'
 
@@ -12,6 +12,8 @@ export interface FiltrosPreguntas {
   materia?: string
   nivel?: string
   estado?: EstadoCompartida
+  /** Búsqueda por código (#123) o texto libre en el enunciado. */
+  busqueda?: string
 }
 
 /**
@@ -30,6 +32,16 @@ export async function listarPreguntasPropias(
   if (filtros?.nivel) conds.push(eq(preguntas.nivel, filtros.nivel))
   if (filtros?.estado === 'compartida') conds.push(gt(preguntas.compartida, 0))
   if (filtros?.estado === 'privada') conds.push(eq(preguntas.compartida, 0))
+  if (filtros?.busqueda) {
+    const term = filtros.busqueda.trim()
+    const sinHash = term.replace(/^#/, '')
+    const numId = Number(sinHash)
+    if (sinHash && Number.isInteger(numId) && numId > 0) {
+      conds.push(eq(preguntas.id, numId))
+    } else if (term) {
+      conds.push(ilike(preguntas.pregunta, `%${term}%`))
+    }
+  }
 
   return db
     .select()

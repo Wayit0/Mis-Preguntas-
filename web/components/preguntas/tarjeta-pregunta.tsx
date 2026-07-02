@@ -57,22 +57,25 @@ export function TarjetaPregunta({
             <Badge variant="secondary">{badge}</Badge>
             {propia ? <Badge>Tuya</Badge> : null}
           </div>
-          {soloLectura ? (
-            autor ? (
-              <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                Publicado por {autor}
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="font-mono text-xs text-muted-foreground">#{p.id}</span>
+            {soloLectura ? (
+              autor ? (
+                <span className="text-xs font-medium text-muted-foreground">
+                  Publicado por {autor}
+                </span>
+              ) : null
+            ) : (
+              <span
+                className={cn(
+                  'text-xs font-medium',
+                  compartida ? 'text-accent' : 'text-muted-foreground',
+                )}
+              >
+                {compartida ? '● Compartida' : 'Privada'}
               </span>
-            ) : null
-          ) : (
-            <span
-              className={cn(
-                'shrink-0 text-xs font-medium',
-                compartida ? 'text-accent' : 'text-muted-foreground',
-              )}
-            >
-              {compartida ? '● Compartida' : 'Privada'}
-            </span>
-          )}
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

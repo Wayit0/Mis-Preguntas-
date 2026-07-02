@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
@@ -33,10 +34,12 @@ export function FiltrosPreguntas({
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const materiaActual = searchParams.get('materia') ?? ''
   const nivelActual = searchParams.get('nivel') ?? ''
   const estadoActual = (searchParams.get('estado') as EstadoCompartida) || 'todas'
+  const busquedaActual = searchParams.get('busqueda') ?? ''
 
   function setParam(clave: string, valor: string | null) {
     const params = new URLSearchParams(searchParams.toString())
@@ -45,8 +48,33 @@ export function FiltrosPreguntas({
     router.push(`/preguntas?${params.toString()}`)
   }
 
+  function buscar() {
+    const valor = inputRef.current?.value.trim() ?? ''
+    setParam('busqueda', valor || null)
+  }
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-2">
+      {/* Buscador */}
+      <div className="flex gap-2">
+        <input
+          ref={inputRef}
+          type="search"
+          defaultValue={busquedaActual}
+          placeholder="Buscar por código #123 o texto..."
+          onKeyDown={(e) => e.key === 'Enter' && buscar()}
+          className="h-9 flex-1 rounded-md border border-border bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:h-8"
+        />
+        <button
+          type="button"
+          onClick={buscar}
+          className="h-9 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 sm:h-8"
+        >
+          Buscar
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
       <Select
         name="materia"
         value={materiaActual || TODAS}
@@ -122,6 +150,7 @@ export function FiltrosPreguntas({
             </button>
           )
         })}
+      </div>
       </div>
     </div>
   )

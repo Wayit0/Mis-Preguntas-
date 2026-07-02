@@ -32,9 +32,10 @@ export default async function PreguntasPage({
     materia?: string
     nivel?: string
     estado?: string
+    busqueda?: string
   }>
 }) {
-  const { asignatura, materia, nivel, estado } = await searchParams
+  const { asignatura, materia, nivel, estado, busqueda } = await searchParams
 
   // Guard explícito (además del layout) para no ejecutar queries con un userId
   // inválido si la página se renderiza junto al redirect del layout.
@@ -46,6 +47,7 @@ export default async function PreguntasPage({
     materia,
     nivel,
     estado: normalizarEstado(estado),
+    busqueda,
   }
 
   const [lista, opciones] = await Promise.all([
