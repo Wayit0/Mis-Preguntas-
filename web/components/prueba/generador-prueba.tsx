@@ -68,6 +68,8 @@ export interface PruebaInicial {
   formulas: string[]
   preguntasIds: number[]
   textosIds: number[]
+  /** Clave de blob del logo guardado de la prueba (sólo indica que hay uno). */
+  logo: string | null
 }
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E'] as const
@@ -287,8 +289,6 @@ function PanelVistaPrevia({
 
 // ── Componente principal ─────────────────────────────────────────────────────
 
-/* eslint-disable @next/next/no-img-element */
-
 export function GeneradorPrueba({
   asignatura,
   profesorInicial,
@@ -296,7 +296,6 @@ export function GeneradorPrueba({
   materias,
   textos,
   colegioInicial = '',
-  logoColegioUrl = null,
   pruebaInicial,
 }: {
   asignatura: string
@@ -305,7 +304,6 @@ export function GeneradorPrueba({
   materias: string[]
   textos: TextoSeleccionable[]
   colegioInicial?: string | null
-  logoColegioUrl?: string | null
   /** Si se pasa, el editor modifica esa prueba en vez de crear una nueva. */
   pruebaInicial?: PruebaInicial
 }) {
@@ -507,19 +505,7 @@ export function GeneradorPrueba({
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="logo">Logo del colegio</Label>
-                  {logoColegioUrl ? (
-                    <div className="mb-1 flex items-center gap-3 rounded-md border border-border bg-muted/30 px-3 py-2">
-                      <img
-                        src={logoColegioUrl}
-                        alt="Logo del colegio"
-                        className="h-10 w-auto object-contain"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Logo actual — se incluye en el PDF.
-                      </p>
-                    </div>
-                  ) : null}
+                  <Label htmlFor="logo">Logo (opcional)</Label>
                   <input
                     ref={logoRef}
                     id="logo"
@@ -528,9 +514,9 @@ export function GeneradorPrueba({
                     className="text-sm text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-secondary file:px-2 file:py-1 file:text-xs file:font-medium file:text-foreground"
                   />
                   <p className="text-xs text-muted-foreground">
-                    {logoColegioUrl
-                      ? 'Sube un archivo para reemplazar el logo del colegio en todos los PDFs.'
-                      : 'Se usará en todos los PDFs del colegio.'}
+                    {pruebaInicial?.logo
+                      ? 'Esta prueba ya tiene un logo. Sube un archivo sólo si quieres reemplazarlo.'
+                      : 'Se incluye únicamente en el PDF de esta prueba.'}
                   </p>
                 </div>
 

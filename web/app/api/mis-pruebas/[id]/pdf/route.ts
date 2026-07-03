@@ -9,7 +9,6 @@ import {
   uploadPdf,
 } from '@/lib/storage/blob'
 import { cargarPruebaPorId } from '@/lib/queries/pruebas'
-import { obtenerColegioPorUsuario } from '@/lib/queries/colegio'
 import {
   construirPruebaPdf,
   nombreArchivo,
@@ -91,17 +90,12 @@ export async function POST(
   const prueba = await cargarPruebaPorId(Number(id), userId)
   if (!prueba) return new Response('No encontrado', { status: 404 })
 
-  // Logo: primero intenta el logo guardado en la prueba; si el blob no se
-  // encuentra (borrado o nunca subido), cae al logo del colegio del usuario.
+  // Logo por prueba (opcional): sólo el guardado en la propia prueba; no se
+  // usa automáticamente el logo del colegio.
   let logo: Buffer | null = null
-  const colegioLogo = (await obtenerColegioPorUsuario(userId))?.logo ?? null
-  for (const key of [prueba.logo, colegioLogo]) {
-    if (!key) continue
-    const blob = await getImageStream(key)
-    if (blob) {
-      logo = await streamABuffer(blob.stream)
-      break
-    }
+  if (prueba.logo) {
+    const blob = await getImageStream(prueba.logo)
+    if (blob) logo = await streamABuffer(blob.stream)
   }
 
   let pdf: Buffer

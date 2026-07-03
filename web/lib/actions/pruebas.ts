@@ -3,7 +3,7 @@
 import { and, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { colegios, pruebas, usuarios } from '@/lib/db/schema'
+import { pruebas } from '@/lib/db/schema'
 import { getSession } from '@/lib/get-session'
 import { deleteBlob, uploadImage } from '@/lib/storage/blob'
 import { idsDesde } from '@/lib/pdf/construir'
@@ -23,25 +23,16 @@ function oNull(valor: string): string | null {
 }
 
 /**
- * Guarda la clave del logo en `colegios` para cualquier usuario que pertenezca
- * a un colegio, de modo que el logo quede compartido en todos los PDFs.
+ * Sube el logo del FormData (si viene) y devuelve su clave de blob, o `null`.
+ * El logo es POR PRUEBA (se guarda en `pruebas.logo`): no se comparte con el
+ * colegio ni se aplica automáticamente a otros PDFs.
  */
-async function guardarLogoEnColegio(userId: number, logoKey: string): Promise<void> {
-  try {
-    const [fila] = await db
-      .select({ colegioId: usuarios.colegioId })
-      .from(usuarios)
-      .where(eq(usuarios.id, userId))
-      .limit(1)
-    if (fila?.colegioId) {
-      await db
-        .update(colegios)
-        .set({ logo: logoKey })
-        .where(eq(colegios.id, fila.colegioId))
-    }
-  } catch {
-    // No bloquea la operación principal.
+async function subirLogo(formData: FormData): Promise<string | null> {
+  const logoEntry = formData.get('logo')
+  if (logoEntry instanceof File && logoEntry.size > 0) {
+    return uploadImage(logoEntry)
   }
+  return null
 }
 
 /** Extrae la selección (fórmulas + ids de preguntas/textos) del FormData. */
@@ -72,12 +63,7 @@ export async function guardarPrueba(
   if (!parsed.success) return { error: primerErrorPrueba(parsed.error) }
   const data = parsed.data
   const seleccion = extraerSeleccion(formData)
-
-  const logoEntry = formData.get('logo')
-  if (logoEntry instanceof File && logoEntry.size > 0) {
-    const logoKey = await uploadImage(logoEntry)
-    await guardarLogoEnColegio(userId, logoKey)
-  }
+  const logo = await subirLogo(formData)
 
   const [fila] = await db
     .insert(pruebas)
@@ -91,6 +77,7 @@ export async function guardarPrueba(
       formulas: seleccion.formulas,
       preguntasIds: seleccion.preguntasIds,
       textosIds: seleccion.textosIds,
+      logo,
     })
     .returning({ id: pruebas.id })
 
@@ -123,12 +110,8 @@ export async function actualizarPrueba(
   if (!parsed.success) return { error: primerErrorPrueba(parsed.error) }
   const data = parsed.data
   const seleccion = extraerSeleccion(formData)
-
-  const logoEntry = formData.get('logo')
-  if (logoEntry instanceof File && logoEntry.size > 0) {
-    const logoKey = await uploadImage(logoEntry)
-    await guardarLogoEnColegio(userId, logoKey)
-  }
+  // Logo nuevo (opcional): sólo se reemplaza si se subió un archivo.
+  const logoNuevo = await subirLogo(formData)
 
   // Invalidar el PDF cacheado: borrar el blob previo (si existía).
   if (existente.pdfKey) await deleteBlob(existente.pdfKey)
@@ -144,6 +127,7 @@ export async function actualizarPrueba(
       formulas: seleccion.formulas,
       preguntasIds: seleccion.preguntasIds,
       textosIds: seleccion.textosIds,
+      ...(logoNuevo ? { logo: logoNuevo } : {}),
       pdfKey: null,
       pdfGeneradoEn: null,
       updatedAt: new Date(),
