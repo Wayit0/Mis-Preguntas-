@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getActor } from '@/lib/authz'
 import { cargarPruebaPorId, cargarDatosGenerador } from '@/lib/queries/pruebas'
 import { obtenerColegioPorUsuario } from '@/lib/queries/colegio'
+import { imageUrl } from '@/lib/storage/blob'
 import { GeneradorPrueba } from '@/components/prueba/generador-prueba'
 
 export default async function EditarPruebaPage({
@@ -31,6 +32,7 @@ export default async function EditarPruebaPage({
       materias={materias}
       textos={textos}
       colegioInicial={colegio?.nombre ?? prueba.colegio ?? ''}
+      logoColegioUrl={colegio?.logo ? imageUrl(colegio.logo) : null}
       pruebaInicial={{
         id: prueba.id,
         titulo: prueba.titulo ?? '',
@@ -41,6 +43,7 @@ export default async function EditarPruebaPage({
         preguntasIds: prueba.preguntasIds ?? [],
         textosIds: prueba.textosIds ?? [],
         logo: prueba.logo ?? null,
+        usarLogoColegio: prueba.usarLogoColegio,
       }}
     />
   )

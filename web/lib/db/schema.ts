@@ -142,8 +142,12 @@ export const pruebas = pgTable('pruebas', {
   preguntasIds: jsonb('preguntas_ids').$type<number[]>().notNull().default([]),
   // IDs de textos de comprensión seleccionados.
   textosIds: jsonb('textos_ids').$type<number[]>().notNull().default([]),
-  // Clave de blob del logo del colegio (nullable).
+  // Clave de blob del logo PROPIO de la prueba (nullable). Si está, tiene
+  // prioridad sobre el logo del colegio.
   logo: text('logo'),
+  // Si true (default), el PDF incluye el logo del colegio cuando la prueba no
+  // tiene logo propio. El profesor puede desmarcarlo para no llevar logo.
+  usarLogoColegio: boolean('usar_logo_colegio').notNull().default(true),
   // Clave de blob del PDF cacheado (NULL = sin PDF o invalidado).
   pdfKey: text('pdf_key'),
   pdfGeneradoEn: timestamp('pdf_generado_en'),

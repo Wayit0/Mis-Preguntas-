@@ -9,6 +9,7 @@ import {
   uploadPdf,
 } from '@/lib/storage/blob'
 import { cargarPruebaPorId } from '@/lib/queries/pruebas'
+import { resolverLogoPrueba } from '@/lib/pdf/logo'
 import {
   construirPruebaPdf,
   nombreArchivo,
@@ -16,15 +17,6 @@ import {
 } from '@/lib/pdf/construir'
 
 export const runtime = 'nodejs'
-
-/** Consume un stream de Node por completo y lo devuelve como Buffer. */
-async function streamABuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
-  const chunks: Buffer[] = []
-  for await (const chunk of stream) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-  }
-  return Buffer.concat(chunks)
-}
 
 /** Cabeceras de descarga de un PDF de prueba. */
 function cabecerasPdf(asignatura: string): Record<string, string> {
@@ -90,13 +82,13 @@ export async function POST(
   const prueba = await cargarPruebaPorId(Number(id), userId)
   if (!prueba) return new Response('No encontrado', { status: 404 })
 
-  // Logo por prueba (opcional): sólo el guardado en la propia prueba; no se
-  // usa automáticamente el logo del colegio.
-  let logo: Buffer | null = null
-  if (prueba.logo) {
-    const blob = await getImageStream(prueba.logo)
-    if (blob) logo = await streamABuffer(blob.stream)
-  }
+  // Logo: propio de la prueba → si no, el del colegio (si usar_logo_colegio) →
+  // si no, sin logo.
+  const logo = await resolverLogoPrueba({
+    userId,
+    customKey: prueba.logo,
+    usarLogoColegio: prueba.usarLogoColegio,
+  })
 
   let pdf: Buffer
   try {

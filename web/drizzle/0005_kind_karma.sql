@@ -1,0 +1,1 @@
+ALTER TABLE "pruebas" ADD COLUMN "usar_logo_colegio" boolean DEFAULT true NOT NULL;

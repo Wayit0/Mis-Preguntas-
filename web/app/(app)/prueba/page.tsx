@@ -3,6 +3,7 @@ import { getActor } from '@/lib/authz'
 import { resolverAsignatura } from '@/lib/asignatura'
 import { cargarDatosGenerador } from '@/lib/queries/pruebas'
 import { obtenerColegioPorUsuario } from '@/lib/queries/colegio'
+import { imageUrl } from '@/lib/storage/blob'
 import { GeneradorPrueba } from '@/components/prueba/generador-prueba'
 
 export default async function PruebaPage() {
@@ -47,6 +48,7 @@ export default async function PruebaPage() {
       materias={materias}
       textos={textos}
       colegioInicial={colegio?.nombre ?? ''}
+      logoColegioUrl={colegio?.logo ? imageUrl(colegio.logo) : null}
     />
   )
 }

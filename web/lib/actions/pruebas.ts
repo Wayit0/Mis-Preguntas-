@@ -36,6 +36,11 @@ async function subirLogo(formData: FormData): Promise<string | null> {
   return null
 }
 
+/** Casilla "Incluir el logo del colegio": true salvo que llegue '0'. */
+function leerUsarLogoColegio(formData: FormData): boolean {
+  return formData.get('usarLogoColegio') !== '0'
+}
+
 /** Extrae la selección (fórmulas + ids de preguntas/textos) del FormData. */
 function extraerSeleccion(formData: FormData) {
   return {
@@ -81,6 +86,7 @@ export async function guardarPrueba(
       preguntasIds: seleccion.preguntasIds,
       textosIds: seleccion.textosIds,
       logo,
+      usarLogoColegio: leerUsarLogoColegio(formData),
     })
     .returning({ id: pruebas.id })
 
@@ -131,6 +137,7 @@ export async function actualizarPrueba(
       preguntasIds: seleccion.preguntasIds,
       textosIds: seleccion.textosIds,
       ...(logoNuevo ? { logo: logoNuevo } : {}),
+      usarLogoColegio: leerUsarLogoColegio(formData),
       pdfKey: null,
       pdfGeneradoEn: null,
       updatedAt: new Date(),

@@ -68,8 +68,10 @@ export interface PruebaInicial {
   formulas: string[]
   preguntasIds: number[]
   textosIds: number[]
-  /** Clave de blob del logo guardado de la prueba (sólo indica que hay uno). */
+  /** Clave de blob del logo propio de la prueba (sólo indica que hay uno). */
   logo: string | null
+  /** Si el PDF debe incluir el logo del colegio (cuando no hay logo propio). */
+  usarLogoColegio: boolean
 }
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E'] as const
@@ -289,6 +291,8 @@ function PanelVistaPrevia({
 
 // ── Componente principal ─────────────────────────────────────────────────────
 
+/* eslint-disable @next/next/no-img-element */
+
 export function GeneradorPrueba({
   asignatura,
   profesorInicial,
@@ -296,6 +300,7 @@ export function GeneradorPrueba({
   materias,
   textos,
   colegioInicial = '',
+  logoColegioUrl = null,
   pruebaInicial,
 }: {
   asignatura: string
@@ -304,6 +309,8 @@ export function GeneradorPrueba({
   materias: string[]
   textos: TextoSeleccionable[]
   colegioInicial?: string | null
+  /** URL del logo del colegio (para el preview de la casilla), o null. */
+  logoColegioUrl?: string | null
   /** Si se pasa, el editor modifica esa prueba en vez de crear una nueva. */
   pruebaInicial?: PruebaInicial
 }) {
@@ -345,6 +352,9 @@ export function GeneradorPrueba({
   const [pendiente, setPendiente] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const logoRef = useRef<HTMLInputElement>(null)
+  const [usarLogoColegio, setUsarLogoColegio] = useState(
+    pruebaInicial?.usarLogoColegio ?? true,
+  )
 
   const preguntasFiltradas = useMemo(() => {
     if (filtroMateria === '__todas__') return preguntas
@@ -408,6 +418,7 @@ export function GeneradorPrueba({
       fd.set('instrucciones', instrucciones)
       const logoFile = logoRef.current?.files?.[0]
       if (logoFile) fd.set('logo', logoFile)
+      fd.set('usarLogoColegio', usarLogoColegio ? '1' : '0')
       for (const expr of formulas) fd.append('formula', expr)
       // El orden del array determina el orden en el PDF
       for (const id of seleccion) fd.append('pregunta', String(id))
@@ -504,20 +515,54 @@ export function GeneradorPrueba({
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="logo">Logo (opcional)</Label>
-                  <input
-                    ref={logoRef}
-                    id="logo"
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    className="text-sm text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-secondary file:px-2 file:py-1 file:text-xs file:font-medium file:text-foreground"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {pruebaInicial?.logo
-                      ? 'Esta prueba ya tiene un logo. Sube un archivo sólo si quieres reemplazarlo.'
-                      : 'Se incluye únicamente en el PDF de esta prueba.'}
-                  </p>
+                <div className="flex flex-col gap-2">
+                  <Label>Logo</Label>
+                  <label className="flex cursor-pointer items-center gap-3 rounded-md border border-border px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={usarLogoColegio}
+                      onChange={(e) => setUsarLogoColegio(e.target.checked)}
+                      className="size-4 accent-primary"
+                    />
+                    {logoColegioUrl ? (
+                      <img
+                        src={logoColegioUrl}
+                        alt="Logo del colegio"
+                        className="h-8 w-auto object-contain"
+                      />
+                    ) : null}
+                    <span className="text-sm text-foreground">
+                      Incluir el logo del colegio en el PDF
+                    </span>
+                  </label>
+                  {!logoColegioUrl ? (
+                    <p className="text-xs text-muted-foreground">
+                      Tu colegio aún no tiene logo. Un administrador puede subirlo
+                      en «Mi Colegio».
+                    </p>
+                  ) : null}
+
+                  <div className="mt-1 flex flex-col gap-1.5">
+                    <Label
+                      htmlFor="logo"
+                      className="text-xs font-normal text-muted-foreground"
+                    >
+                      O sube un logo distinto sólo para esta prueba (opcional)
+                    </Label>
+                    <input
+                      ref={logoRef}
+                      id="logo"
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="text-sm text-muted-foreground file:mr-2 file:rounded file:border-0 file:bg-secondary file:px-2 file:py-1 file:text-xs file:font-medium file:text-foreground"
+                    />
+                    {pruebaInicial?.logo ? (
+                      <p className="text-xs text-muted-foreground">
+                        Esta prueba ya tiene un logo propio. Súbelo de nuevo sólo
+                        para reemplazarlo.
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">

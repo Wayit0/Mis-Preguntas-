@@ -95,7 +95,7 @@ export function ConfigurarColegio({
 
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="logo-colegio">
-                Logo del colegio (opcional, aparece en el PDF)
+                Logo del colegio (aparece por defecto en las pruebas)
               </Label>
               {logoSrc ? (
                 <img

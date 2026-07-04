@@ -1,4 +1,5 @@
 import { getSession } from '@/lib/get-session'
+import { resolverLogoPrueba } from '@/lib/pdf/logo'
 import {
   construirPruebaPdf,
   idsDesde,
@@ -29,13 +30,15 @@ export async function POST(request: Request) {
     return new Response('Falta la asignatura', { status: 400 })
   }
 
-  // Logo opcional: sólo se usa el que el usuario suba, y sólo para este PDF (no
-  // se guarda ni se toma automáticamente el del colegio).
+  // Logo: propio subido → si no, el del colegio (salvo que se desmarque) → si
+  // no, sin logo. El logo subido aquí sólo se usa para este PDF (no se guarda).
   const logoEntry = form.get('logo')
-  const logo =
+  const customBuffer =
     logoEntry instanceof File && logoEntry.size > 0
       ? Buffer.from(await logoEntry.arrayBuffer())
       : null
+  const usarLogoColegio = form.get('usarLogoColegio') !== '0'
+  const logo = await resolverLogoPrueba({ userId, customBuffer, usarLogoColegio })
 
   let pdf: Buffer
   try {
