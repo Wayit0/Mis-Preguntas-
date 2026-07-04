@@ -29,8 +29,13 @@ const ac = createAccessControl(defaultStatements)
 
 // Rol con plenos poderes administrativos (espejo del admin por defecto).
 const globalAdminRole = ac.newRole({ ...adminAc.statements })
-// Admin de colegio: puede listar/ver usuarios; no gestiona roles globales.
-const schoolAdminRole = ac.newRole({ user: ['list', 'get'], session: [] })
+// Admin de colegio: SIN permisos del plugin admin. Los endpoints admin de
+// better-auth (list-users/get-user/ban/...) NO están acotados por colegio, así
+// que otorgar `user:['list','get']` dejaba a cualquier school_admin enumerar a
+// TODOS los usuarios de la plataforma (PII cross-tenant). La gestión de
+// profesores del colegio se hace vía `listarProfesores(colegioId)` (acotado) y
+// las server actions con guard `esAdminDeColegio`, no vía el plugin.
+const schoolAdminRole = ac.newRole({ user: [], session: [] })
 // Profesor: sin permisos administrativos.
 const teacherRole = ac.newRole({ user: [], session: [] })
 

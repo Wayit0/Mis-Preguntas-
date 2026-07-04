@@ -9,6 +9,7 @@ import {
   invitacionesColegio,
   preguntas,
   pruebas,
+  sessions,
   textos,
   usuarios,
 } from '@/lib/db/schema'
@@ -326,6 +327,11 @@ export async function suspenderProfesor(
       banExpires: null,
     })
     .where(eq(usuarios.id, userId))
+
+  // Revocar de inmediato las sesiones vivas del profesor: al setear `banned`
+  // directo en BD, better-auth no revoca sesiones, y getSession sólo bloquea en
+  // la siguiente petición. Borrarlas cierra el acceso al instante.
+  await db.delete(sessions).where(eq(sessions.userId, userId))
 
   revalidatePath('/colegio')
   return { ok: true }
