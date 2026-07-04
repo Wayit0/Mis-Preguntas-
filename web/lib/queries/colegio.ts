@@ -19,6 +19,8 @@ export interface Profesor {
   nombre: string
   email: string
   role: string
+  /** true = suspendido (no puede entrar); su contenido sigue en el colegio. */
+  banned: boolean | null
 }
 
 /** Una pregunta del banco del colegio junto con el nombre de su autor. */
@@ -84,6 +86,7 @@ export async function listarProfesores(colegioId: number): Promise<Profesor[]> {
       nombre: usuarios.nombre,
       email: usuarios.email,
       role: usuarios.role,
+      banned: usuarios.banned,
     })
     .from(usuarios)
     .where(eq(usuarios.colegioId, colegioId))

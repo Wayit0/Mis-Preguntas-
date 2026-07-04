@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { TarjetaPregunta } from '@/components/preguntas/tarjeta-pregunta'
 import { InvitarProfesor } from '@/components/colegio/invitar-profesor'
 import { CopiarCodigo } from '@/components/colegio/copiar-codigo'
-import { BotonQuitarProfesor } from '@/components/colegio/boton-quitar-profesor'
+import { GestionProfesor } from '@/components/colegio/gestion-profesor'
 import { ConfigurarColegio } from '@/components/colegio/configurar-colegio'
 import { AccionesBancoPregunta } from '@/components/colegio/acciones-banco-pregunta'
 
@@ -126,7 +126,11 @@ export default async function ColegioPage({
       </div>
 
       {tabActual === 'profesores' ? (
-        <ProfesoresTab colegioId={colegioId} codigo={colegio.joinCode} />
+        <ProfesoresTab
+          colegioId={colegioId}
+          codigo={colegio.joinCode}
+          actorUserId={actor.userId}
+        />
       ) : tabActual === 'banco' ? (
         <BancoTab colegioId={colegioId} />
       ) : (
@@ -143,9 +147,11 @@ export default async function ColegioPage({
 async function ProfesoresTab({
   colegioId,
   codigo,
+  actorUserId,
 }: {
   colegioId: number
   codigo: string
+  actorUserId: number
 }) {
   const profesores = await listarProfesores(colegioId)
 
@@ -190,12 +196,21 @@ async function ProfesoresTab({
                           Admin
                         </Badge>
                       ) : null}
+                      {p.banned ? (
+                        <Badge variant="destructive" className="ml-2 align-middle">
+                          Suspendido
+                        </Badge>
+                      ) : null}
                     </span>
                     <span className="truncate text-xs text-muted-foreground">
                       {p.email}
                     </span>
                   </div>
-                  <BotonQuitarProfesor userId={p.id} />
+                  <GestionProfesor
+                    userId={p.id}
+                    banned={!!p.banned}
+                    esYo={p.id === actorUserId}
+                  />
                 </CardContent>
               </Card>
             ))}

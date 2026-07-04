@@ -13,7 +13,7 @@ import {
   usuarios,
 } from '@/lib/db/schema'
 import { uploadImage } from '@/lib/storage/blob'
-import { getActor, esAdminDeColegio } from '@/lib/authz'
+import { getActor, esAdminDeColegio, type Actor } from '@/lib/authz'
 import {
   contarAdminsColegio,
   obtenerColegio,
@@ -269,6 +269,78 @@ export async function quitarProfesor(
   await db
     .update(usuarios)
     .set({ colegioId: null })
+    .where(eq(usuarios.id, userId))
+
+  revalidatePath('/colegio')
+  return { ok: true }
+}
+
+/**
+ * Guard compartido de suspender/reactivar: el actor debe administrar su colegio
+ * y `userId` debe ser un profesor de ESE colegio. Devuelve el actor y el colegio,
+ * o un error legible.
+ */
+async function guardGestionProfesor(
+  userId: number,
+): Promise<{ error: string } | { actor: Actor; colegioId: number }> {
+  const actor = await getActor()
+  if (!actor) return { error: 'Debes iniciar sesión.' }
+
+  const colegioId = actor.colegioId
+  if (colegioId === null || !esAdminDeColegio(actor, colegioId)) {
+    return { error: 'No tienes permiso para gestionar profesores.' }
+  }
+  if (!Number.isFinite(userId)) return { error: 'Profesor no encontrado.' }
+
+  const [objetivo] = await db
+    .select({ colegioId: usuarios.colegioId })
+    .from(usuarios)
+    .where(eq(usuarios.id, userId))
+    .limit(1)
+  if (!objetivo || objetivo.colegioId !== colegioId) {
+    return { error: 'Ese profesor no pertenece a tu colegio.' }
+  }
+  return { actor, colegioId }
+}
+
+/**
+ * suspenderProfesor: marca al profesor como suspendido (`banned = true`) → no
+ * puede iniciar sesión ni navegar. Su contenido PERMANECE en el colegio (anclado
+ * por `colegio_id`). No puedes suspenderte a ti mismo. Reversible con
+ * `reactivarProfesor`.
+ */
+export async function suspenderProfesor(
+  userId: number,
+): Promise<ResultadoColegio> {
+  const g = await guardGestionProfesor(userId)
+  if ('error' in g) return { error: g.error }
+  if (userId === g.actor.userId) {
+    return { error: 'No puedes suspenderte a ti mismo.' }
+  }
+
+  await db
+    .update(usuarios)
+    .set({
+      banned: true,
+      banReason: 'Suspendido por el administrador del colegio',
+      banExpires: null,
+    })
+    .where(eq(usuarios.id, userId))
+
+  revalidatePath('/colegio')
+  return { ok: true }
+}
+
+/** reactivarProfesor: quita la suspensión (`banned = false`). */
+export async function reactivarProfesor(
+  userId: number,
+): Promise<ResultadoColegio> {
+  const g = await guardGestionProfesor(userId)
+  if ('error' in g) return { error: g.error }
+
+  await db
+    .update(usuarios)
+    .set({ banned: false, banReason: null, banExpires: null })
     .where(eq(usuarios.id, userId))
 
   revalidatePath('/colegio')

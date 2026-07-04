@@ -47,6 +47,13 @@ export async function getActor(): Promise<Actor | null> {
     .limit(1)
   if (!row) return null
 
+  // Usuario suspendido (`banned`): se trata como sin sesión válida → las páginas
+  // con `requireActor` lo redirigen a /login. `banExpires` en el futuro = una
+  // suspensión temporal aún vigente; sin `banExpires` = suspensión permanente.
+  if (row.banned && (!row.banExpires || row.banExpires > new Date())) {
+    return null
+  }
+
   return {
     userId: row.id,
     role: row.role as Rol,
