@@ -18,10 +18,15 @@
 # ===========================================================================
 name: Deploy a Azure App Service
 
+# Deploy por ambiente según la rama:
+#   main  -> producción (app-mispreguntas-ecupwarmwaeb6)
+#   devel -> QA          (app-mispreguntas-qa)
+# La app y el publish profile se eligen por rama en el paso de deploy.
 on:
   push:
     branches:
-      - feature/nextjs-azure-rewrite
+      - main
+      - devel
     paths:
       - 'web/**'
       - '.github/workflows/deploy.yml'
@@ -36,7 +41,6 @@ concurrency:
 
 env:
   NODE_VERSION: '22'
-  AZURE_WEBAPP_NAME: app-mispreguntas-ecupwarmwaeb6
 
 jobs:
   build-and-deploy:
@@ -127,11 +131,12 @@ jobs:
           zip -ryq ../standalone.zip .
           unzip -l ../standalone.zip '.next/node_modules/*' | head
 
+      # Selección de ambiente por rama: main -> prod, cualquier otra (devel) -> QA.
       - name: Deploy a Azure Web App (publish profile)
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          app-name: ${{ github.ref_name == 'main' && 'app-mispreguntas-ecupwarmwaeb6' || 'app-mispreguntas-qa' }}
+          publish-profile: ${{ github.ref_name == 'main' && secrets.AZURE_WEBAPP_PUBLISH_PROFILE || secrets.AZURE_WEBAPP_PUBLISH_PROFILE_QA }}
           package: web/.next/standalone.zip
           type: zip
           # clean=true vacía wwwroot antes de desplegar. Sin esto, el rsync de
