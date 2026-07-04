@@ -123,14 +123,14 @@ export async function listarBancoColegio(
     .select({ pregunta: preguntas, autor: usuarios.nombre })
     .from(preguntas)
     .innerJoin(usuarios, eq(usuarios.id, preguntas.userId))
-    .where(eq(usuarios.colegioId, colegioId))
+    .where(eq(preguntas.colegioId, colegioId))
     .orderBy(asc(usuarios.nombre), asc(preguntas.id))
 
   const filasTextos = await db
     .select({ texto: textos, autor: usuarios.nombre })
     .from(textos)
     .innerJoin(usuarios, eq(usuarios.id, textos.userId))
-    .where(eq(usuarios.colegioId, colegioId))
+    .where(eq(textos.colegioId, colegioId))
     .orderBy(asc(usuarios.nombre), asc(textos.id))
 
   return {
@@ -152,8 +152,7 @@ export async function cargarPreguntaDeColegio(
   const [fila] = await db
     .select({ pregunta: preguntas })
     .from(preguntas)
-    .innerJoin(usuarios, eq(usuarios.id, preguntas.userId))
-    .where(and(eq(preguntas.id, id), eq(usuarios.colegioId, colegioId)))
+    .where(and(eq(preguntas.id, id), eq(preguntas.colegioId, colegioId)))
     .limit(1)
   return fila?.pregunta ?? null
 }

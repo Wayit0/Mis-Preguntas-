@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { preguntas, textos } from '@/lib/db/schema'
 import { getSession } from '@/lib/get-session'
+import { colegioIdDeUsuario } from '@/lib/queries/visibilidad'
 import { textoSchema, primerErrorTexto } from '@/lib/validation/texto'
 
 /** Resultado de crear un texto: error legible, o el id del texto creado. */
@@ -24,11 +25,13 @@ export async function guardarTexto(
   const parsed = textoSchema.safeParse(input)
   if (!parsed.success) return { error: primerErrorTexto(parsed.error) }
   const data = parsed.data
+  const colegioId = await colegioIdDeUsuario(userId)
 
   const [fila] = await db
     .insert(textos)
     .values({
       userId,
+      colegioId,
       asignatura: data.asignatura,
       titulo: data.titulo,
       contenido: data.contenido,

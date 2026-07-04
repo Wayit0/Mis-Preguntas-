@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { pruebas } from '@/lib/db/schema'
 import { getSession } from '@/lib/get-session'
 import { deleteBlob, uploadImage } from '@/lib/storage/blob'
+import { colegioIdDeUsuario } from '@/lib/queries/visibilidad'
 import { idsDesde } from '@/lib/pdf/construir'
 import {
   extraerCamposPrueba,
@@ -64,11 +65,13 @@ export async function guardarPrueba(
   const data = parsed.data
   const seleccion = extraerSeleccion(formData)
   const logo = await subirLogo(formData)
+  const colegioId = await colegioIdDeUsuario(userId)
 
   const [fila] = await db
     .insert(pruebas)
     .values({
       userId,
+      colegioId,
       asignatura: data.asignatura,
       titulo: oNull(data.titulo),
       colegio: oNull(data.colegio),

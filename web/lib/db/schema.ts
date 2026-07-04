@@ -77,6 +77,10 @@ export const invitacionesColegio = pgTable('invitaciones_colegio', {
 export const preguntas = pgTable('preguntas', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull(),
+  // Colegio dueño del contenido (nullable = contenido personal, sin colegio).
+  // Se estampa al crear con el colegio del autor y ANCLA el contenido al
+  // colegio: permanece en el banco aunque el autor sea suspendido/eliminado.
+  colegioId: integer('colegio_id'),
   asignatura: text('asignatura').notNull(),
   materia: text('materia'),
   contenido: text('contenido'),
@@ -104,6 +108,8 @@ export const preguntas = pgTable('preguntas', {
 export const textos = pgTable('textos', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull(),
+  // Colegio dueño del contenido (nullable). Ver nota en `preguntas.colegioId`.
+  colegioId: integer('colegio_id'),
   asignatura: text('asignatura').notNull(),
   titulo: text('titulo').notNull(),
   contenido: text('contenido').notNull(),
@@ -123,6 +129,8 @@ export const textos = pgTable('textos', {
 export const pruebas = pgTable('pruebas', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull(),
+  // Colegio dueño de la prueba (nullable). Ver nota en `preguntas.colegioId`.
+  colegioId: integer('colegio_id'),
   asignatura: text('asignatura').notNull(),
   titulo: text('titulo'),
   colegio: text('colegio'),

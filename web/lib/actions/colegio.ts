@@ -1,10 +1,17 @@
 'use server'
 
 import { randomBytes } from 'node:crypto'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { colegios, invitacionesColegio, usuarios } from '@/lib/db/schema'
+import {
+  colegios,
+  invitacionesColegio,
+  preguntas,
+  pruebas,
+  textos,
+  usuarios,
+} from '@/lib/db/schema'
 import { uploadImage } from '@/lib/storage/blob'
 import { getActor, esAdminDeColegio } from '@/lib/authz'
 import {
@@ -51,6 +58,34 @@ async function generarJoinCodeUnico(): Promise<string> {
   return generarToken(24)
 }
 
+/** Tipo del ejecutor de transacción de Drizzle (para helpers reutilizables). */
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+/**
+ * Adopta al colegio el contenido personal del profesor que aún no tiene colegio
+ * (`colegio_id` NULL): preguntas, textos y pruebas. Preserva el comportamiento
+ * de "al unirte, tu banco pasa a estar en el colegio" y deja el contenido
+ * anclado a `colegioId` (no re-mueve el que ya pertenece a otro colegio).
+ */
+async function adoptarContenidoAlColegio(
+  tx: Tx,
+  userId: number,
+  colegioId: number,
+): Promise<void> {
+  await tx
+    .update(preguntas)
+    .set({ colegioId })
+    .where(and(eq(preguntas.userId, userId), isNull(preguntas.colegioId)))
+  await tx
+    .update(textos)
+    .set({ colegioId })
+    .where(and(eq(textos.userId, userId), isNull(textos.colegioId)))
+  await tx
+    .update(pruebas)
+    .set({ colegioId })
+    .where(and(eq(pruebas.userId, userId), isNull(pruebas.colegioId)))
+}
+
 /**
  * joinByCode: el profesor actual ingresa un código. Si coincide con el joinCode
  * de un colegio y el usuario no tiene colegio, se asocia (set colegio_id).
@@ -82,10 +117,13 @@ export async function joinByCode(code: string): Promise<ResultadoColegio> {
     return { error: 'Ya perteneces a un colegio.' }
   }
 
-  await db
-    .update(usuarios)
-    .set({ colegioId: colegio.id })
-    .where(eq(usuarios.id, actor.userId))
+  await db.transaction(async (tx) => {
+    await tx
+      .update(usuarios)
+      .set({ colegioId: colegio.id })
+      .where(eq(usuarios.id, actor.userId))
+    await adoptarContenidoAlColegio(tx, actor.userId, colegio.id)
+  })
 
   revalidatePath('/cuenta')
   revalidatePath('/dashboard')
@@ -178,6 +216,7 @@ export async function aceptarInvitacion(
       .update(invitacionesColegio)
       .set({ estado: 'aceptada' })
       .where(eq(invitacionesColegio.id, inv.id))
+    await adoptarContenidoAlColegio(tx, actor.userId, inv.colegioId)
   })
 
   revalidatePath('/cuenta')

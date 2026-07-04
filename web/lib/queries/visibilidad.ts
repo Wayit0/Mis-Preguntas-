@@ -1,5 +1,4 @@
 import { and, eq, exists, ne, or, sql, type SQL } from 'drizzle-orm'
-import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@/lib/db'
 import { colaboraciones, preguntas, usuarios } from '@/lib/db/schema'
 
@@ -11,13 +10,12 @@ import { colaboraciones, preguntas, usuarios } from '@/lib/db/schema'
  * pregunta P de autor A (con A ≠ actor) con `compartida = 1` es visible si se
  * cumple AL MENOS UNA (UNION / OR, retro-compatible):
  *
- *  (1) AUTO-COLEGIO: el autor A y el actor pertenecen al MISMO colegio
- *      (`usuarios.colegio_id` del autor = `actorColegioId`) y `actorColegioId`
- *      NO es null. Las cuentas personales (colegio null) nunca disparan este
- *      caso. La pregunta no tiene colegio propio: se deriva del autor uniendo
- *      `preguntas.user_id → usuarios.id → usuarios.colegio_id` mediante un
- *      EXISTS correlacionado (alias `autor_vis` para no chocar con un join a
- *      `usuarios` ya presente en la consulta externa).
+ *  (1) AUTO-COLEGIO: la pregunta pertenece al colegio del actor
+ *      (`preguntas.colegio_id` = `actorColegioId`) y `actorColegioId` NO es
+ *      null. Las cuentas personales (colegio null) nunca disparan este caso.
+ *      El colegio se ANCLA en la propia pregunta (`preguntas.colegio_id`, que se
+ *      estampa al crear), no en el autor: así sigue visible en el banco del
+ *      colegio aunque el autor sea suspendido o eliminado del colegio.
  *  (2) INVITACIÓN (modelo actual): existe `colaboraciones.from_user_id = A
  *      (autor) AND to_user_id = actor`, vía EXISTS correlacionado.
  *
@@ -53,22 +51,12 @@ export function preguntaCompartidaVisible(
 
   const visibles: SQL[] = [invitacion]
 
-  // (1) AUTO-COLEGIO: solo aplica si el actor pertenece a un colegio.
+  // (1) AUTO-COLEGIO: la pregunta PERTENECE a mi colegio (`preguntas.colegio_id`
+  // = colegio del actor). Ancla el contenido al colegio: sigue visible aunque el
+  // autor haya sido suspendido o eliminado del colegio. Solo aplica si el actor
+  // pertenece a un colegio.
   if (actorColegioId !== null) {
-    const autor = alias(usuarios, 'autor_vis')
-    visibles.push(
-      exists(
-        db
-          .select({ one: sql`1` })
-          .from(autor)
-          .where(
-            and(
-              eq(autor.id, preguntas.userId),
-              eq(autor.colegioId, actorColegioId),
-            ),
-          ),
-      ),
-    )
+    visibles.push(eq(preguntas.colegioId, actorColegioId))
   }
 
   return and(

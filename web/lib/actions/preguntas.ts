@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { preguntas } from '@/lib/db/schema'
 import { getSession } from '@/lib/get-session'
+import { colegioIdDeUsuario } from '@/lib/queries/visibilidad'
 import { preguntaSchema, primerErrorPregunta } from '@/lib/validation/pregunta'
 import {
   camposDb,
@@ -36,9 +37,11 @@ export async function crearPregunta(
   const data = parsed.data
 
   const imagenes = await subirImagenes(formData)
+  const colegioId = await colegioIdDeUsuario(userId)
 
   await db.insert(preguntas).values({
     userId,
+    colegioId,
     asignatura: data.asignatura,
     ...camposDb(data),
     imagenPregunta: imagenes.imagenPregunta ?? null,

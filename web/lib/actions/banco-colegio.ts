@@ -3,7 +3,7 @@
 import { eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { preguntas, usuarios } from '@/lib/db/schema'
+import { preguntas } from '@/lib/db/schema'
 import { getActor, esAdminDeColegio, type Actor } from '@/lib/authz'
 import { preguntaSchema, primerErrorPregunta } from '@/lib/validation/pregunta'
 import {
@@ -24,12 +24,12 @@ import {
 
 interface PreguntaAutor {
   preguntaId: number
-  autorColegioId: number | null
+  colegioId: number | null
 }
 
 /**
- * Carga el id de la pregunta y el colegio de su autor. Devuelve null si la
- * pregunta no existe.
+ * Carga el id de la pregunta y el colegio al que PERTENECE (el `colegio_id` de la
+ * propia pregunta, anclado al crear). Devuelve null si la pregunta no existe.
  */
 async function cargarPreguntaConAutor(
   id: number,
@@ -38,10 +38,9 @@ async function cargarPreguntaConAutor(
   const [fila] = await db
     .select({
       preguntaId: preguntas.id,
-      autorColegioId: usuarios.colegioId,
+      colegioId: preguntas.colegioId,
     })
     .from(preguntas)
-    .innerJoin(usuarios, eq(usuarios.id, preguntas.userId))
     .where(eq(preguntas.id, id))
     .limit(1)
   return fila ?? null
@@ -61,12 +60,9 @@ async function autorizarGestion(
   const info = await cargarPreguntaConAutor(id)
   if (!info) return { error: 'La pregunta no existe.' }
 
-  // El autor debe pertenecer a un colegio y el actor debe administrar ESE
+  // La pregunta debe pertenecer a un colegio y el actor debe administrar ESE
   // colegio. esAdminDeColegio cubre school_admin (mismo colegio) y global_admin.
-  if (
-    info.autorColegioId === null ||
-    !esAdminDeColegio(actor, info.autorColegioId)
-  ) {
+  if (info.colegioId === null || !esAdminDeColegio(actor, info.colegioId)) {
     return { error: 'No tienes permiso para gestionar esta pregunta.' }
   }
   return { actor }
