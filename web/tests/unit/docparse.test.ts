@@ -105,4 +105,21 @@ describe('docparse/extract', () => {
     expect(imagenBloque.source.media_type).toBe('image/png')
     expect(imagenBloque.source.data).toBe(imagenes[0].base64)
   })
+
+  it('DOCX con content-type de imagen no estándar (p. ej. "image/png;base64") igual se reconoce', async () => {
+    // Reproduce un bug real: algunas herramientas de banco de preguntas
+    // declaran el content-type de la imagen con un sufijo no estándar
+    // ("image/png;base64" en vez de "image/png"), lo que antes hacía que se
+    // descartaran TODAS las imágenes del documento (comparación exacta fallida).
+    const docxBytes = readFileSync(
+      join(fixturesDir, 'sample-con-imagen-content-type-raro.docx'),
+    )
+    const { imagenes } = await extraerBloquesDocumento({
+      data: docxBytes,
+      mime: MIME_DOCX,
+    })
+
+    expect(imagenes).toHaveLength(1)
+    expect(imagenes[0].mediaType).toBe('image/png')
+  })
 })

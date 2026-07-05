@@ -2,6 +2,9 @@
 //   - sample.docx           : un DOCX OOXML mínimo y válido con texto conocido.
 //   - sample.png            : un PNG real de 1x1 px.
 //   - sample-con-imagen.docx: un DOCX con esa misma imagen incrustada inline.
+//   - sample-con-imagen-content-type-raro.docx: ídem, pero con el
+//     content-type de imagen no estándar ("image/png;base64") que reportan
+//     algunas herramientas de banco de preguntas (bug real visto en QA).
 //
 // Ejecutar desde web/:  node tests/fixtures/generar-fixtures.mjs
 // jszip llega de forma transitiva vía mammoth; lo resolvemos desde su ruta en
@@ -121,6 +124,35 @@ zipConImagen.folder('word').folder('media').file('image1.png', pngBuffer)
 const docxConImagenBuffer = await zipConImagen.generateAsync({ type: 'nodebuffer' })
 writeFileSync(join(here, 'sample-con-imagen.docx'), docxConImagenBuffer)
 
+// ---------------------------------------------------------------------------
+// sample-con-imagen-content-type-raro.docx: igual que el anterior, pero
+// declarando el content-type de la imagen como "image/png;base64" (con
+// sufijo) en vez de "image/png". Reproduce el bug real: la comparación exacta
+// contra la whitelist de tipos soportados fallaba y se descartaban TODAS las
+// imágenes del documento.
+// ---------------------------------------------------------------------------
+
+const contentTypesRaro = contentTypesConImagen.replace(
+  'ContentType="image/png"',
+  'ContentType="image/png;base64"',
+)
+
+const zipContentTypeRaro = new JSZip()
+zipContentTypeRaro.file('[Content_Types].xml', contentTypesRaro)
+zipContentTypeRaro.folder('_rels').file('.rels', rels)
+zipContentTypeRaro.folder('word').file('document.xml', documentXmlConImagen)
+zipContentTypeRaro.folder('word').folder('_rels').file('document.xml.rels', documentRelsConImagen)
+zipContentTypeRaro.folder('word').folder('media').file('image1.png', pngBuffer)
+
+const docxContentTypeRaroBuffer = await zipContentTypeRaro.generateAsync({
+  type: 'nodebuffer',
+})
+writeFileSync(
+  join(here, 'sample-con-imagen-content-type-raro.docx'),
+  docxContentTypeRaroBuffer,
+)
+
 console.log(
-  'Fixtures generados: sample.docx, sample.png, sample-con-imagen.docx',
+  'Fixtures generados: sample.docx, sample.png, sample-con-imagen.docx, ' +
+    'sample-con-imagen-content-type-raro.docx',
 )
