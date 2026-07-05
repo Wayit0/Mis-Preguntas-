@@ -4,6 +4,7 @@ import { getSession } from '@/lib/get-session'
 import { getActor } from '@/lib/authz'
 import { resolverAsignatura } from '@/lib/asignatura'
 import { getDashboardStats } from '@/lib/queries/dashboard'
+import { ElegirAsignatura } from '@/components/shell/elegir-asignatura'
 import { buttonVariants } from '@/components/ui/button'
 import {
   Card,
@@ -84,6 +85,8 @@ export default async function DashboardPage() {
             : 'Resumen de todas tus asignaturas.'}
         </p>
       </div>
+
+      {!asignatura ? <ElegirAsignatura /> : null}
 
       {sugerirColegio ? (
         <Card>

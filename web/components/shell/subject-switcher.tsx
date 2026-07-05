@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { ASIGNATURAS, COOKIE_ASIGNATURA } from './subjects'
+import { ASIGNATURAS, fijarCookieAsignatura } from './subjects'
 
 const TODAS = '📚 Todas las asignaturas'
 
@@ -39,13 +39,7 @@ export function SubjectSwitcher({
 
   function seleccionar(nombre: string | null) {
     setSel(nombre ?? '')
-    if (nombre) {
-      document.cookie = `${COOKIE_ASIGNATURA}=${encodeURIComponent(
-        nombre,
-      )}; path=/; max-age=31536000; samesite=lax`
-    } else {
-      document.cookie = `${COOKIE_ASIGNATURA}=; path=/; max-age=0; samesite=lax`
-    }
+    fijarCookieAsignatura(nombre)
     router.refresh()
   }
 
