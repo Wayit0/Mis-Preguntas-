@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { guardarPrueba, actualizarPrueba } from '@/lib/actions/pruebas'
@@ -92,9 +92,11 @@ function PanelVistaPrevia({
   pendiente,
   editando,
   asignatura,
+  cargandoPreview,
   onMover,
   onQuitar,
   onGuardar,
+  onVistaPrevia,
 }: {
   preguntas: PreguntaSeleccionable[]
   seleccion: number[]
@@ -103,9 +105,11 @@ function PanelVistaPrevia({
   pendiente: boolean
   editando: boolean
   asignatura: string
+  cargandoPreview: boolean
   onMover: (from: number, to: number) => void
   onQuitar: (id: number) => void
   onGuardar: () => void
+  onVistaPrevia: () => void
 }) {
   const [dragging, setDragging] = useState<number | null>(null)
   const [dragOver, setDragOver] = useState<number | null>(null)
@@ -261,6 +265,15 @@ function PanelVistaPrevia({
           </ul>
         )}
 
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onVistaPrevia}
+          disabled={cargandoPreview || vacio}
+          className="w-full"
+        >
+          {cargandoPreview ? 'Generando vista previa…' : '👁 Vista previa'}
+        </Button>
         <Button
           type="button"
           onClick={onGuardar}
@@ -446,6 +459,85 @@ export function GeneradorPrueba({
     setFormulas((prev) => prev.filter((_, idx) => idx !== i))
   }
 
+  // Vista previa: object URL del PDF generado (o null si el modal está cerrado).
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [cargandoPreview, setCargandoPreview] = useState(false)
+
+  // Con el modal abierto: cerrar con Escape y bloquear el scroll del fondo.
+  useEffect(() => {
+    if (!previewUrl) return
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        URL.revokeObjectURL(previewUrl!)
+        setPreviewUrl(null)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    const overflowPrevio = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.style.overflow = overflowPrevio
+    }
+  }, [previewUrl])
+
+  function cerrarPreview() {
+    setPreviewUrl((old) => {
+      if (old) URL.revokeObjectURL(old)
+      return null
+    })
+  }
+
+  /** Arma el FormData de la prueba (mismo payload para guardar y previsualizar). */
+  function construirFormData(): FormData {
+    const fd = new FormData()
+    fd.set('asignatura', asignatura)
+    fd.set('titulo', titulo)
+    fd.set('colegio', colegio)
+    fd.set('profesor', profesor)
+    fd.set('instrucciones', instrucciones)
+    const logoFile = logoRef.current?.files?.[0]
+    if (logoFile) fd.set('logo', logoFile)
+    fd.set('usarLogoColegio', usarLogoColegio ? '1' : '0')
+    for (const expr of formulas) fd.append('formula', expr)
+    // El orden del array determina el orden en el PDF.
+    for (const id of seleccion) fd.append('pregunta', String(id))
+    for (const id of textosSel) fd.append('texto', String(id))
+    return fd
+  }
+
+  // Genera el PDF de la selección actual (endpoint puntual, sin persistir) y lo
+  // muestra embebido para previsualizarlo antes de guardar/descargar.
+  async function vistaPrevia() {
+    setError(null)
+    if (seleccion.length === 0 && textosSel.size === 0) {
+      setError('Selecciona al menos una pregunta o un texto.')
+      return
+    }
+    setCargandoPreview(true)
+    try {
+      const res = await fetch('/api/prueba', {
+        method: 'POST',
+        body: construirFormData(),
+      })
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '')
+        setError(msg || 'No se pudo generar la vista previa. Inténtalo de nuevo.')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      setPreviewUrl((old) => {
+        if (old) URL.revokeObjectURL(old)
+        return url
+      })
+    } catch {
+      setError('Ocurrió un error al generar la vista previa.')
+    } finally {
+      setCargandoPreview(false)
+    }
+  }
+
   async function guardar() {
     setError(null)
     if (seleccion.length === 0 && textosSel.size === 0) {
@@ -454,20 +546,7 @@ export function GeneradorPrueba({
     }
     setPendiente(true)
     try {
-      const fd = new FormData()
-      fd.set('asignatura', asignatura)
-      fd.set('titulo', titulo)
-      fd.set('colegio', colegio)
-      fd.set('profesor', profesor)
-      fd.set('instrucciones', instrucciones)
-      const logoFile = logoRef.current?.files?.[0]
-      if (logoFile) fd.set('logo', logoFile)
-      fd.set('usarLogoColegio', usarLogoColegio ? '1' : '0')
-      for (const expr of formulas) fd.append('formula', expr)
-      // El orden del array determina el orden en el PDF
-      for (const id of seleccion) fd.append('pregunta', String(id))
-      for (const id of textosSel) fd.append('texto', String(id))
-
+      const fd = construirFormData()
       const resultado = pruebaInicial
         ? await actualizarPrueba(pruebaInicial.id, fd)
         : await guardarPrueba(fd)
@@ -910,13 +989,59 @@ export function GeneradorPrueba({
               pendiente={pendiente}
               editando={editando}
               asignatura={asignatura}
+              cargandoPreview={cargandoPreview}
               onMover={mover}
               onQuitar={quitar}
               onGuardar={guardar}
+              onVistaPrevia={vistaPrevia}
             />
           </div>
         </div>
       )}
+
+      {/* Modal de vista previa: muestra el PDF real embebido. */}
+      {previewUrl ? (
+        <div
+          className="fixed inset-0 z-50 flex bg-black/60 p-2 sm:p-4"
+          onClick={cerrarPreview}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Vista previa de la prueba"
+        >
+          <div
+            className="mx-auto flex h-full w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-card shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
+              <p className="text-sm font-semibold text-foreground">
+                Vista previa de la prueba
+              </p>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewUrl}
+                  download={`prueba_${asignatura || 'general'}.pdf`}
+                  className={buttonVariants({ size: 'sm' })}
+                >
+                  ⬇️ Descargar
+                </a>
+                <button
+                  type="button"
+                  onClick={cerrarPreview}
+                  aria-label="Cerrar vista previa"
+                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                >
+                  Cerrar ✕
+                </button>
+              </div>
+            </div>
+            <iframe
+              src={previewUrl}
+              title="Vista previa de la prueba"
+              className="w-full flex-1 bg-white"
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
