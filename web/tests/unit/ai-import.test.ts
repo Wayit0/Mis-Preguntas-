@@ -109,52 +109,7 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
     expect(preguntas.every((p) => p.pregunta.trim().length > 0)).toBe(true)
   })
 
-  it('si falla con imágenes, reintenta UNA vez sólo con texto y devuelve ese resultado', async () => {
-    const bloquesConImagen: BloqueContenido[] = [
-      { type: 'text', text: 'documento con [IMAGEN_0]' },
-      { type: 'text', text: 'Imagen 0:' },
-      {
-        type: 'image',
-        source: { type: 'base64', media_type: 'image/png', data: 'ZmFrZQ==' },
-      },
-    ]
-
-    mocks.parse
-      .mockRejectedValueOnce(new Error('la API rechazó la imagen'))
-      .mockResolvedValueOnce({
-        stop_reason: 'end_turn',
-        parsed_output: {
-          preguntas: [
-            {
-              pregunta: '¿Cuánto es 2 + 2?',
-              A: '3',
-              B: '4',
-              C: '5',
-              D: '6',
-              E: null,
-              correcta: 'B',
-              explicacion: '',
-              materia: null,
-              nivel: null,
-              tipo: 'seleccion_multiple',
-            },
-          ],
-        },
-      })
-
-    const preguntas = await detectarPreguntas(bloquesConImagen, 'Matemáticas')
-
-    expect(mocks.parse).toHaveBeenCalledTimes(2)
-    expect(preguntas).toHaveLength(1)
-    expect(preguntas[0].pregunta).toBe('¿Cuánto es 2 + 2?')
-
-    // El segundo intento sólo lleva bloques de texto (sin la imagen).
-    const segundoIntento = mocks.parse.mock.calls[1][0]
-    const contenido = segundoIntento.messages[0].content as Array<{ type: string }>
-    expect(contenido.every((b) => b.type === 'text')).toBe(true)
-  })
-
-  it('si falla y no había imágenes que descartar, propaga el error original', async () => {
+  it('propaga el error si la llamada al modelo falla', async () => {
     mocks.parse.mockRejectedValueOnce(new Error('fallo de red'))
 
     await expect(detectarPreguntas(bloques, 'Física')).rejects.toThrow(

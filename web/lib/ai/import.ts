@@ -114,39 +114,12 @@ const FIXTURE_FAKE: readonly unknown[] = [
   },
 ]
 
-/** Una sola llamada a Claude con los content blocks dados. */
-async function llamarModelo(
-  client: Anthropic,
-  contentBlocks: Anthropic.ContentBlockParam[],
-  asignatura: string,
-) {
-  const instruccion =
-    `Extrae todas las preguntas del documento adjunto. ` +
-    `La asignatura es "${asignatura}".`
-
-  return client.messages.parse({
-    model: MODELO,
-    max_tokens: 16000,
-    system: SISTEMA,
-    messages: [
-      { role: 'user', content: [...contentBlocks, { type: 'text', text: instruccion }] },
-    ],
-    output_config: { format: zodOutputFormat(PreguntasDetectadasSchema) },
-  })
-}
-
 /**
  * Extrae las preguntas presentes en un documento ya convertido a content blocks.
  *
  * Devuelve sólo las preguntas válidas (con enunciado no vacío). Si el modelo no
  * produce salida estructurada (`parsed_output` nulo) o rechaza la petición
  * (`stop_reason === 'refusal'`), devuelve un arreglo vacío en lugar de fallar.
- *
- * Si la llamada falla y el documento incluía imágenes incrustadas (DOCX), se
- * reintenta UNA vez sólo con los bloques de texto (sin imágenes): así una
- * imagen problemática (formato que la API rechaza, payload demasiado grande,
- * etc.) no tumba la detección completa — en el peor caso, el profesor recupera
- * las preguntas en texto y pierde sólo la asociación con las imágenes.
  */
 export async function detectarPreguntas(
   contentBlocks: BloqueContenido[],
@@ -159,18 +132,19 @@ export async function detectarPreguntas(
 
   const client = new Anthropic() // lee ANTHROPIC_API_KEY del entorno
 
-  let res: Awaited<ReturnType<typeof llamarModelo>>
-  try {
-    res = await llamarModelo(client, contentBlocks, asignatura)
-  } catch (err) {
-    const soloTexto = contentBlocks.filter((b) => b.type === 'text')
-    if (soloTexto.length === contentBlocks.length) throw err
-    console.error(
-      '[ai/import] falló con imágenes incluidas, reintentando sólo con texto:',
-      err,
-    )
-    res = await llamarModelo(client, soloTexto, asignatura)
-  }
+  const instruccion =
+    `Extrae todas las preguntas del documento adjunto. ` +
+    `La asignatura es "${asignatura}".`
+
+  const res = await client.messages.parse({
+    model: MODELO,
+    max_tokens: 16000,
+    system: SISTEMA,
+    messages: [
+      { role: 'user', content: [...contentBlocks, { type: 'text', text: instruccion }] },
+    ],
+    output_config: { format: zodOutputFormat(PreguntasDetectadasSchema) },
+  })
 
   if (res.stop_reason === 'refusal') return []
 
