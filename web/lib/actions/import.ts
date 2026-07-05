@@ -4,6 +4,8 @@ import { getSession } from '@/lib/get-session'
 import {
   esTipoSoportado,
   extraerBloquesDocumento,
+  type DocumentoExtraido,
+  type ImagenExtraida,
 } from '@/lib/docparse/extract'
 import { detectarPreguntas } from '@/lib/ai/import'
 import { crearPregunta } from '@/lib/actions/preguntas'
@@ -11,6 +13,7 @@ import { LETRAS } from '@/lib/validation/pregunta'
 import {
   guardarImportSchema,
   type GuardarImportInput,
+  type ImagenParaGuardar,
   type PreguntaDetectada,
 } from '@/lib/validation/import'
 
@@ -23,7 +26,7 @@ import {
 
 /** Resultado del análisis de un documento. */
 export type ResultadoAnalisis =
-  | { ok: true; preguntas: PreguntaDetectada[] }
+  | { ok: true; preguntas: PreguntaDetectada[]; imagenes: ImagenExtraida[] }
   | { ok: false; error: string }
 
 /** Resultado de la confirmación (guardado en lote). */
@@ -58,9 +61,9 @@ export async function analizarDocumento(
     }
   }
 
-  let bloques
+  let documento: DocumentoExtraido
   try {
-    bloques = await extraerBloquesDocumento(archivo)
+    documento = await extraerBloquesDocumento(archivo)
   } catch {
     return {
       ok: false,
@@ -69,14 +72,28 @@ export async function analizarDocumento(
   }
 
   try {
-    const preguntas = await detectarPreguntas(bloques, asignatura)
-    return { ok: true, preguntas }
+    const preguntas = await detectarPreguntas(documento.bloques, asignatura)
+    return { ok: true, preguntas, imagenes: documento.imagenes }
   } catch (err) {
+    // Log con detalle para poder diagnosticar en los logs del servidor (Azure App
+    // Service / Application Insights) qué falló realmente: el mensaje que ve el
+    // profesor es genérico a propósito, pero acá sí queremos el detalle.
+    console.error('[importar] detectarPreguntas falló:', err)
+
     // Distingue un problema de configuración (clave de Anthropic ausente o
-    // inválida → 401/403) de un fallo transitorio, para dar un mensaje accionable
-    // en vez de pedir "inténtalo de nuevo" sobre algo que nunca va a funcionar.
+    // inválida) de un fallo transitorio, para dar un mensaje accionable en vez
+    // de pedir "inténtalo de nuevo" sobre algo que nunca va a funcionar.
+    // - Clave INVÁLIDA → la API responde 401/403 (`err.status`).
+    // - Clave AUSENTE → el SDK lanza ANTES de llamar a la API (sin `.status`),
+    //   con un mensaje que menciona la API key.
     const status = (err as { status?: number } | null)?.status
-    if (status === 401 || status === 403) {
+    const mensaje = err instanceof Error ? err.message.toLowerCase() : ''
+    const esProblemaDeClave =
+      status === 401 ||
+      status === 403 ||
+      mensaje.includes('api key') ||
+      mensaje.includes('anthropic_api_key')
+    if (esProblemaDeClave) {
       return {
         ok: false,
         error:
@@ -89,6 +106,31 @@ export async function analizarDocumento(
       error: 'La IA no pudo procesar el documento. Inténtalo de nuevo.',
     }
   }
+}
+
+/** Extensión de archivo por mime, para el nombre del `File` reconstruido. */
+const EXT_POR_MIME: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+}
+
+/**
+ * Si `img` trae datos, reconstruye el `File` (a partir del base64 extraído del
+ * documento) y lo agrega al FormData bajo `campo`, para que `subirImagenes` (en
+ * `pregunta-fields.ts`, ya usado por `crearPregunta`) lo suba a Blob Storage
+ * igual que si viniera de un `<input type="file">`.
+ */
+function setImagenSiExiste(
+  fd: FormData,
+  campo: string,
+  img: ImagenParaGuardar | null | undefined,
+): void {
+  if (!img) return
+  const ext = EXT_POR_MIME[img.mediaType] ?? 'png'
+  const bytes = Buffer.from(img.base64, 'base64')
+  fd.set(campo, new File([bytes], `${campo}.${ext}`, { type: img.mediaType }))
 }
 
 /** Construye el FormData de una pregunta para reutilizar `crearPregunta`. */
@@ -104,6 +146,7 @@ function formDataDePregunta(
   fd.set('nivel', p.nivel)
   fd.set('explicacion', p.explicacion)
   fd.set('compartida', '0')
+  setImagenSiExiste(fd, 'imagen_pregunta', p.imagenPregunta)
 
   if (p.tipo === 'seleccion_multiple') {
     fd.set('A', p.A)

@@ -108,4 +108,13 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
     expect(preguntas.length).toBeGreaterThanOrEqual(1)
     expect(preguntas.every((p) => p.pregunta.trim().length > 0)).toBe(true)
   })
+
+  it('propaga el error si la llamada al modelo falla', async () => {
+    mocks.parse.mockRejectedValueOnce(new Error('fallo de red'))
+
+    await expect(detectarPreguntas(bloques, 'Física')).rejects.toThrow(
+      'fallo de red',
+    )
+    expect(mocks.parse).toHaveBeenCalledTimes(1)
+  })
 })
