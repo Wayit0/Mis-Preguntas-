@@ -43,6 +43,13 @@
       "when": 1783139614551,
       "tag": "0005_kind_karma",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783287650320,
+      "tag": "0006_neat_demogoblin",
+      "breakpoints": true
     }
   ]
 }

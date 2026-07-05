@@ -18,6 +18,8 @@ import { getActor, esAdminDeColegio, type Actor } from '@/lib/authz'
 import {
   contarAdminsColegio,
   obtenerColegio,
+  colegioPorDominio,
+  normalizarDominio,
 } from '@/lib/queries/colegio'
 
 // ---------------------------------------------------------------------------
@@ -372,10 +374,29 @@ export async function configurarColegio(
   const nombre = (formData.get('nombre') ?? '').toString().trim()
   if (!nombre) return { error: 'El nombre del colegio es obligatorio.' }
 
-  const cambios: { nombre: string; logo?: string } = { nombre }
+  const cambios: { nombre: string; logo?: string; dominio?: string | null } = {
+    nombre,
+  }
   const archivo = formData.get('logo')
   if (archivo instanceof File && archivo.size > 0) {
     cambios.logo = await uploadImage(archivo)
+  }
+
+  // Dominio de correo (opcional). Vacío = sin dominio. Debe ser válido y único
+  // entre colegios (para que la asociación automática al registrarse no sea
+  // ambigua).
+  const dominio = normalizarDominio((formData.get('dominio') ?? '').toString())
+  if (dominio) {
+    if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(dominio)) {
+      return { error: 'El dominio no es válido (ej: colegiosanjose.cl).' }
+    }
+    const otro = await colegioPorDominio(dominio)
+    if (otro && otro.id !== colegioId) {
+      return { error: 'Ese dominio ya está en uso por otro colegio.' }
+    }
+    cambios.dominio = dominio
+  } else {
+    cambios.dominio = null
   }
 
   await db.update(colegios).set(cambios).where(eq(colegios.id, colegioId))

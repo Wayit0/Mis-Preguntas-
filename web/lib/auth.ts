@@ -4,9 +4,15 @@ import { createAuthMiddleware } from 'better-auth/api'
 import { admin } from 'better-auth/plugins'
 import { createAccessControl } from 'better-auth/plugins/access'
 import { defaultStatements, adminAc } from 'better-auth/plugins/admin/access'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { usuarios, accounts, sessions, verifications } from '@/lib/db/schema'
+import {
+  usuarios,
+  accounts,
+  colegios,
+  sessions,
+  verifications,
+} from '@/lib/db/schema'
 import { hashPw, verifyPw, LEGACY } from '@/lib/auth-password'
 
 // ---------------------------------------------------------------------------
@@ -120,40 +126,67 @@ export const auth = betterAuth({
   // validada (ctx.body) y (b) el usuario autenticado (ctx.context.returned).
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
-      if (ctx.path !== '/sign-in/email') return
-
       const returned = ctx.context.returned as
         | { token?: string; user?: { id?: string | number } }
         | undefined
       // Sólo en éxito: el handler devuelve { token, user }. En fallo el
       // `returned` es un APIError (sin token), así que salimos.
       if (!returned?.token || returned.user?.id == null) return
-
-      const body = ctx.body as { password?: string } | undefined
-      const password = body?.password
-      if (typeof password !== 'string') return
-
       const userId = Number(returned.user.id)
       if (!Number.isFinite(userId)) return
 
-      const [account] = await db
-        .select()
-        .from(accounts)
-        .where(
-          and(
-            eq(accounts.userId, userId),
-            eq(accounts.providerId, 'credential'),
-          ),
-        )
-        .limit(1)
+      // Rehash de credenciales legacy tras un sign-in exitoso.
+      if (ctx.path === '/sign-in/email') {
+        const body = ctx.body as { password?: string } | undefined
+        const password = body?.password
+        if (typeof password !== 'string') return
 
-      if (!account?.password?.startsWith(LEGACY)) return
+        const [account] = await db
+          .select()
+          .from(accounts)
+          .where(
+            and(
+              eq(accounts.userId, userId),
+              eq(accounts.providerId, 'credential'),
+            ),
+          )
+          .limit(1)
+        if (!account?.password?.startsWith(LEGACY)) return
 
-      const nuevo = await hashPw(password)
-      await db
-        .update(accounts)
-        .set({ password: nuevo, updatedAt: new Date() })
-        .where(eq(accounts.id, account.id))
+        const nuevo = await hashPw(password)
+        await db
+          .update(accounts)
+          .set({ password: nuevo, updatedAt: new Date() })
+          .where(eq(accounts.id, account.id))
+        return
+      }
+
+      // Auto-asociación al colegio por DOMINIO de correo tras el registro: si el
+      // dominio del correo coincide con el de un colegio, se asocia la cuenta
+      // (sólo si aún no tiene colegio).
+      if (ctx.path === '/sign-up/email') {
+        const [u] = await db
+          .select({ email: usuarios.email, colegioId: usuarios.colegioId })
+          .from(usuarios)
+          .where(eq(usuarios.id, userId))
+          .limit(1)
+        if (!u || u.colegioId != null) return
+
+        const dominio = u.email.toLowerCase().split('@')[1]
+        if (!dominio) return
+
+        const [colegio] = await db
+          .select({ id: colegios.id })
+          .from(colegios)
+          .where(eq(colegios.dominio, dominio))
+          .limit(1)
+        if (!colegio) return
+
+        await db
+          .update(usuarios)
+          .set({ colegioId: colegio.id })
+          .where(and(eq(usuarios.id, userId), isNull(usuarios.colegioId)))
+      }
     }),
   },
   // Rate limiting: por defecto better-auth lo activa en producción y aplica una

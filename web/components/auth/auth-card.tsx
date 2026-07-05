@@ -172,6 +172,14 @@ export function AuthCard({ modoInicial = 'login' }: { modoInicial?: Modo }) {
             />
           </div>
 
+          {modo === 'registro' && (
+            <p className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+              💡 Si te registras con el correo de tu colegio, tu cuenta se
+              asociará automáticamente al colegio y podrás compartir tus pruebas
+              y preguntas con el resto del equipo.
+            </p>
+          )}
+
           <div className="flex flex-col gap-2">
             <Label htmlFor="password">Contraseña</Label>
             <Input

@@ -20,10 +20,12 @@ export function ConfigurarColegio({
   nombreInicial,
   logoInicial,
   codigoInicial,
+  dominioInicial,
 }: {
   nombreInicial: string
   logoInicial: string | null
   codigoInicial: string
+  dominioInicial: string | null
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -91,6 +93,22 @@ export function ConfigurarColegio({
                 placeholder="Ej: Colegio San Ignacio"
                 required
               />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="dominio-colegio">
+                Dominio de correo del colegio (opcional)
+              </Label>
+              <Input
+                id="dominio-colegio"
+                name="dominio"
+                defaultValue={dominioInicial ?? ''}
+                placeholder="Ej: colegiosanjose.cl"
+              />
+              <p className="text-xs text-muted-foreground">
+                Quienes se registren con un correo de este dominio se unirán
+                automáticamente a tu colegio y podrán compartir su banco.
+              </p>
             </div>
 
             <div className="flex flex-col gap-1.5">

@@ -138,6 +138,7 @@ export default async function ColegioPage({
           nombreInicial={colegio.nombre}
           logoInicial={colegio.logo}
           codigoInicial={colegio.joinCode}
+          dominioInicial={colegio.dominio}
         />
       )}
     </div>
