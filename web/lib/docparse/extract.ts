@@ -177,11 +177,14 @@ const LADO_MAXIMO_IMAGEN_IA = 1568
 /**
  * Redimensiona una imagen (si excede `LADO_MAXIMO_IMAGEN_IA` en algún lado) para
  * que quede dentro de los límites de tamaño de la API de visión de Anthropic.
- * Conserva el formato original. Si sharp no puede procesarla (dato corrupto o
- * variante rara pese al content-type declarado), devuelve el buffer tal cual:
- * es mejor enviarla sin redimensionar que perder la imagen.
+ * Conserva el formato original. Decodifica con sharp de paso: así confirmamos
+ * que los bytes son realmente una imagen ráster válida (y no, p. ej., un objeto
+ * OLE o un EMF/WMF que Word declaró con un content-type ráster engañoso), algo
+ * que de otro modo llegaría intacto hasta la API de Anthropic y haría fallar
+ * TODA la detección (una sola imagen corrupta tumba la pregunta completa).
+ * Devuelve `null` si sharp no puede decodificarla: esa imagen se descarta.
  */
-async function redimensionarSiHaceFalta(buffer: Buffer): Promise<Buffer> {
+async function redimensionarONulo(buffer: Buffer): Promise<Buffer | null> {
   try {
     return await sharp(buffer)
       .resize({
@@ -191,16 +194,19 @@ async function redimensionarSiHaceFalta(buffer: Buffer): Promise<Buffer> {
         withoutEnlargement: true,
       })
       .toBuffer()
-  } catch {
-    return buffer
+  } catch (err) {
+    console.error('[docparse] imagen de DOCX no decodificable, se descarta:', err)
+    return null
   }
 }
 
 /**
  * Extrae el texto (con marcadores `[IMAGEN_n]` en el lugar de cada imagen) y
  * las imágenes incrustadas de un DOCX. Las imágenes en formatos no soportados
- * (p. ej. EMF/WMF de Word antiguo) se omiten en silencio: quedan fuera del
- * arreglo y su marcador no se inserta.
+ * (p. ej. EMF/WMF de Word antiguo) o que sharp no pueda decodificar pese al
+ * content-type declarado se omiten en silencio: quedan fuera del arreglo y su
+ * marcador no se inserta (mejor perder una imagen que hacer fallar todo el
+ * documento en la API de Anthropic).
  */
 async function extraerDocx(
   bytes: Buffer,
@@ -216,7 +222,8 @@ async function extraerDocx(
           return { src: '' }
         }
         const original = Buffer.from(await image.read('base64'), 'base64')
-        const redimensionada = await redimensionarSiHaceFalta(original)
+        const redimensionada = await redimensionarONulo(original)
+        if (!redimensionada) return { src: '' }
         const indice = imagenes.length
         imagenes.push({
           indice,
