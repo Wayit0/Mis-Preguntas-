@@ -103,7 +103,7 @@ export async function construirPruebaPdf(
           and(eq(tablaPreguntas.userId, userId), eq(tablaPreguntas.textoId, t.id)),
         )
         .orderBy(tablaPreguntas.id)
-      if (filasPreg.length === 0) continue
+      // Se incluye el texto aunque no tenga preguntas asociadas (texto solo).
       textosPdf.push({ id: t.id, titulo: t.titulo, contenido: t.contenido })
       for (const fp of filasPreg) {
         preguntasDeTextos.push(aPreguntaPdf(fp))
@@ -132,7 +132,8 @@ export async function construirPruebaPdf(
     }
   }
 
-  if (preguntasDeTextos.length === 0 && preguntasSueltas.length === 0) {
+  // Válida si hay al menos un texto o una pregunta (un texto puede ir solo).
+  if (textosPdf.length === 0 && preguntasSueltas.length === 0) {
     throw new PruebaSinPreguntasError()
   }
 

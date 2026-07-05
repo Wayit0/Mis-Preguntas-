@@ -630,11 +630,11 @@ export function GeneradorPrueba({
                 <CardContent className="flex flex-col gap-3">
                   <div className="flex flex-col gap-0.5">
                     <p className="text-sm font-semibold text-foreground">
-                      Textos con preguntas asociadas (opcional)
+                      Mis Textos ({textos.length}) — opcional
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Al seleccionar un texto se incluye completo, seguido de todas
-                      sus preguntas.
+                      Al seleccionar un texto se incluye completo en la prueba,
+                      seguido de sus preguntas asociadas (si tiene).
                     </p>
                   </div>
                   <ul className="flex flex-col gap-2">
@@ -650,8 +650,11 @@ export function GeneradorPrueba({
                           <span className="text-sm text-foreground">
                             📰 {t.titulo}{' '}
                             <span className="text-muted-foreground">
-                              ({t.nPreguntas} pregunta
-                              {t.nPreguntas === 1 ? '' : 's'})
+                              {t.nPreguntas === 0
+                                ? '(sin preguntas)'
+                                : `(${t.nPreguntas} pregunta${
+                                    t.nPreguntas === 1 ? '' : 's'
+                                  })`}
                             </span>
                           </span>
                         </label>

@@ -50,8 +50,9 @@ export async function cargarPruebaPorId(
 /**
  * Datos que necesita el generador de pruebas (`GeneradorPrueba`): las preguntas
  * sueltas seleccionables (serializadas y sin las asociadas a un texto), las
- * materias para el filtro, y los textos con al menos una pregunta asociada.
- * Se comparte entre `/prueba` (crear) y `/mis-pruebas/[id]/editar` (editar).
+ * materias para el filtro, y TODOS los textos del usuario (con o sin preguntas
+ * asociadas; un texto puede incluirse solo). Se comparte entre `/prueba` (crear)
+ * y `/mis-pruebas/[id]/editar` (editar).
  */
 export async function cargarDatosGenerador(
   userId: number,
@@ -89,13 +90,11 @@ export async function cargarDatosGenerador(
       E: p.E ?? '',
     }))
 
-  const textosUtiles = textos
-    .map((t) => ({
-      id: t.id,
-      titulo: t.titulo,
-      nPreguntas: conteos.get(t.id) ?? 0,
-    }))
-    .filter((t) => t.nPreguntas > 0)
+  const textosUtiles = textos.map((t) => ({
+    id: t.id,
+    titulo: t.titulo,
+    nPreguntas: conteos.get(t.id) ?? 0,
+  }))
 
   return { preguntas, materias: opciones.materias, textos: textosUtiles }
 }

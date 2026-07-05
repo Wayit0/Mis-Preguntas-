@@ -481,7 +481,7 @@ export async function generarPruebaPdf(config: PruebaConfig): Promise<Buffer> {
   for (const texto of textos) {
     if (texto.id == null) continue
     const delTexto = preguntas.filter((p) => p.texto_id === texto.id)
-    if (delTexto.length === 0) continue
+    // Se incluye el texto aunque no tenga preguntas (se muestra el texto solo).
     const preparadas: PreguntaPreparada[] = []
     for (const p of delTexto) {
       preparadas.push(await prepararPregunta(p, contador++))
