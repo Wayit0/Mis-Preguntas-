@@ -20,7 +20,7 @@ import { Card, CardContent } from '@/components/ui/card'
 
 /**
  * Formulario de alta de un texto de comprensión lectora. Tras guardar, navega a
- * la pestaña "Ver mis textos" de la misma asignatura para que el profesor pueda
+ * la lista «Mis Textos» de la misma asignatura para que el profesor pueda
  * empezar a asociarle preguntas.
  */
 export function FormularioTexto({
@@ -61,7 +61,7 @@ export function FormularioTexto({
 
       // Éxito: la lista ya fue revalidada en el servidor; vamos a "Ver mis textos".
       router.push(
-        `/textos?asignatura=${encodeURIComponent(asignatura)}&tab=ver`,
+        `/textos?asignatura=${encodeURIComponent(asignatura)}`,
       )
       router.refresh()
     } catch {
@@ -162,7 +162,7 @@ export function FormularioTexto({
           className="w-full sm:w-auto"
           onClick={() =>
             router.push(
-              `/textos?asignatura=${encodeURIComponent(asignatura)}&tab=ver`,
+              `/textos?asignatura=${encodeURIComponent(asignatura)}`,
             )
           }
         >

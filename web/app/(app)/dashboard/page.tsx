@@ -147,10 +147,10 @@ export default async function DashboardPage() {
             ➕ Agregar pregunta
           </Link>
           <Link
-            href={hrefCon('/textos', asignatura)}
+            href={hrefCon('/textos/nueva', asignatura)}
             className={buttonVariants({ variant: 'secondary', size: 'sm' })}
           >
-            📰 Nuevo texto
+            ✏️ Agregar texto
           </Link>
           <Link
             href={hrefCon('/prueba', asignatura)}
