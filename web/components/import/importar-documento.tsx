@@ -11,9 +11,14 @@ import {
   TIPOS_PREGUNTA,
   ETIQUETA_TIPO,
   LETRAS,
+  type Letra,
   type TipoPregunta,
 } from '@/lib/validation/pregunta'
-import type { PreguntaDetectada } from '@/lib/validation/import'
+import type {
+  ImagenParaGuardar,
+  PreguntaDetectada,
+} from '@/lib/validation/import'
+import type { ImagenExtraida } from '@/lib/docparse/extract'
 import { ASIGNATURAS } from '@/components/shell/subjects'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +33,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { LatexText } from '@/components/preguntas/latex-text'
+
+/* eslint-disable @next/next/no-img-element */
 
 /** Una pregunta detectada, ya en forma editable (sin nulls) + selección. */
 interface PreguntaEditable {
@@ -44,10 +51,41 @@ interface PreguntaEditable {
   materia: string
   nivel: string
   tipo: TipoPregunta
+  imagenPregunta: ImagenParaGuardar | null
+  imagenA: ImagenParaGuardar | null
+  imagenB: ImagenParaGuardar | null
+  imagenC: ImagenParaGuardar | null
+  imagenD: ImagenParaGuardar | null
+  imagenE: ImagenParaGuardar | null
+}
+
+/** Nombre del campo de imagen de cada alternativa en `PreguntaEditable`. */
+const CAMPO_IMAGEN_ALT: Record<
+  Letra,
+  'imagenA' | 'imagenB' | 'imagenC' | 'imagenD' | 'imagenE'
+> = {
+  A: 'imagenA',
+  B: 'imagenB',
+  C: 'imagenC',
+  D: 'imagenD',
+  E: 'imagenE',
+}
+
+/** Resuelve un índice de imagen (el que puso la IA) al objeto correspondiente. */
+function resolverImagen(
+  indice: number | null | undefined,
+  imagenesDisponibles: ImagenExtraida[],
+): ImagenParaGuardar | null {
+  if (indice == null) return null
+  const img = imagenesDisponibles[indice]
+  return img ? { base64: img.base64, mediaType: img.mediaType } : null
 }
 
 let contador = 0
-function aEditable(p: PreguntaDetectada): PreguntaEditable {
+function aEditable(
+  p: PreguntaDetectada,
+  imagenesDisponibles: ImagenExtraida[],
+): PreguntaEditable {
   const tipo = (TIPOS_PREGUNTA as readonly string[]).includes(p.tipo)
     ? (p.tipo as TipoPregunta)
     : 'seleccion_multiple'
@@ -70,7 +108,37 @@ function aEditable(p: PreguntaDetectada): PreguntaEditable {
     materia: p.materia ?? '',
     nivel: p.nivel ?? '',
     tipo,
+    imagenPregunta: resolverImagen(p.imagenPreguntaIndice, imagenesDisponibles),
+    imagenA: resolverImagen(p.imagenAIndice, imagenesDisponibles),
+    imagenB: resolverImagen(p.imagenBIndice, imagenesDisponibles),
+    imagenC: resolverImagen(p.imagenCIndice, imagenesDisponibles),
+    imagenD: resolverImagen(p.imagenDIndice, imagenesDisponibles),
+    imagenE: resolverImagen(p.imagenEIndice, imagenesDisponibles),
   }
+}
+
+/** Miniatura de una imagen detectada, con botón para quitarla. */
+function MiniaturaImagen({
+  imagen,
+  alt,
+  onQuitar,
+}: {
+  imagen: ImagenParaGuardar
+  alt: string
+  onQuitar: () => void
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <img
+        src={`data:${imagen.mediaType};base64,${imagen.base64}`}
+        alt={alt}
+        className="max-h-24 w-fit rounded-md border border-border object-contain"
+      />
+      <Button type="button" variant="outline" size="sm" onClick={onQuitar}>
+        Quitar imagen
+      </Button>
+    </div>
+  )
 }
 
 type Fase = 'subir' | 'analizando' | 'revisar' | 'guardando'
@@ -120,7 +188,9 @@ export function ImportarDocumento({
         setFase('subir')
         return
       }
-      setPreguntas(resultado.preguntas.map(aEditable))
+      setPreguntas(
+        resultado.preguntas.map((p) => aEditable(p, resultado.imagenes)),
+      )
       setFase('revisar')
     } catch {
       setError('Ocurrió un error al analizar el documento. Inténtalo de nuevo.')
@@ -158,6 +228,12 @@ export function ImportarDocumento({
           materia: p.materia,
           nivel: p.nivel,
           tipo: p.tipo,
+          imagenPregunta: p.imagenPregunta,
+          imagenA: p.imagenA,
+          imagenB: p.imagenB,
+          imagenC: p.imagenC,
+          imagenD: p.imagenD,
+          imagenE: p.imagenE,
         })),
       })
       if (!resultado.ok) {
@@ -286,27 +362,47 @@ export function ImportarDocumento({
                         className="text-xs text-muted-foreground"
                       />
                     ) : null}
+                    {p.imagenPregunta ? (
+                      <MiniaturaImagen
+                        imagen={p.imagenPregunta}
+                        alt={`Imagen del enunciado ${i + 1}`}
+                        onQuitar={() => actualizar(p.id, { imagenPregunta: null })}
+                      />
+                    ) : null}
                   </div>
 
                   {esSeleccion ? (
                     <div className="flex flex-col gap-2">
-                      {LETRAS.map((letra) => (
-                        <div
-                          key={letra}
-                          className="flex flex-col gap-1.5"
-                        >
-                          <Label htmlFor={`alt-${p.id}-${letra}`}>
-                            Alternativa {letra}
-                          </Label>
-                          <Input
-                            id={`alt-${p.id}-${letra}`}
-                            value={p[letra]}
-                            onChange={(e) =>
-                              actualizar(p.id, { [letra]: e.target.value })
-                            }
-                          />
-                        </div>
-                      ))}
+                      {LETRAS.map((letra) => {
+                        const campoImagen = CAMPO_IMAGEN_ALT[letra]
+                        const imagenAlt = p[campoImagen]
+                        return (
+                          <div
+                            key={letra}
+                            className="flex flex-col gap-1.5"
+                          >
+                            <Label htmlFor={`alt-${p.id}-${letra}`}>
+                              Alternativa {letra}
+                            </Label>
+                            <Input
+                              id={`alt-${p.id}-${letra}`}
+                              value={p[letra]}
+                              onChange={(e) =>
+                                actualizar(p.id, { [letra]: e.target.value })
+                              }
+                            />
+                            {imagenAlt ? (
+                              <MiniaturaImagen
+                                imagen={imagenAlt}
+                                alt={`Imagen de la alternativa ${letra}`}
+                                onQuitar={() =>
+                                  actualizar(p.id, { [campoImagen]: null })
+                                }
+                              />
+                            ) : null}
+                          </div>
+                        )
+                      })}
                       <div className="flex flex-col gap-1.5">
                         <Label>Respuesta correcta</Label>
                         <Select

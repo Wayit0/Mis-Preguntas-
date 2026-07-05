@@ -28,6 +28,13 @@ export const TIPOS_PREGUNTA_IMPORT = TIPOS_PREGUNTA
 /** Acepta string, null o ausente (lo que devuelva el modelo). */
 const textoOpcional = z.string().nullish()
 
+/**
+ * Índice (0-based) de una imagen incrustada en el documento (ver
+ * `ImagenExtraida` en `docparse/extract`), o null si esa pregunta/alternativa
+ * no depende de ninguna imagen.
+ */
+const indiceImagenOpcional = z.number().int().nonnegative().nullish()
+
 /** Una pregunta tal cual la entrega el modelo (forma laxa, pre-criba). */
 export const preguntaDetectadaSchema = z.object({
   pregunta: z.string(),
@@ -41,6 +48,15 @@ export const preguntaDetectadaSchema = z.object({
   materia: textoOpcional,
   nivel: textoOpcional,
   tipo: z.enum(TIPOS_PREGUNTA_IMPORT),
+  // Referencias a las imágenes incrustadas del documento (marcadores
+  // `[IMAGEN_n]`): a qué imagen corresponde el enunciado y cada alternativa,
+  // si depende de un diagrama/gráfico/figura. Null si no aplica.
+  imagenPreguntaIndice: indiceImagenOpcional,
+  imagenAIndice: indiceImagenOpcional,
+  imagenBIndice: indiceImagenOpcional,
+  imagenCIndice: indiceImagenOpcional,
+  imagenDIndice: indiceImagenOpcional,
+  imagenEIndice: indiceImagenOpcional,
 })
 
 /** Forma estructurada que pedimos al modelo (raíz del structured output). */
@@ -75,6 +91,31 @@ const textoGuardar = z
   .optional()
   .transform((v) => v ?? '')
 
+/** Tipos MIME de imagen que se pueden re-subir a Blob Storage al guardar. */
+const MEDIA_TYPES_IMAGEN_GUARDAR = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/gif',
+] as const
+
+/**
+ * Una imagen ya extraída del documento (base64 + su mime), lista para re-subir
+ * a Blob Storage como `imagenPregunta`/`imagenA`–`E` al confirmar el guardado.
+ * El cliente la arma a partir de `ImagenExtraida` (la resuelve desde el índice
+ * que puso la IA) y la reenvía tal cual: `analizarDocumento` y
+ * `guardarPreguntasImportadas` son actions independientes, sin estado
+ * compartido en el servidor.
+ */
+const imagenObjetoSchema = z.object({
+  base64: z.string().min(1),
+  mediaType: z.enum(MEDIA_TYPES_IMAGEN_GUARDAR),
+})
+const imagenParaGuardarSchema = imagenObjetoSchema.nullish()
+
+/** Imagen ya resuelta (no nula): base64 + mime, lista para re-subir. */
+export type ImagenParaGuardar = z.infer<typeof imagenObjetoSchema>
+
 /** Una pregunta lista para guardar (ya revisada/editada por el usuario). */
 export const preguntaImportInputSchema = z.object({
   pregunta: z.string().trim().min(1, 'El enunciado no puede estar vacío'),
@@ -88,6 +129,12 @@ export const preguntaImportInputSchema = z.object({
   materia: textoGuardar,
   nivel: textoGuardar,
   tipo: z.enum(TIPOS_PREGUNTA_IMPORT).default('seleccion_multiple'),
+  imagenPregunta: imagenParaGuardarSchema,
+  imagenA: imagenParaGuardarSchema,
+  imagenB: imagenParaGuardarSchema,
+  imagenC: imagenParaGuardarSchema,
+  imagenD: imagenParaGuardarSchema,
+  imagenE: imagenParaGuardarSchema,
 })
 
 /** Payload de la confirmación: asignatura + preguntas seleccionadas. */

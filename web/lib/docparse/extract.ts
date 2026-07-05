@@ -8,7 +8,10 @@ import mammoth from 'mammoth'
  * Fase 7.2. La función es **pura**: nunca llama al API: solo prepara los datos.
  *
  * Estrategia (aprovechar capacidades nativas de Claude en vez de OCR propio):
- *   - DOCX  → mammoth.extractRawText → un bloque `text`.
+ *   - DOCX  → mammoth.convertToHtml → un bloque `text` (con marcadores
+ *     `[IMAGEN_n]` donde había una imagen incrustada) + un bloque `image` por
+ *     cada imagen soportada, para que la IA pueda asociarlas a la pregunta o
+ *     alternativa que ilustran (ver `ImagenExtraida`/`DocumentoExtraido`).
  *   - PDF   → un bloque `document` en base64 (Claude lee el PDF nativamente).
  *   - Imagen → un bloque `image` en base64 (visión nativa de Claude).
  *
@@ -46,6 +49,25 @@ export interface BloqueDocumento {
 }
 
 export type BloqueContenido = BloqueTexto | BloqueImagen | BloqueDocumento
+
+/**
+ * Una imagen incrustada en el documento (p. ej. un diagrama dentro de un DOCX),
+ * extraída aparte de los bloques para poder re-subirla a Blob Storage más tarde
+ * como `imagenPregunta`/`imagenA`–`E` de la pregunta a la que pertenece. `indice`
+ * es el número con el que se referencia dentro del texto (marcador `[IMAGEN_n]`)
+ * y en los bloques (bloque de texto "Imagen n:" seguido del bloque de imagen).
+ */
+export interface ImagenExtraida {
+  indice: number
+  mediaType: MediaTypeImagen
+  base64: string
+}
+
+/** Resultado de la extracción: los bloques para la IA + las imágenes crudas. */
+export interface DocumentoExtraido {
+  bloques: BloqueContenido[]
+  imagenes: ImagenExtraida[]
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos MIME soportados
@@ -121,50 +143,120 @@ async function normalizar(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DOCX: texto con marcadores de imagen + imágenes extraídas
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Quita las etiquetas HTML del resultado de `mammoth.convertToHtml`, dejando
+ * texto plano con saltos de línea en los límites de bloque y conservando los
+ * marcadores `[IMAGEN_n]` que insertamos en los `<img>` (ver `extraerDocx`).
+ */
+function htmlATextoConMarcadores(html: string): string {
+  const texto = html
+    .replace(/<img[^>]*src="img:(\d+)"[^>]*>/g, '[IMAGEN_$1]')
+    .replace(/<\/(p|li|h[1-6]|tr)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+
+  return texto.replace(/\n{3,}/g, '\n\n').trim()
+}
+
+/**
+ * Extrae el texto (con marcadores `[IMAGEN_n]` en el lugar de cada imagen) y
+ * las imágenes incrustadas de un DOCX. Las imágenes en formatos no soportados
+ * (p. ej. EMF/WMF de Word antiguo) se omiten en silencio: quedan fuera del
+ * arreglo y su marcador no se inserta.
+ */
+async function extraerDocx(
+  bytes: Buffer,
+): Promise<{ texto: string; imagenes: ImagenExtraida[] }> {
+  const imagenes: ImagenExtraida[] = []
+
+  const { value: html } = await mammoth.convertToHtml(
+    { buffer: bytes },
+    {
+      convertImage: mammoth.images.imgElement(async (image) => {
+        const mediaType = image.contentType
+        if (!(MIMES_IMAGEN as readonly string[]).includes(mediaType)) {
+          return { src: '' }
+        }
+        const base64 = await image.read('base64')
+        const indice = imagenes.length
+        imagenes.push({ indice, mediaType: mediaType as MediaTypeImagen, base64 })
+        return { src: `img:${indice}` }
+      }),
+    },
+  )
+
+  return { texto: htmlATextoConMarcadores(html), imagenes }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // API principal
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Devuelve los content blocks de Anthropic que representan el contenido del
- * archivo, listos para enviarse a la IA en la Fase 7.2.
+ * archivo, listos para enviarse a la IA en la Fase 7.2, junto con las imágenes
+ * incrustadas que se hayan podido extraer (por ahora sólo DOCX) para poder
+ * re-subirlas como imagen de la pregunta/alternativa a la que pertenezcan.
  *
  * Lanza {@link TipoArchivoNoSoportadoError} si el mime no es PDF, DOCX ni una
  * imagen soportada.
  */
 export async function extraerBloquesDocumento(
   entrada: ArchivoEntrada,
-): Promise<BloqueContenido[]> {
+): Promise<DocumentoExtraido> {
   const { bytes, mime } = await normalizar(entrada)
 
   if (mime === MIME_DOCX) {
-    const { value } = await mammoth.extractRawText({ buffer: bytes })
-    return [{ type: 'text', text: value.trim() }]
+    const { texto, imagenes } = await extraerDocx(bytes)
+    const bloques: BloqueContenido[] = [{ type: 'text', text: texto }]
+    for (const img of imagenes) {
+      bloques.push({ type: 'text', text: `Imagen ${img.indice}:` })
+      bloques.push({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+      })
+    }
+    return { bloques, imagenes }
   }
 
   if (mime === MIME_PDF) {
-    return [
-      {
-        type: 'document',
-        source: {
-          type: 'base64',
-          media_type: MIME_PDF,
-          data: bytes.toString('base64'),
+    return {
+      bloques: [
+        {
+          type: 'document',
+          source: {
+            type: 'base64',
+            media_type: MIME_PDF,
+            data: bytes.toString('base64'),
+          },
         },
-      },
-    ]
+      ],
+      imagenes: [],
+    }
   }
 
   if ((MIMES_IMAGEN as readonly string[]).includes(mime)) {
-    return [
-      {
-        type: 'image',
-        source: {
-          type: 'base64',
-          media_type: mime as MediaTypeImagen,
-          data: bytes.toString('base64'),
+    return {
+      bloques: [
+        {
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: mime as MediaTypeImagen,
+            data: bytes.toString('base64'),
+          },
         },
-      },
-    ]
+      ],
+      imagenes: [],
+    }
   }
 
   throw new TipoArchivoNoSoportadoError(mime)

@@ -4,6 +4,8 @@ import { getSession } from '@/lib/get-session'
 import {
   esTipoSoportado,
   extraerBloquesDocumento,
+  type DocumentoExtraido,
+  type ImagenExtraida,
 } from '@/lib/docparse/extract'
 import { detectarPreguntas } from '@/lib/ai/import'
 import { crearPregunta } from '@/lib/actions/preguntas'
@@ -11,6 +13,7 @@ import { LETRAS } from '@/lib/validation/pregunta'
 import {
   guardarImportSchema,
   type GuardarImportInput,
+  type ImagenParaGuardar,
   type PreguntaDetectada,
 } from '@/lib/validation/import'
 
@@ -23,7 +26,7 @@ import {
 
 /** Resultado del análisis de un documento. */
 export type ResultadoAnalisis =
-  | { ok: true; preguntas: PreguntaDetectada[] }
+  | { ok: true; preguntas: PreguntaDetectada[]; imagenes: ImagenExtraida[] }
   | { ok: false; error: string }
 
 /** Resultado de la confirmación (guardado en lote). */
@@ -58,9 +61,9 @@ export async function analizarDocumento(
     }
   }
 
-  let bloques
+  let documento: DocumentoExtraido
   try {
-    bloques = await extraerBloquesDocumento(archivo)
+    documento = await extraerBloquesDocumento(archivo)
   } catch {
     return {
       ok: false,
@@ -69,8 +72,8 @@ export async function analizarDocumento(
   }
 
   try {
-    const preguntas = await detectarPreguntas(bloques, asignatura)
-    return { ok: true, preguntas }
+    const preguntas = await detectarPreguntas(documento.bloques, asignatura)
+    return { ok: true, preguntas, imagenes: documento.imagenes }
   } catch (err) {
     // Distingue un problema de configuración (clave de Anthropic ausente o
     // inválida → 401/403) de un fallo transitorio, para dar un mensaje accionable
@@ -91,6 +94,31 @@ export async function analizarDocumento(
   }
 }
 
+/** Extensión de archivo por mime, para el nombre del `File` reconstruido. */
+const EXT_POR_MIME: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+}
+
+/**
+ * Si `img` trae datos, reconstruye el `File` (a partir del base64 extraído del
+ * documento) y lo agrega al FormData bajo `campo`, para que `subirImagenes` (en
+ * `pregunta-fields.ts`, ya usado por `crearPregunta`) lo suba a Blob Storage
+ * igual que si viniera de un `<input type="file">`.
+ */
+function setImagenSiExiste(
+  fd: FormData,
+  campo: string,
+  img: ImagenParaGuardar | null | undefined,
+): void {
+  if (!img) return
+  const ext = EXT_POR_MIME[img.mediaType] ?? 'png'
+  const bytes = Buffer.from(img.base64, 'base64')
+  fd.set(campo, new File([bytes], `${campo}.${ext}`, { type: img.mediaType }))
+}
+
 /** Construye el FormData de una pregunta para reutilizar `crearPregunta`. */
 function formDataDePregunta(
   asignatura: string,
@@ -104,6 +132,7 @@ function formDataDePregunta(
   fd.set('nivel', p.nivel)
   fd.set('explicacion', p.explicacion)
   fd.set('compartida', '0')
+  setImagenSiExiste(fd, 'imagen_pregunta', p.imagenPregunta)
 
   if (p.tipo === 'seleccion_multiple') {
     fd.set('A', p.A)
@@ -117,6 +146,12 @@ function formDataDePregunta(
       ? p.correcta
       : 'A'
     fd.set('correcta', correcta)
+
+    setImagenSiExiste(fd, 'imagen_A', p.imagenA)
+    setImagenSiExiste(fd, 'imagen_B', p.imagenB)
+    setImagenSiExiste(fd, 'imagen_C', p.imagenC)
+    setImagenSiExiste(fd, 'imagen_D', p.imagenD)
+    setImagenSiExiste(fd, 'imagen_E', p.imagenE)
   }
 
   return fd
