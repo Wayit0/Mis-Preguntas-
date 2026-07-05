@@ -11,7 +11,6 @@ import {
   TIPOS_PREGUNTA,
   ETIQUETA_TIPO,
   LETRAS,
-  type Letra,
   type TipoPregunta,
 } from '@/lib/validation/pregunta'
 import type {
@@ -52,23 +51,6 @@ interface PreguntaEditable {
   nivel: string
   tipo: TipoPregunta
   imagenPregunta: ImagenParaGuardar | null
-  imagenA: ImagenParaGuardar | null
-  imagenB: ImagenParaGuardar | null
-  imagenC: ImagenParaGuardar | null
-  imagenD: ImagenParaGuardar | null
-  imagenE: ImagenParaGuardar | null
-}
-
-/** Nombre del campo de imagen de cada alternativa en `PreguntaEditable`. */
-const CAMPO_IMAGEN_ALT: Record<
-  Letra,
-  'imagenA' | 'imagenB' | 'imagenC' | 'imagenD' | 'imagenE'
-> = {
-  A: 'imagenA',
-  B: 'imagenB',
-  C: 'imagenC',
-  D: 'imagenD',
-  E: 'imagenE',
 }
 
 /** Resuelve un índice de imagen (el que puso la IA) al objeto correspondiente. */
@@ -109,11 +91,6 @@ function aEditable(
     nivel: p.nivel ?? '',
     tipo,
     imagenPregunta: resolverImagen(p.imagenPreguntaIndice, imagenesDisponibles),
-    imagenA: resolverImagen(p.imagenAIndice, imagenesDisponibles),
-    imagenB: resolverImagen(p.imagenBIndice, imagenesDisponibles),
-    imagenC: resolverImagen(p.imagenCIndice, imagenesDisponibles),
-    imagenD: resolverImagen(p.imagenDIndice, imagenesDisponibles),
-    imagenE: resolverImagen(p.imagenEIndice, imagenesDisponibles),
   }
 }
 
@@ -229,11 +206,6 @@ export function ImportarDocumento({
           nivel: p.nivel,
           tipo: p.tipo,
           imagenPregunta: p.imagenPregunta,
-          imagenA: p.imagenA,
-          imagenB: p.imagenB,
-          imagenC: p.imagenC,
-          imagenD: p.imagenD,
-          imagenE: p.imagenE,
         })),
       })
       if (!resultado.ok) {
@@ -373,36 +345,23 @@ export function ImportarDocumento({
 
                   {esSeleccion ? (
                     <div className="flex flex-col gap-2">
-                      {LETRAS.map((letra) => {
-                        const campoImagen = CAMPO_IMAGEN_ALT[letra]
-                        const imagenAlt = p[campoImagen]
-                        return (
-                          <div
-                            key={letra}
-                            className="flex flex-col gap-1.5"
-                          >
-                            <Label htmlFor={`alt-${p.id}-${letra}`}>
-                              Alternativa {letra}
-                            </Label>
-                            <Input
-                              id={`alt-${p.id}-${letra}`}
-                              value={p[letra]}
-                              onChange={(e) =>
-                                actualizar(p.id, { [letra]: e.target.value })
-                              }
-                            />
-                            {imagenAlt ? (
-                              <MiniaturaImagen
-                                imagen={imagenAlt}
-                                alt={`Imagen de la alternativa ${letra}`}
-                                onQuitar={() =>
-                                  actualizar(p.id, { [campoImagen]: null })
-                                }
-                              />
-                            ) : null}
-                          </div>
-                        )
-                      })}
+                      {LETRAS.map((letra) => (
+                        <div
+                          key={letra}
+                          className="flex flex-col gap-1.5"
+                        >
+                          <Label htmlFor={`alt-${p.id}-${letra}`}>
+                            Alternativa {letra}
+                          </Label>
+                          <Input
+                            id={`alt-${p.id}-${letra}`}
+                            value={p[letra]}
+                            onChange={(e) =>
+                              actualizar(p.id, { [letra]: e.target.value })
+                            }
+                          />
+                        </div>
+                      ))}
                       <div className="flex flex-col gap-1.5">
                         <Label>Respuesta correcta</Label>
                         <Select

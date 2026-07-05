@@ -49,13 +49,10 @@ El documento puede incluir imágenes incrustadas (diagramas, gráficos, figuras 
 geométricas, etc.). Cada una aparece en el texto como un marcador \
 "[IMAGEN_n]" (n = 0, 1, 2…) en el lugar exacto donde estaba, y luego se adjunta \
 la imagen correspondiente con la etiqueta "Imagen n:". Si el enunciado de una \
-pregunta o alguna de sus alternativas A–E depende de una de esas imágenes \
-(es decir, no se entiende sin verla), indica su número n en \
-"imagenPreguntaIndice" (para el enunciado) o "imagenAIndice"…"imagenEIndice" \
-(para la alternativa correspondiente). Usa el número EXACTO del marcador; si no \
-aplica ninguna imagen, deja el campo en null. Al transcribir el enunciado o la \
-alternativa, quita el marcador "[IMAGEN_n]" del texto (la referencia ya queda \
-registrada en el campo correspondiente).
+pregunta depende de una de esas imágenes (es decir, no se entiende sin verla), \
+indica su número n en "imagenPreguntaIndice"; si no aplica ninguna imagen, deja \
+el campo en null. Al transcribir el enunciado, quita el marcador "[IMAGEN_n]" \
+del texto (la referencia ya queda registrada en ese campo).
 
 Reglas:
 - No inventes preguntas, alternativas ni respuestas: extrae únicamente lo que \

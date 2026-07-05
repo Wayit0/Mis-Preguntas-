@@ -30,11 +30,16 @@ const textoOpcional = z.string().nullish()
 
 /**
  * Índice (0-based) de una imagen incrustada en el documento (ver
- * `ImagenExtraida` en `docparse/extract`), o null si esa pregunta/alternativa
- * no depende de ninguna imagen. Sin `.nonnegative()`/rango: las restricciones
- * numéricas (`minimum`/`maximum`) no están soportadas en structured outputs;
- * un índice negativo o fuera de rango simplemente no resuelve a ninguna imagen
- * (ver `resolverImagen` en el cliente), no hace falta que el schema lo valide.
+ * `ImagenExtraida` en `docparse/extract`), o null si el enunciado no depende
+ * de ninguna imagen. Sin `.nonnegative()`/rango: las restricciones numéricas
+ * (`minimum`/`maximum`) no están soportadas en structured outputs; un índice
+ * negativo o fuera de rango simplemente no resuelve a ninguna imagen (ver
+ * `resolverImagen` en el cliente), no hace falta que el schema lo valide.
+ *
+ * Sólo se pide para el enunciado (no por alternativa): un campo por
+ * alternativa (5 más) hacía que la API rechazara la petición con
+ * `400 "Schema is too complex."`. El caso más común —un diagrama o gráfico en
+ * el enunciado del que dependen las alternativas— sigue cubierto.
  */
 const indiceImagenOpcional = z.number().int().nullish()
 
@@ -51,15 +56,10 @@ export const preguntaDetectadaSchema = z.object({
   materia: textoOpcional,
   nivel: textoOpcional,
   tipo: z.enum(TIPOS_PREGUNTA_IMPORT),
-  // Referencias a las imágenes incrustadas del documento (marcadores
-  // `[IMAGEN_n]`): a qué imagen corresponde el enunciado y cada alternativa,
-  // si depende de un diagrama/gráfico/figura. Null si no aplica.
+  // Referencia a la imagen incrustada del documento (marcador `[IMAGEN_n]`) de
+  // la que depende el enunciado, si aplica (ver comentario de
+  // `indiceImagenOpcional`).
   imagenPreguntaIndice: indiceImagenOpcional,
-  imagenAIndice: indiceImagenOpcional,
-  imagenBIndice: indiceImagenOpcional,
-  imagenCIndice: indiceImagenOpcional,
-  imagenDIndice: indiceImagenOpcional,
-  imagenEIndice: indiceImagenOpcional,
 })
 
 /** Forma estructurada que pedimos al modelo (raíz del structured output). */
@@ -104,11 +104,10 @@ const MEDIA_TYPES_IMAGEN_GUARDAR = [
 
 /**
  * Una imagen ya extraída del documento (base64 + su mime), lista para re-subir
- * a Blob Storage como `imagenPregunta`/`imagenA`–`E` al confirmar el guardado.
- * El cliente la arma a partir de `ImagenExtraida` (la resuelve desde el índice
- * que puso la IA) y la reenvía tal cual: `analizarDocumento` y
- * `guardarPreguntasImportadas` son actions independientes, sin estado
- * compartido en el servidor.
+ * a Blob Storage como `imagenPregunta` al confirmar el guardado. El cliente la
+ * arma a partir de `ImagenExtraida` (la resuelve desde el índice que puso la
+ * IA) y la reenvía tal cual: `analizarDocumento` y `guardarPreguntasImportadas`
+ * son actions independientes, sin estado compartido en el servidor.
  */
 const imagenObjetoSchema = z.object({
   base64: z.string().min(1),
@@ -133,11 +132,6 @@ export const preguntaImportInputSchema = z.object({
   nivel: textoGuardar,
   tipo: z.enum(TIPOS_PREGUNTA_IMPORT).default('seleccion_multiple'),
   imagenPregunta: imagenParaGuardarSchema,
-  imagenA: imagenParaGuardarSchema,
-  imagenB: imagenParaGuardarSchema,
-  imagenC: imagenParaGuardarSchema,
-  imagenD: imagenParaGuardarSchema,
-  imagenE: imagenParaGuardarSchema,
 })
 
 /** Payload de la confirmación: asignatura + preguntas seleccionadas. */
