@@ -333,6 +333,11 @@ export function GeneradorPrueba({
   const [nuevaFormula, setNuevaFormula] = useState('')
 
   const [filtroMateria, setFiltroMateria] = useState<string>('__todas__')
+  const [filtroNivel, setFiltroNivel] = useState<string>('__todos__')
+  const [busqueda, setBusqueda] = useState('')
+  const [soloSeleccionadas, setSoloSeleccionadas] = useState(false)
+  const [pagina, setPagina] = useState(0)
+  const POR_PAGINA = 8
   // Array ordenado de IDs seleccionados (el orden importa para el PDF). Al
   // editar, se conservan sólo los IDs que aún existen (los borrados se ignoran).
   const [seleccion, setSeleccion] = useState<number[]>(() =>
@@ -356,10 +361,49 @@ export function GeneradorPrueba({
     pruebaInicial?.usarLogoColegio ?? true,
   )
 
+  // Niveles distintos presentes en el banco (para el filtro).
+  const niveles = useMemo(() => {
+    const s = new Set<string>()
+    for (const p of preguntas) if (p.nivel) s.add(p.nivel)
+    return [...s].sort((a, b) => a.localeCompare(b, 'es'))
+  }, [preguntas])
+
+  // Preguntas tras aplicar materia + nivel + búsqueda (texto o #código) + "solo
+  // seleccionadas". La paginación se calcula sobre este resultado.
   const preguntasFiltradas = useMemo(() => {
-    if (filtroMateria === '__todas__') return preguntas
-    return preguntas.filter((p) => p.materia === filtroMateria)
-  }, [preguntas, filtroMateria])
+    const q = busqueda.trim().toLowerCase()
+    const sinHash = q.replace(/^#/, '')
+    const idBuscado = /^\d+$/.test(sinHash) ? Number(sinHash) : null
+    return preguntas.filter((p) => {
+      if (filtroMateria !== '__todas__' && p.materia !== filtroMateria) return false
+      if (filtroNivel !== '__todos__' && p.nivel !== filtroNivel) return false
+      if (soloSeleccionadas && !seleccion.includes(p.id)) return false
+      if (q) {
+        if (idBuscado !== null) return p.id === idBuscado
+        return p.enunciado.toLowerCase().includes(q)
+      }
+      return true
+    })
+  }, [preguntas, filtroMateria, filtroNivel, busqueda, soloSeleccionadas, seleccion])
+
+  const totalPaginas = Math.max(
+    1,
+    Math.ceil(preguntasFiltradas.length / POR_PAGINA),
+  )
+  // Página segura: si un filtro reduce el total, no quedar en una página vacía.
+  const paginaSegura = Math.min(pagina, totalPaginas - 1)
+  const preguntasPagina = preguntasFiltradas.slice(
+    paginaSegura * POR_PAGINA,
+    paginaSegura * POR_PAGINA + POR_PAGINA,
+  )
+
+  // Al cambiar cualquier filtro/búsqueda, volver a la primera página.
+  function conReset<T>(setter: (v: T) => void) {
+    return (v: T) => {
+      setter(v)
+      setPagina(0)
+    }
+  }
 
   const sinNada = preguntas.length === 0 && textos.length === 0
 
@@ -668,91 +712,183 @@ export function GeneradorPrueba({
             {/* Lista de preguntas */}
             <Card>
               <CardContent className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-sm font-semibold text-foreground">
-                    Preguntas ({preguntasFiltradas.length})
-                  </p>
-                  {materias.length > 0 ? (
-                    <div className="w-full sm:w-48">
-                      <Select
-                        value={filtroMateria}
-                        onValueChange={(v) => setFiltroMateria(v as string)}
-                      >
-                        <SelectTrigger
-                          aria-label="Filtrar por materia"
-                          className="w-full"
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-foreground">
+                      Preguntas ({preguntasFiltradas.length})
+                    </p>
+                    <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={soloSeleccionadas}
+                        onChange={(e) =>
+                          conReset(setSoloSeleccionadas)(e.target.checked)
+                        }
+                        className="size-4 accent-primary"
+                      />
+                      Solo seleccionadas ({seleccion.length})
+                    </label>
+                  </div>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                    <Input
+                      value={busqueda}
+                      onChange={(e) => conReset(setBusqueda)(e.target.value)}
+                      placeholder="Buscar por texto o código (#123)"
+                      aria-label="Buscar preguntas"
+                      className="sm:min-w-[12rem] sm:flex-1"
+                    />
+                    {materias.length > 0 ? (
+                      <div className="w-full sm:w-44">
+                        <Select
+                          value={filtroMateria}
+                          onValueChange={(v) =>
+                            conReset(setFiltroMateria)(v as string)
+                          }
                         >
-                          <SelectValue>
-                            {(value: string) =>
-                              value === '__todas__' ? 'Todas las materias' : value
-                            }
-                          </SelectValue>
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__todas__">Todas las materias</SelectItem>
-                          {materias.map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
+                          <SelectTrigger
+                            aria-label="Filtrar por materia"
+                            className="w-full"
+                          >
+                            <SelectValue>
+                              {(value: string) =>
+                                value === '__todas__'
+                                  ? 'Todas las materias'
+                                  : value
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__todas__">
+                              Todas las materias
                             </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : null}
+                            {materias.map((m) => (
+                              <SelectItem key={m} value={m}>
+                                {m}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
+                    {niveles.length > 0 ? (
+                      <div className="w-full sm:w-44">
+                        <Select
+                          value={filtroNivel}
+                          onValueChange={(v) =>
+                            conReset(setFiltroNivel)(v as string)
+                          }
+                        >
+                          <SelectTrigger
+                            aria-label="Filtrar por nivel"
+                            className="w-full"
+                          >
+                            <SelectValue>
+                              {(value: string) =>
+                                value === '__todos__'
+                                  ? 'Todos los niveles'
+                                  : value
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__todos__">
+                              Todos los niveles
+                            </SelectItem>
+                            {niveles.map((n) => (
+                              <SelectItem key={n} value={n}>
+                                {n}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 {preguntasFiltradas.length === 0 ? (
                   <p className="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-                    No hay preguntas con este filtro.
+                    No hay preguntas con estos filtros.
                   </p>
                 ) : (
-                  <ul className="flex flex-col gap-2">
-                    {preguntasFiltradas.map((p) => {
-                      const orden = seleccion.indexOf(p.id)
-                      const seleccionada = orden !== -1
-                      return (
-                        <li key={p.id}>
-                          <label
-                            className={[
-                              'flex cursor-pointer gap-3 rounded-md border px-3 py-2.5',
-                              seleccionada
-                                ? 'border-primary/40 bg-primary/5'
-                                : 'border-border hover:bg-muted/40',
-                            ].join(' ')}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={seleccionada}
-                              onChange={() => toggle(p.id)}
-                              aria-label={`Seleccionar pregunta ${p.id}`}
-                              className="mt-1 size-4 accent-primary"
-                            />
-                            <div className="flex min-w-0 flex-1 flex-col gap-1">
-                              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                {seleccionada && (
-                                  <span className="rounded bg-primary px-1.5 py-0.5 font-mono font-bold text-primary-foreground">
-                                    #{orden + 1}
-                                  </span>
-                                )}
-                                <span className="rounded bg-secondary px-1.5 py-0.5 font-medium text-secondary-foreground">
-                                  {ETIQUETA_TIPO[p.tipo] ?? p.tipo}
-                                </span>
-                                <span>
-                                  {[p.materia, p.contenido, p.nivel]
-                                    .filter(Boolean)
-                                    .join(' · ') || 'Sin clasificar'}
-                                </span>
-                              </div>
-                              <LatexText
-                                text={p.enunciado}
-                                className="text-sm text-foreground"
+                  <>
+                    <ul className="flex flex-col gap-2">
+                      {preguntasPagina.map((p) => {
+                        const orden = seleccion.indexOf(p.id)
+                        const seleccionada = orden !== -1
+                        return (
+                          <li key={p.id}>
+                            <label
+                              className={[
+                                'flex cursor-pointer gap-3 rounded-md border px-3 py-2.5',
+                                seleccionada
+                                  ? 'border-primary/40 bg-primary/5'
+                                  : 'border-border hover:bg-muted/40',
+                              ].join(' ')}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={seleccionada}
+                                onChange={() => toggle(p.id)}
+                                aria-label={`Seleccionar pregunta ${p.id}`}
+                                className="mt-1 size-4 accent-primary"
                               />
-                            </div>
-                          </label>
-                        </li>
-                      )
-                    })}
-                  </ul>
+                              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                  {seleccionada && (
+                                    <span className="rounded bg-primary px-1.5 py-0.5 font-mono font-bold text-primary-foreground">
+                                      #{orden + 1}
+                                    </span>
+                                  )}
+                                  <span className="font-mono text-muted-foreground">
+                                    #{p.id}
+                                  </span>
+                                  <span className="rounded bg-secondary px-1.5 py-0.5 font-medium text-secondary-foreground">
+                                    {ETIQUETA_TIPO[p.tipo] ?? p.tipo}
+                                  </span>
+                                  <span>
+                                    {[p.materia, p.contenido, p.nivel]
+                                      .filter(Boolean)
+                                      .join(' · ') || 'Sin clasificar'}
+                                  </span>
+                                </div>
+                                <LatexText
+                                  text={p.enunciado}
+                                  className="text-sm text-foreground"
+                                />
+                              </div>
+                            </label>
+                          </li>
+                        )
+                      })}
+                    </ul>
+
+                    {totalPaginas > 1 ? (
+                      <div className="flex items-center justify-between gap-2 pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={paginaSegura === 0}
+                          onClick={() => setPagina(paginaSegura - 1)}
+                        >
+                          ‹ Anterior
+                        </Button>
+                        <span className="text-xs text-muted-foreground">
+                          Página {paginaSegura + 1} de {totalPaginas}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={paginaSegura >= totalPaginas - 1}
+                          onClick={() => setPagina(paginaSegura + 1)}
+                        >
+                          Siguiente ›
+                        </Button>
+                      </div>
+                    ) : null}
+                  </>
                 )}
               </CardContent>
             </Card>
