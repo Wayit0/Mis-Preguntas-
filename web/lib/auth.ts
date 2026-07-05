@@ -14,6 +14,7 @@ import {
   verifications,
 } from '@/lib/db/schema'
 import { hashPw, verifyPw, LEGACY } from '@/lib/auth-password'
+import { enviarVerificacionCorreo } from '@/lib/email/enviar'
 
 // ---------------------------------------------------------------------------
 // Control de acceso (access control) del plugin admin.
@@ -50,6 +51,38 @@ export const roles = {
   global_admin: globalAdminRole,
   school_admin: schoolAdminRole,
   teacher: teacherRole,
+}
+
+/**
+ * Auto-asociación al colegio por DOMINIO de correo. Se ejecuta SÓLO cuando el
+ * correo ya está VERIFICADO (desde `afterEmailVerification`): así el dominio del
+ * correo prueba pertenencia al colegio y nadie puede colarse registrándose con
+ * un correo de un dominio ajeno que no controla. Si el usuario ya tiene colegio,
+ * no hace nada.
+ */
+async function asociarColegioPorDominio(userId: number): Promise<void> {
+  if (!Number.isFinite(userId)) return
+  const [u] = await db
+    .select({ email: usuarios.email, colegioId: usuarios.colegioId })
+    .from(usuarios)
+    .where(eq(usuarios.id, userId))
+    .limit(1)
+  if (!u || u.colegioId != null) return
+
+  const dominio = u.email.toLowerCase().split('@')[1]
+  if (!dominio) return
+
+  const [colegio] = await db
+    .select({ id: colegios.id })
+    .from(colegios)
+    .where(eq(colegios.dominio, dominio))
+    .limit(1)
+  if (!colegio) return
+
+  await db
+    .update(usuarios)
+    .set({ colegioId: colegio.id })
+    .where(and(eq(usuarios.id, userId), isNull(usuarios.colegioId)))
 }
 
 export const auth = betterAuth({
@@ -108,6 +141,25 @@ export const auth = betterAuth({
     minPasswordLength: 6,
     password: { hash: hashPw, verify: verifyPw },
   },
+  // Verificación de correo. NO exigimos verificar para iniciar sesión
+  // (requireEmailVerification queda en false por defecto): así los usuarios
+  // migrados/antiguos siguen entrando y cualquiera puede usar la app de
+  // inmediato. Verificar el correo es lo que DISPARA la auto-asociación al
+  // colegio por dominio (afterEmailVerification), con el correo ya probado.
+  // - sendOnSignUp: manda el correo de verificación al registrarse.
+  // - autoSignInAfterVerification: tras verificar, deja la sesión iniciada.
+  // - expiresIn: 24h de validez del enlace.
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    expiresIn: 60 * 60 * 24,
+    sendVerificationEmail: async ({ user, url }) => {
+      await enviarVerificacionCorreo(user.email, user.name ?? '', url)
+    },
+    afterEmailVerification: async (user) => {
+      await asociarColegioPorDominio(Number(user.id))
+    },
+  },
   // Plugin admin: roles + columnas role/banned/banReason/banExpires (ya en el
   // schema). `defaultRole: 'teacher'` => signUp crea profesores. `adminRoles`
   // marca qué roles son admin (deben existir en `roles`, ver bloque AC arriba).
@@ -159,43 +211,6 @@ export const auth = betterAuth({
           .set({ password: nuevo, updatedAt: new Date() })
           .where(eq(accounts.id, account.id))
         return
-      }
-
-      // Auto-asociación al colegio por DOMINIO de correo tras el registro: si el
-      // dominio del correo coincide con el de un colegio, se asocia la cuenta
-      // (sólo si aún no tiene colegio).
-      if (ctx.path === '/sign-up/email') {
-        const [u] = await db
-          .select({
-            email: usuarios.email,
-            colegioId: usuarios.colegioId,
-            emailVerified: usuarios.emailVerified,
-          })
-          .from(usuarios)
-          .where(eq(usuarios.id, userId))
-          .limit(1)
-        if (!u || u.colegioId != null) return
-
-        // SEGURIDAD: sólo asociar cuentas con correo VERIFICADO. Sin esto,
-        // cualquiera podría registrarse con un correo de un dominio de colegio
-        // que NO controla y colarse en el banco del colegio. Requiere tener
-        // activada la verificación de correo para que la asociación se dispare.
-        if (!u.emailVerified) return
-
-        const dominio = u.email.toLowerCase().split('@')[1]
-        if (!dominio) return
-
-        const [colegio] = await db
-          .select({ id: colegios.id })
-          .from(colegios)
-          .where(eq(colegios.dominio, dominio))
-          .limit(1)
-        if (!colegio) return
-
-        await db
-          .update(usuarios)
-          .set({ colegioId: colegio.id })
-          .where(and(eq(usuarios.id, userId), isNull(usuarios.colegioId)))
       }
     }),
   },

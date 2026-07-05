@@ -106,8 +106,10 @@ export function ConfigurarColegio({
                 placeholder="Ej: colegiosanjose.cl"
               />
               <p className="text-xs text-muted-foreground">
-                Quienes se registren con un correo de este dominio se unirán
-                automáticamente a tu colegio y podrán compartir su banco.
+                Quienes se registren con un correo de este dominio y lo
+                verifiquen se unirán automáticamente a tu colegio y podrán
+                compartir su banco. No se aceptan dominios de correo públicos
+                (gmail, outlook, etc.).
               </p>
             </div>
 
