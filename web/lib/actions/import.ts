@@ -24,6 +24,17 @@ import {
 //  2. `guardarPreguntasImportadas` — guarda en lote reusando `crearPregunta`.
 // ---------------------------------------------------------------------------
 
+// TODO(debug-temporal): borrar `detalleDeError` y sus usos una vez diagnosticado
+// el error de "Importar Documento" en QA (no hay acceso a los logs de Azure).
+// Expone el error real en el mensaje que ve el profesor, en vez de sólo loguearlo
+// server-side, para poder verlo en pantalla sin acceso a Application Insights.
+function detalleDeError(err: unknown): string {
+  const status = (err as { status?: number } | null)?.status
+  const nombre = err instanceof Error ? err.name : typeof err
+  const mensaje = err instanceof Error ? err.message : String(err)
+  return `${nombre}${status ? ` status=${status}` : ''}: ${mensaje}`.slice(0, 500)
+}
+
 /** Resultado del análisis de un documento. */
 export type ResultadoAnalisis =
   | { ok: true; preguntas: PreguntaDetectada[]; imagenes: ImagenExtraida[] }
@@ -64,10 +75,12 @@ export async function analizarDocumento(
   let documento: DocumentoExtraido
   try {
     documento = await extraerBloquesDocumento(archivo)
-  } catch {
+  } catch (err) {
     return {
       ok: false,
-      error: 'No pudimos leer el documento. Verifica que no esté dañado.',
+      error:
+        'No pudimos leer el documento. Verifica que no esté dañado. ' +
+        `[DEBUG: ${detalleDeError(err)}]`,
     }
   }
 
@@ -98,12 +111,15 @@ export async function analizarDocumento(
         ok: false,
         error:
           'La importación con IA no está configurada: falta o es inválida la ' +
-          'clave de Anthropic. Avísale al administrador del sitio.',
+          'clave de Anthropic. Avísale al administrador del sitio. ' +
+          `[DEBUG: ${detalleDeError(err)}]`,
       }
     }
     return {
       ok: false,
-      error: 'La IA no pudo procesar el documento. Inténtalo de nuevo.',
+      error:
+        'La IA no pudo procesar el documento. Inténtalo de nuevo. ' +
+        `[DEBUG: ${detalleDeError(err)}]`,
     }
   }
 }
