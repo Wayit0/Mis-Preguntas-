@@ -31,9 +31,12 @@ const textoOpcional = z.string().nullish()
 /**
  * Índice (0-based) de una imagen incrustada en el documento (ver
  * `ImagenExtraida` en `docparse/extract`), o null si esa pregunta/alternativa
- * no depende de ninguna imagen.
+ * no depende de ninguna imagen. Sin `.nonnegative()`/rango: las restricciones
+ * numéricas (`minimum`/`maximum`) no están soportadas en structured outputs;
+ * un índice negativo o fuera de rango simplemente no resuelve a ninguna imagen
+ * (ver `resolverImagen` en el cliente), no hace falta que el schema lo valide.
  */
-const indiceImagenOpcional = z.number().int().nonnegative().nullish()
+const indiceImagenOpcional = z.number().int().nullish()
 
 /** Una pregunta tal cual la entrega el modelo (forma laxa, pre-criba). */
 export const preguntaDetectadaSchema = z.object({
