@@ -75,11 +75,25 @@ export async function analizarDocumento(
     const preguntas = await detectarPreguntas(documento.bloques, asignatura)
     return { ok: true, preguntas, imagenes: documento.imagenes }
   } catch (err) {
+    // Log con detalle para poder diagnosticar en los logs del servidor (Azure App
+    // Service / Application Insights) qué falló realmente: el mensaje que ve el
+    // profesor es genérico a propósito, pero acá sí queremos el detalle.
+    console.error('[importar] detectarPreguntas falló:', err)
+
     // Distingue un problema de configuración (clave de Anthropic ausente o
-    // inválida → 401/403) de un fallo transitorio, para dar un mensaje accionable
-    // en vez de pedir "inténtalo de nuevo" sobre algo que nunca va a funcionar.
+    // inválida) de un fallo transitorio, para dar un mensaje accionable en vez
+    // de pedir "inténtalo de nuevo" sobre algo que nunca va a funcionar.
+    // - Clave INVÁLIDA → la API responde 401/403 (`err.status`).
+    // - Clave AUSENTE → el SDK lanza ANTES de llamar a la API (sin `.status`),
+    //   con un mensaje que menciona la API key.
     const status = (err as { status?: number } | null)?.status
-    if (status === 401 || status === 403) {
+    const mensaje = err instanceof Error ? err.message.toLowerCase() : ''
+    const esProblemaDeClave =
+      status === 401 ||
+      status === 403 ||
+      mensaje.includes('api key') ||
+      mensaje.includes('anthropic_api_key')
+    if (esProblemaDeClave) {
       return {
         ok: false,
         error:

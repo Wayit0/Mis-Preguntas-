@@ -1,4 +1,5 @@
 import mammoth from 'mammoth'
+import sharp from 'sharp'
 
 /**
  * Extracción de documentos para la importación con IA (Fase 7).
@@ -166,6 +167,35 @@ function htmlATextoConMarcadores(html: string): string {
   return texto.replace(/\n{3,}/g, '\n\n').trim()
 }
 
+// Lado máximo recomendado por Anthropic para imágenes de visión: más grande no
+// mejora la lectura del modelo, sólo infla el payload (y una foto/escaneo
+// incrustado en un DOCX real puede venir en resolución de varios MB, muy por
+// encima del límite de tamaño de imagen de la API). Se re-sube en el mismo
+// formato, sólo se achica si excede este lado.
+const LADO_MAXIMO_IMAGEN_IA = 1568
+
+/**
+ * Redimensiona una imagen (si excede `LADO_MAXIMO_IMAGEN_IA` en algún lado) para
+ * que quede dentro de los límites de tamaño de la API de visión de Anthropic.
+ * Conserva el formato original. Si sharp no puede procesarla (dato corrupto o
+ * variante rara pese al content-type declarado), devuelve el buffer tal cual:
+ * es mejor enviarla sin redimensionar que perder la imagen.
+ */
+async function redimensionarSiHaceFalta(buffer: Buffer): Promise<Buffer> {
+  try {
+    return await sharp(buffer)
+      .resize({
+        width: LADO_MAXIMO_IMAGEN_IA,
+        height: LADO_MAXIMO_IMAGEN_IA,
+        fit: 'inside',
+        withoutEnlargement: true,
+      })
+      .toBuffer()
+  } catch {
+    return buffer
+  }
+}
+
 /**
  * Extrae el texto (con marcadores `[IMAGEN_n]` en el lugar de cada imagen) y
  * las imágenes incrustadas de un DOCX. Las imágenes en formatos no soportados
@@ -185,9 +215,14 @@ async function extraerDocx(
         if (!(MIMES_IMAGEN as readonly string[]).includes(mediaType)) {
           return { src: '' }
         }
-        const base64 = await image.read('base64')
+        const original = Buffer.from(await image.read('base64'), 'base64')
+        const redimensionada = await redimensionarSiHaceFalta(original)
         const indice = imagenes.length
-        imagenes.push({ indice, mediaType: mediaType as MediaTypeImagen, base64 })
+        imagenes.push({
+          indice,
+          mediaType: mediaType as MediaTypeImagen,
+          base64: redimensionada.toString('base64'),
+        })
         return { src: `img:${indice}` }
       }),
     },
