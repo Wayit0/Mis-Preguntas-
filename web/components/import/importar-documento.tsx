@@ -166,11 +166,16 @@ export function ImportarDocumento({
         return
       }
       // TODO(debug-temporal): borrar este log una vez diagnosticado por qué no
-      // se asocian imágenes a las preguntas en algunos DOCX. Muestra cuántas
-      // imágenes se extrajeron del documento y qué `imagenPreguntaIndice` puso
-      // la IA en cada pregunta, para ver en qué punto de la cadena se pierde
-      // (extracción del DOCX vs. asociación de la IA).
+      // se asocian imágenes a las preguntas en algunos DOCX.
       console.log('[importar][debug] imágenes extraídas del documento:', resultado.imagenes.length)
+      console.log(
+        '[importar][debug] imágenes que mammoth encontró (content-type de cada una):',
+        resultado.debugImagenesConsideradas,
+      )
+      console.log(
+        '[importar][debug] mensajes/advertencias de mammoth:',
+        resultado.debugMensajesMammoth,
+      )
       console.log(
         '[importar][debug] imagenPreguntaIndice por pregunta:',
         resultado.preguntas.map((p, i) => ({ i, imagenPreguntaIndice: p.imagenPreguntaIndice })),

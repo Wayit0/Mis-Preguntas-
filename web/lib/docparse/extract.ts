@@ -68,6 +68,10 @@ export interface ImagenExtraida {
 export interface DocumentoExtraido {
   bloques: BloqueContenido[]
   imagenes: ImagenExtraida[]
+  // TODO(debug-temporal): borrar junto con el resto de los logs de depuración
+  // de por qué un DOCX con imágenes puede extraer `imagenes: []`.
+  debugImagenesConsideradas?: string[]
+  debugMensajesMammoth?: string[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -208,16 +212,21 @@ async function redimensionarONulo(buffer: Buffer): Promise<Buffer | null> {
  * marcador no se inserta (mejor perder una imagen que hacer fallar todo el
  * documento en la API de Anthropic).
  */
-async function extraerDocx(
-  bytes: Buffer,
-): Promise<{ texto: string; imagenes: ImagenExtraida[] }> {
+async function extraerDocx(bytes: Buffer): Promise<{
+  texto: string
+  imagenes: ImagenExtraida[]
+  debugImagenesConsideradas: string[]
+  debugMensajesMammoth: string[]
+}> {
   const imagenes: ImagenExtraida[] = []
+  const debugImagenesConsideradas: string[] = []
 
-  const { value: html } = await mammoth.convertToHtml(
+  const { value: html, messages } = await mammoth.convertToHtml(
     { buffer: bytes },
     {
       convertImage: mammoth.images.imgElement(async (image) => {
         const mediaType = image.contentType
+        debugImagenesConsideradas.push(String(mediaType))
         if (!(MIMES_IMAGEN as readonly string[]).includes(mediaType)) {
           return { src: '' }
         }
@@ -235,7 +244,12 @@ async function extraerDocx(
     },
   )
 
-  return { texto: htmlATextoConMarcadores(html), imagenes }
+  return {
+    texto: htmlATextoConMarcadores(html),
+    imagenes,
+    debugImagenesConsideradas,
+    debugMensajesMammoth: messages.map((m) => `${m.type}: ${m.message}`),
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -257,7 +271,8 @@ export async function extraerBloquesDocumento(
   const { bytes, mime } = await normalizar(entrada)
 
   if (mime === MIME_DOCX) {
-    const { texto, imagenes } = await extraerDocx(bytes)
+    const { texto, imagenes, debugImagenesConsideradas, debugMensajesMammoth } =
+      await extraerDocx(bytes)
     const bloques: BloqueContenido[] = [{ type: 'text', text: texto }]
     for (const img of imagenes) {
       bloques.push({ type: 'text', text: `Imagen ${img.indice}:` })
@@ -266,7 +281,7 @@ export async function extraerBloquesDocumento(
         source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
       })
     }
-    return { bloques, imagenes }
+    return { bloques, imagenes, debugImagenesConsideradas, debugMensajesMammoth }
   }
 
   if (mime === MIME_PDF) {

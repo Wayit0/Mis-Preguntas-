@@ -26,7 +26,14 @@ import {
 
 /** Resultado del análisis de un documento. */
 export type ResultadoAnalisis =
-  | { ok: true; preguntas: PreguntaDetectada[]; imagenes: ImagenExtraida[] }
+  | {
+      ok: true
+      preguntas: PreguntaDetectada[]
+      imagenes: ImagenExtraida[]
+      // TODO(debug-temporal): borrar junto con el resto de logs de depuración.
+      debugImagenesConsideradas?: string[]
+      debugMensajesMammoth?: string[]
+    }
   | { ok: false; error: string }
 
 /** Resultado de la confirmación (guardado en lote). */
@@ -73,7 +80,13 @@ export async function analizarDocumento(
 
   try {
     const preguntas = await detectarPreguntas(documento.bloques, asignatura)
-    return { ok: true, preguntas, imagenes: documento.imagenes }
+    return {
+      ok: true,
+      preguntas,
+      imagenes: documento.imagenes,
+      debugImagenesConsideradas: documento.debugImagenesConsideradas,
+      debugMensajesMammoth: documento.debugMensajesMammoth,
+    }
   } catch (err) {
     // Log con detalle para poder diagnosticar en los logs del servidor (Azure App
     // Service / Application Insights) qué falló realmente: el mensaje que ve el
