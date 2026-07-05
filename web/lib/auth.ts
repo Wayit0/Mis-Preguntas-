@@ -166,11 +166,21 @@ export const auth = betterAuth({
       // (sólo si aún no tiene colegio).
       if (ctx.path === '/sign-up/email') {
         const [u] = await db
-          .select({ email: usuarios.email, colegioId: usuarios.colegioId })
+          .select({
+            email: usuarios.email,
+            colegioId: usuarios.colegioId,
+            emailVerified: usuarios.emailVerified,
+          })
           .from(usuarios)
           .where(eq(usuarios.id, userId))
           .limit(1)
         if (!u || u.colegioId != null) return
+
+        // SEGURIDAD: sólo asociar cuentas con correo VERIFICADO. Sin esto,
+        // cualquiera podría registrarse con un correo de un dominio de colegio
+        // que NO controla y colarse en el banco del colegio. Requiere tener
+        // activada la verificación de correo para que la asociación se dispare.
+        if (!u.emailVerified) return
 
         const dominio = u.email.toLowerCase().split('@')[1]
         if (!dominio) return

@@ -356,9 +356,37 @@ export async function reactivarProfesor(
 }
 
 /**
- * configurarColegio: el school_admin edita el nombre y (opcionalmente) el logo
- * de SU colegio. El logo se sube al blob storage; si no se envía archivo, se
- * conserva el actual. Recibe FormData (campo `nombre` y archivo `logo`).
+ * Dominios de correo PÚBLICOS que un colegio no puede reclamar como propios:
+ * si no, un admin podría poner `gmail.com` y absorber automáticamente a
+ * cualquiera que se registre con un Gmail. El dominio debe ser el propio del
+ * colegio.
+ */
+const PROVEEDORES_PUBLICOS = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'outlook.com',
+  'hotmail.com',
+  'hotmail.es',
+  'live.com',
+  'msn.com',
+  'yahoo.com',
+  'yahoo.es',
+  'icloud.com',
+  'me.com',
+  'mac.com',
+  'proton.me',
+  'protonmail.com',
+  'aol.com',
+  'gmx.com',
+  'zoho.com',
+  'mail.com',
+  'yandex.com',
+])
+
+/**
+ * configurarColegio: el school_admin edita el nombre, el logo y el dominio de
+ * correo de SU colegio. El logo se sube al blob storage; si no se envía archivo,
+ * se conserva el actual. Recibe FormData (`nombre`, `dominio`, archivo `logo`).
  */
 export async function configurarColegio(
   formData: FormData,
@@ -389,6 +417,12 @@ export async function configurarColegio(
   if (dominio) {
     if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(dominio)) {
       return { error: 'El dominio no es válido (ej: colegiosanjose.cl).' }
+    }
+    if (PROVEEDORES_PUBLICOS.has(dominio)) {
+      return {
+        error:
+          'No se puede usar un dominio de correo público (gmail, outlook, etc.). Usa el dominio propio de tu colegio.',
+      }
     }
     const otro = await colegioPorDominio(dominio)
     if (otro && otro.id !== colegioId) {
