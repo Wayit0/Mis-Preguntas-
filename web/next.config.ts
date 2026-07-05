@@ -10,6 +10,13 @@ const nextConfig: NextConfig = {
   // bundlean, faltan sus assets/binarios en producción y la generación de PDF
   // falla (el dev con `next start` no lo detecta porque usa node_modules entero).
   serverExternalPackages: ["@react-pdf/renderer", "sharp"],
+  // Default de Server Actions es 1MB: muy poco para "Importar Documento" (DOCX/PDF
+  // con fotos/diagramas incrustados, o la re-subida de esas imágenes al guardar).
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "15mb",
+    },
+  },
 };
 
 export default nextConfig;
