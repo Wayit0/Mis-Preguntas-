@@ -18,6 +18,8 @@ import { getActor, esAdminDeColegio, type Actor } from '@/lib/authz'
 import {
   contarAdminsColegio,
   obtenerColegio,
+  colegioPorDominio,
+  normalizarDominio,
 } from '@/lib/queries/colegio'
 
 // ---------------------------------------------------------------------------
@@ -354,9 +356,37 @@ export async function reactivarProfesor(
 }
 
 /**
- * configurarColegio: el school_admin edita el nombre y (opcionalmente) el logo
- * de SU colegio. El logo se sube al blob storage; si no se envía archivo, se
- * conserva el actual. Recibe FormData (campo `nombre` y archivo `logo`).
+ * Dominios de correo PÚBLICOS que un colegio no puede reclamar como propios:
+ * si no, un admin podría poner `gmail.com` y absorber automáticamente a
+ * cualquiera que se registre con un Gmail. El dominio debe ser el propio del
+ * colegio.
+ */
+const PROVEEDORES_PUBLICOS = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'outlook.com',
+  'hotmail.com',
+  'hotmail.es',
+  'live.com',
+  'msn.com',
+  'yahoo.com',
+  'yahoo.es',
+  'icloud.com',
+  'me.com',
+  'mac.com',
+  'proton.me',
+  'protonmail.com',
+  'aol.com',
+  'gmx.com',
+  'zoho.com',
+  'mail.com',
+  'yandex.com',
+])
+
+/**
+ * configurarColegio: el school_admin edita el nombre, el logo y el dominio de
+ * correo de SU colegio. El logo se sube al blob storage; si no se envía archivo,
+ * se conserva el actual. Recibe FormData (`nombre`, `dominio`, archivo `logo`).
  */
 export async function configurarColegio(
   formData: FormData,
@@ -372,10 +402,35 @@ export async function configurarColegio(
   const nombre = (formData.get('nombre') ?? '').toString().trim()
   if (!nombre) return { error: 'El nombre del colegio es obligatorio.' }
 
-  const cambios: { nombre: string; logo?: string } = { nombre }
+  const cambios: { nombre: string; logo?: string; dominio?: string | null } = {
+    nombre,
+  }
   const archivo = formData.get('logo')
   if (archivo instanceof File && archivo.size > 0) {
     cambios.logo = await uploadImage(archivo)
+  }
+
+  // Dominio de correo (opcional). Vacío = sin dominio. Debe ser válido y único
+  // entre colegios (para que la asociación automática al registrarse no sea
+  // ambigua).
+  const dominio = normalizarDominio((formData.get('dominio') ?? '').toString())
+  if (dominio) {
+    if (!/^[a-z0-9.-]+\.[a-z]{2,}$/.test(dominio)) {
+      return { error: 'El dominio no es válido (ej: colegiosanjose.cl).' }
+    }
+    if (PROVEEDORES_PUBLICOS.has(dominio)) {
+      return {
+        error:
+          'No se puede usar un dominio de correo público (gmail, outlook, etc.). Usa el dominio propio de tu colegio.',
+      }
+    }
+    const otro = await colegioPorDominio(dominio)
+    if (otro && otro.id !== colegioId) {
+      return { error: 'Ese dominio ya está en uso por otro colegio.' }
+    }
+    cambios.dominio = dominio
+  } else {
+    cambios.dominio = null
   }
 
   await db.update(colegios).set(cambios).where(eq(colegios.id, colegioId))

@@ -73,6 +73,25 @@ export async function obtenerColegio(
   return c ?? null
 }
 
+/** Normaliza un dominio de correo: minúsculas, sin espacios ni `@` inicial. */
+export function normalizarDominio(valor: string): string {
+  return valor.trim().toLowerCase().replace(/^@+/, '')
+}
+
+/** Lee un colegio por su dominio de correo (normalizado), o null. */
+export async function colegioPorDominio(
+  dominio: string,
+): Promise<Colegio | null> {
+  const d = normalizarDominio(dominio)
+  if (!d) return null
+  const [c] = await db
+    .select()
+    .from(colegios)
+    .where(eq(colegios.dominio, d))
+    .limit(1)
+  return c ?? null
+}
+
 /**
  * Profesores (y admins) del colegio, ordenados por nombre. Incluye el rol para
  * que la UI distinga al/los school_admin. Quien llama DEBE haber verificado que

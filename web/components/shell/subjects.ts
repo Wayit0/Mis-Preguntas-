@@ -5,6 +5,19 @@
  */
 export const COOKIE_ASIGNATURA = 'asignatura'
 
+/**
+ * Fija (o borra, con `null`) la cookie del contexto de asignatura desde el
+ * cliente. Vive a nivel de módulo (fuera de cualquier componente) para reusarla
+ * en el selector y en el cuadro de onboarding sin repetir la lógica. Los
+ * llamadores deben refrescar (`router.refresh()`) tras invocarla.
+ */
+export function fijarCookieAsignatura(nombre: string | null): void {
+  if (typeof document === 'undefined') return
+  document.cookie = nombre
+    ? `${COOKIE_ASIGNATURA}=${encodeURIComponent(nombre)}; path=/; max-age=31536000; samesite=lax`
+    : `${COOKIE_ASIGNATURA}=; path=/; max-age=0; samesite=lax`
+}
+
 export interface Asignatura {
   /** Nombre visible y, a la vez, valor del searchParam `?asignatura=`. */
   nombre: string

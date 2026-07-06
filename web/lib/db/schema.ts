@@ -58,6 +58,11 @@ export const colegios = pgTable('colegios', {
   logo: text('logo'),
   // Código para que los profesores se unan al colegio. Único.
   joinCode: text('join_code').notNull().unique(),
+  // Dominio de correo del colegio (ej: 'colegiosanjose.cl', sin @, minúsculas).
+  // Si alguien se registra con un correo de este dominio, se asocia
+  // automáticamente al colegio. Único entre colegios (nullable: los colegios sin
+  // dominio conviven, ya que Postgres permite múltiples NULL en una UNIQUE).
+  dominio: text('dominio').unique(),
   createdAt: timestamp('created_at').defaultNow(),
 })
 

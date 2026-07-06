@@ -5,6 +5,7 @@ import { cargarDatosGenerador } from '@/lib/queries/pruebas'
 import { obtenerColegioPorUsuario } from '@/lib/queries/colegio'
 import { imageUrl } from '@/lib/storage/blob'
 import { GeneradorPrueba } from '@/components/prueba/generador-prueba'
+import { ElegirAsignatura } from '@/components/shell/elegir-asignatura'
 
 export default async function PruebaPage() {
   const actor = await getActor()
@@ -15,22 +16,17 @@ export default async function PruebaPage() {
   const asignatura = await resolverAsignatura(userId)
 
   // Una prueba es siempre de una asignatura concreta. Si el contexto es "Todas",
-  // pedimos elegir una en el menú lateral en vez de mostrar el generador.
+  // mostramos el selector para elegir una aquí mismo (queda como la por defecto).
   if (!asignatura) {
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
         <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
           Crear Prueba
         </h1>
-        <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
-          <p className="text-base font-medium text-foreground">
-            Elige una asignatura para crear la prueba
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Selecciona una asignatura en el menú lateral (arriba a la izquierda) y
-            vuelve aquí. La prueba se creará para esa asignatura.
-          </p>
-        </div>
+        <ElegirAsignatura
+          titulo="¿De qué asignatura es la prueba?"
+          subtitulo="Elige la asignatura para crear la prueba. Quedará como tu asignatura por defecto (puedes cambiarla en el menú lateral)."
+        />
       </div>
     )
   }

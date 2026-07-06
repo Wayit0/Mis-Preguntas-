@@ -18,24 +18,31 @@ interface NavGrupo {
   items: NavItem[]
 }
 
-// Dos grupos de navegación, según el mockup north star: "Trabajo" y "Red".
+// Grupos de navegación: "Acciones" (crear/importar contenido), "Trabajo"
+// (bancos propios + compartido) y "Red" (colaboración).
 const GRUPOS: NavGrupo[] = [
+  {
+    titulo: 'Acciones',
+    items: [
+      { href: '/preguntas/nueva', etiqueta: 'Agregar Pregunta', emoji: '➕' },
+      { href: '/textos/nueva', etiqueta: 'Agregar Texto', emoji: '✏️' },
+      { href: '/prueba', etiqueta: 'Crear Prueba', emoji: '📝' },
+      { href: '/importar', etiqueta: 'Importar Documento', emoji: '📄' },
+    ],
+  },
   {
     titulo: 'Trabajo',
     items: [
       { href: '/preguntas', etiqueta: 'Mis Preguntas', emoji: '📖' },
-      { href: '/compartido', etiqueta: 'Banco Compartido', emoji: '🌐' },
-      { href: '/preguntas/nueva', etiqueta: 'Agregar Pregunta', emoji: '➕' },
       { href: '/textos', etiqueta: 'Mis Textos', emoji: '📰' },
-      { href: '/prueba', etiqueta: 'Crear Prueba', emoji: '📝' },
       { href: '/mis-pruebas', etiqueta: 'Mis Pruebas', emoji: '🗂️' },
+      { href: '/compartido', etiqueta: 'Banco Compartido', emoji: '🌐' },
     ],
   },
   {
     titulo: 'Red',
     items: [
       { href: '/colaboradores', etiqueta: 'Colaboradores', emoji: '🤝' },
-      { href: '/importar', etiqueta: 'Importar Documento', emoji: '📄' },
     ],
   },
 ]
@@ -59,13 +66,17 @@ function gruposPara(
   return [...GRUPOS, { titulo: 'Administración', items }]
 }
 
-// Marca activo el ítem cuyo href coincide con la ruta. /preguntas resalta también
-// sus sub-rutas de detalle (p. ej. /preguntas/123/editar) pero NO /preguntas/nueva,
-// que es un ítem propio. /colegio resalta también sus sub-rutas.
+// Marca activo el ítem cuyo href coincide con la ruta. /preguntas y /textos
+// resaltan también sus sub-rutas de detalle (p. ej. /preguntas/123/editar) pero
+// NO /preguntas/nueva ni /textos/nueva, que son ítems propios. /colegio resalta
+// también sus sub-rutas.
 function esActivo(pathname: string, href: string): boolean {
   if (pathname === href) return true
   if (href === '/preguntas') {
     return pathname.startsWith('/preguntas/') && pathname !== '/preguntas/nueva'
+  }
+  if (href === '/textos') {
+    return pathname.startsWith('/textos/') && pathname !== '/textos/nueva'
   }
   if (href === '/mis-pruebas') {
     return pathname.startsWith('/mis-pruebas/')

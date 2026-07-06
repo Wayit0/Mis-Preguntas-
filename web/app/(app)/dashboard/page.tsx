@@ -4,6 +4,7 @@ import { getSession } from '@/lib/get-session'
 import { getActor } from '@/lib/authz'
 import { resolverAsignatura } from '@/lib/asignatura'
 import { getDashboardStats } from '@/lib/queries/dashboard'
+import { ElegirAsignatura } from '@/components/shell/elegir-asignatura'
 import { buttonVariants } from '@/components/ui/button'
 import {
   Card,
@@ -85,6 +86,8 @@ export default async function DashboardPage() {
         </p>
       </div>
 
+      {!asignatura ? <ElegirAsignatura /> : null}
+
       {sugerirColegio ? (
         <Card>
           <CardHeader>
@@ -144,10 +147,10 @@ export default async function DashboardPage() {
             ➕ Agregar pregunta
           </Link>
           <Link
-            href={hrefCon('/textos', asignatura)}
+            href={hrefCon('/textos/nueva', asignatura)}
             className={buttonVariants({ variant: 'secondary', size: 'sm' })}
           >
-            📰 Nuevo texto
+            ✏️ Agregar texto
           </Link>
           <Link
             href={hrefCon('/prueba', asignatura)}
