@@ -431,14 +431,21 @@ export function ImportarDocumento({
         {encabezado}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-medium text-foreground">
-            {preguntas.length === 1
-              ? '1 pregunta detectada'
-              : `${preguntas.length} preguntas detectadas`}{' '}
-            <span className="font-normal text-muted-foreground">
-              · revisa, edita y elige cuáles guardar
-            </span>
-          </p>
+          <div className="flex flex-col gap-0.5">
+            <p className="text-sm font-medium text-foreground">
+              {preguntas.length === 1
+                ? '1 pregunta detectada'
+                : `${preguntas.length} preguntas detectadas`}{' '}
+              <span className="font-normal text-muted-foreground">
+                · revisa, edita y elige cuáles guardar
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Cuando el documento no trae la respuesta correcta, la IA la
+              resuelve y deja la pauta en la explicación — revísalas antes de
+              guardar.
+            </p>
+          </div>
           <Button
             type="button"
             variant="outline"

@@ -37,22 +37,28 @@ LaTeX entre signos $...$ si aparecen.
 "desarrollo_largo" si requiere una respuesta extensa o argumentada.
 - Para las de selección múltiple, completa "A", "B", "C", "D" y "E" con el \
 texto de cada alternativa (deja en null las que no existan) e indica en \
-"correcta" la LETRA de la alternativa correcta SÓLO si el documento la señala; \
-en caso contrario usa null.
+"correcta" la LETRA de la alternativa correcta: la que el documento señale o, \
+si el documento no la trae, RESUÉLVELA tú con rigor (desarrolla el cálculo o \
+razonamiento antes de decidir) y indícala.
 - Para las de desarrollo, deja las alternativas y "correcta" en null.
-- "explicacion": la explicación, pauta o solución si aparece en el documento; \
-si no aparece, deja una cadena vacía.
+- "explicacion": la explicación, pauta o solución si aparece en el documento. \
+Si no aparece y tú resolviste la pregunta, escribe aquí una pauta breve de \
+cómo se llega a la respuesta (máximo 2-3 líneas).
 - "materia" y "nivel": complétalos sólo si el documento los indica claramente; \
 si no, déjalos en null.
 
 El documento puede incluir imágenes incrustadas (diagramas, gráficos, figuras \
-geométricas, etc.). Cada una aparece en el texto como un marcador \
-"[IMAGEN_n]" (n = 0, 1, 2…) en el lugar exacto donde estaba, y luego se adjunta \
-la imagen correspondiente con la etiqueta "Imagen n:". Si el enunciado de una \
-pregunta depende de una de esas imágenes (es decir, no se entiende sin verla), \
-indica su número n en "imagenPreguntaIndice"; si no aplica ninguna imagen, deja \
-el campo en null. Al transcribir el enunciado, quita el marcador "[IMAGEN_n]" \
-del texto (la referencia ya queda registrada en ese campo).
+geométricas, etc.). Según el tipo de documento se presentan así:
+- En documentos de texto, cada imagen aparece como un marcador "[IMAGEN_n]" \
+(n = 0, 1, 2…) en el lugar exacto donde estaba, y luego se adjunta la imagen \
+con la etiqueta "Imagen n:". Al transcribir el enunciado, quita el marcador \
+"[IMAGEN_n]" del texto.
+- En PDFs no hay marcadores: las mismas imágenes del documento se adjuntan \
+numeradas ("Imagen n:") después del PDF; compáralas visualmente con las \
+figuras que ves dentro del PDF para saber a qué pregunta pertenece cada una.
+Si el enunciado de una pregunta depende de una de esas imágenes (es decir, no \
+se entiende sin verla), indica su número n en "imagenPreguntaIndice"; si no \
+aplica ninguna imagen, deja el campo en null.
 
 Si una ALTERNATIVA es una imagen o depende de una (p. ej. alternativas que son \
 gráficos o figuras), regístralo en "imagenesAlternativas" como un texto \
