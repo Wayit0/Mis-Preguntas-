@@ -23,6 +23,22 @@ import {
 /** Modelo de extracción (id exacto, sin sufijo de fecha). */
 const MODELO = 'claude-opus-4-8'
 
+/** Uso de tokens de una detección (para el registro de costos del admin). */
+export interface UsoDeteccion {
+  modelo: string
+  inputTokens: number
+  outputTokens: number
+  cacheCreationTokens: number
+  cacheReadTokens: number
+}
+
+/** Resultado de la detección: preguntas válidas + uso real reportado por la API. */
+export interface ResultadoDeteccion {
+  preguntas: PreguntaDetectada[]
+  /** null cuando no hubo llamada real (fixture de e2e). */
+  uso: UsoDeteccion | null
+}
+
 /** Instrucciones de extracción (en español, es-CL). */
 const SISTEMA = `Eres un asistente experto en educación chilena. Recibirás el \
 contenido de un documento (texto, PDF o imagen) que contiene preguntas de una \
@@ -136,10 +152,10 @@ const FIXTURE_FAKE: readonly unknown[] = [
 export async function detectarPreguntas(
   contentBlocks: BloqueContenido[],
   asignatura: string,
-): Promise<PreguntaDetectada[]> {
+): Promise<ResultadoDeteccion> {
   // Camino de prueba: sin tocar la red ni la API real de Anthropic.
   if (process.env.IMPORT_AI_FAKE) {
-    return cribarPreguntas(FIXTURE_FAKE)
+    return { preguntas: cribarPreguntas(FIXTURE_FAKE), uso: null }
   }
 
   const client = new Anthropic() // lee ANTHROPIC_API_KEY del entorno
@@ -173,10 +189,19 @@ export async function detectarPreguntas(
     res = await llamar()
   }
 
-  if (res.stop_reason === 'refusal') return []
+  // Uso real reportado por la API (para el panel de costos del admin).
+  const uso: UsoDeteccion = {
+    modelo: MODELO,
+    inputTokens: res.usage.input_tokens ?? 0,
+    outputTokens: res.usage.output_tokens ?? 0,
+    cacheCreationTokens: res.usage.cache_creation_input_tokens ?? 0,
+    cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
+  }
+
+  if (res.stop_reason === 'refusal') return { preguntas: [], uso }
 
   const data = res.parsed_output
-  if (!data) return []
+  if (!data) return { preguntas: [], uso }
 
-  return cribarPreguntas(data.preguntas)
+  return { preguntas: cribarPreguntas(data.preguntas), uso }
 }

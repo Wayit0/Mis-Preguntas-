@@ -171,6 +171,31 @@ export const pruebas = pgTable('pruebas', {
   updatedAt: timestamp('updated_at').defaultNow(),
 })
 
+// ---------------------------------------------------------------------------
+// Registro de usos de IA (para el panel de costos del admin global). Cada
+// llamada a la API de Anthropic inserta una fila con los tokens reales que
+// reportó la API y el costo calculado con los precios vigentes al momento del
+// uso (snapshot: si los precios cambian, el histórico no se recalcula).
+// ---------------------------------------------------------------------------
+
+export const usosIa = pgTable('usos_ia', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  // Acción que originó el uso (ej: 'importar_documento').
+  accion: text('accion').notNull(),
+  modelo: text('modelo').notNull(),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  cacheCreationTokens: integer('cache_creation_tokens').notNull().default(0),
+  cacheReadTokens: integer('cache_read_tokens').notNull().default(0),
+  // Costo en microdólares (USD * 1e6): entero exacto, sin problemas de coma
+  // flotante ni de serialización de numeric.
+  costoMicroUsd: integer('costo_micro_usd').notNull().default(0),
+  // Contexto legible del uso (archivo, páginas, imágenes, preguntas, duración).
+  detalle: jsonb('detalle').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
 export const colaboraciones = pgTable(
   'colaboraciones',
   {

@@ -1,6 +1,6 @@
-import { asc, count, eq } from 'drizzle-orm'
+import { asc, count, desc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { colegios, usuarios } from '@/lib/db/schema'
+import { colegios, usosIa, usuarios } from '@/lib/db/schema'
 
 // ---------------------------------------------------------------------------
 // Lecturas para la administración global (Parte E.2). Son funciones puras: el
@@ -67,4 +67,79 @@ export async function listarUsuarios(): Promise<UsuarioAdmin[]> {
     .from(usuarios)
     .leftJoin(colegios, eq(colegios.id, usuarios.colegioId))
     .orderBy(asc(usuarios.nombre))
+}
+
+// ---------------------------------------------------------------------------
+// Costos de IA (pestaña «Costos de IA» del panel de administración).
+// ---------------------------------------------------------------------------
+
+/** Un uso de IA con los datos del usuario que lo originó. */
+export interface UsoIaAdmin {
+  id: number
+  usuarioNombre: string | null
+  usuarioEmail: string | null
+  accion: string
+  modelo: string
+  inputTokens: number
+  outputTokens: number
+  cacheCreationTokens: number
+  cacheReadTokens: number
+  costoMicroUsd: number
+  detalle: Record<string, unknown>
+  createdAt: Date | null
+}
+
+/** Totales agregados de costos de IA. */
+export interface ResumenUsosIa {
+  totalMicroUsd: number
+  mesMicroUsd: number
+  totalUsos: number
+}
+
+/** Últimos usos de IA (más recientes primero), con nombre/email del usuario. */
+export async function listarUsosIa(limite = 100): Promise<UsoIaAdmin[]> {
+  const filas = await db
+    .select({
+      id: usosIa.id,
+      usuarioNombre: usuarios.nombre,
+      usuarioEmail: usuarios.email,
+      accion: usosIa.accion,
+      modelo: usosIa.modelo,
+      inputTokens: usosIa.inputTokens,
+      outputTokens: usosIa.outputTokens,
+      cacheCreationTokens: usosIa.cacheCreationTokens,
+      cacheReadTokens: usosIa.cacheReadTokens,
+      costoMicroUsd: usosIa.costoMicroUsd,
+      detalle: usosIa.detalle,
+      createdAt: usosIa.createdAt,
+    })
+    .from(usosIa)
+    .leftJoin(usuarios, eq(usuarios.id, usosIa.userId))
+    .orderBy(desc(usosIa.createdAt), desc(usosIa.id))
+    .limit(limite)
+  return filas
+}
+
+/** Total gastado (histórico y mes en curso) + número de usos. */
+export async function resumenUsosIa(): Promise<ResumenUsosIa> {
+  const inicioMes = new Date()
+  inicioMes.setDate(1)
+  inicioMes.setHours(0, 0, 0, 0)
+
+  const [total] = await db
+    .select({
+      micro: sql<number>`coalesce(sum(${usosIa.costoMicroUsd}), 0)`,
+      usos: sql<number>`count(*)`,
+    })
+    .from(usosIa)
+  const [mes] = await db
+    .select({ micro: sql<number>`coalesce(sum(${usosIa.costoMicroUsd}), 0)` })
+    .from(usosIa)
+    .where(gte(usosIa.createdAt, inicioMes))
+
+  return {
+    totalMicroUsd: Number(total?.micro ?? 0),
+    mesMicroUsd: Number(mes?.micro ?? 0),
+    totalUsos: Number(total?.usos ?? 0),
+  }
 }

@@ -18,6 +18,7 @@ export const runtime = 'nodejs'
 export async function POST(request: Request) {
   const session = await getSession()
   if (!session) return new Response('No autorizado', { status: 401 })
+  const userId = Number(session.user.id)
 
   const form = await request.formData()
   const archivo = form.get('archivo')
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
       }, 8000)
 
       try {
-        const resultado = await analizarArchivo(archivo, asignatura)
+        const resultado = await analizarArchivo(archivo, asignatura, userId)
         enviar({ resultado })
       } catch (err) {
         console.error('[importar] error no controlado en la ruta:', err)

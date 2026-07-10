@@ -71,6 +71,13 @@
       "when": 1783672116741,
       "tag": "0009_talented_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783711685301,
+      "tag": "0010_real_shinobi_shaw",
+      "breakpoints": true
     }
   ]
 }

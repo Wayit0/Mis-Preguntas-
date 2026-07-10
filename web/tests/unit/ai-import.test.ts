@@ -61,31 +61,44 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
           },
         ],
       },
+      usage: { input_tokens: 1200, output_tokens: 300 },
     })
 
-    const preguntas = await detectarPreguntas(bloques, 'Matemáticas')
+    const { preguntas, uso } = await detectarPreguntas(bloques, 'Matemáticas')
 
     expect(preguntas).toHaveLength(1)
     expect(preguntas[0].pregunta).toBe('¿Cuánto es 2 + 2?')
     expect(preguntas[0].correcta).toBe('B')
     expect(preguntas[0].tipo).toBe('seleccion_multiple')
+    expect(uso?.modelo).toBe('claude-opus-4-8')
     expect(mocks.parse).toHaveBeenCalledTimes(1)
   })
 
   it('devuelve [] cuando parsed_output es null', async () => {
-    mocks.parse.mockResolvedValue({ stop_reason: 'end_turn', parsed_output: null })
-    await expect(detectarPreguntas(bloques, 'Física')).resolves.toEqual([])
+    mocks.parse.mockResolvedValue({
+      stop_reason: 'end_turn',
+      parsed_output: null,
+      usage: { input_tokens: 10, output_tokens: 0 },
+    })
+    const res = await detectarPreguntas(bloques, 'Física')
+    expect(res.preguntas).toEqual([])
   })
 
   it('devuelve [] cuando el modelo rechaza (stop_reason "refusal")', async () => {
-    mocks.parse.mockResolvedValue({ stop_reason: 'refusal', parsed_output: null })
-    await expect(detectarPreguntas(bloques, 'Física')).resolves.toEqual([])
+    mocks.parse.mockResolvedValue({
+      stop_reason: 'refusal',
+      parsed_output: null,
+      usage: { input_tokens: 10, output_tokens: 0 },
+    })
+    const res = await detectarPreguntas(bloques, 'Física')
+    expect(res.preguntas).toEqual([])
   })
 
   it('llama al modelo correcto y adjunta la asignatura como último bloque de texto', async () => {
     mocks.parse.mockResolvedValue({
       stop_reason: 'end_turn',
       parsed_output: { preguntas: [] },
+      usage: { input_tokens: 10, output_tokens: 0 },
     })
 
     await detectarPreguntas(bloques, 'Biología')
@@ -103,9 +116,10 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
   it('usa el fixture y no llama al API cuando IMPORT_AI_FAKE está activo', async () => {
     process.env.IMPORT_AI_FAKE = '1'
 
-    const preguntas = await detectarPreguntas(bloques, 'Física')
+    const { preguntas, uso } = await detectarPreguntas(bloques, 'Física')
 
     expect(mocks.parse).not.toHaveBeenCalled()
+    expect(uso).toBeNull()
     expect(preguntas.length).toBeGreaterThanOrEqual(1)
     expect(preguntas.every((p) => p.pregunta.trim().length > 0)).toBe(true)
   })
@@ -132,9 +146,10 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
           },
         ],
       },
+      usage: { input_tokens: 10, output_tokens: 5 },
     })
 
-    const preguntas = await detectarPreguntas(bloques, 'Física')
+    const { preguntas } = await detectarPreguntas(bloques, 'Física')
 
     expect(preguntas).toHaveLength(1)
     expect(preguntas[0].imagenesAlternativas).toBe('A:0,B:1')
@@ -174,9 +189,11 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
       .mockResolvedValueOnce({
         stop_reason: 'end_turn',
         parsed_output: { preguntas: [] },
+        usage: { input_tokens: 10, output_tokens: 5 },
       })
 
-    await expect(detectarPreguntas(bloques, 'Física')).resolves.toEqual([])
+    const res = await detectarPreguntas(bloques, 'Física')
+    expect(res.preguntas).toEqual([])
     expect(mocks.parse).toHaveBeenCalledTimes(2)
   })
 })

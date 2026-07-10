@@ -6,7 +6,10 @@ import {
   type DocumentoExtraido,
   type ImagenExtraida,
 } from '@/lib/docparse/extract'
-import { detectarPreguntas } from '@/lib/ai/import'
+import { detectarPreguntas, type UsoDeteccion } from '@/lib/ai/import'
+import { calcularCostoMicroUsd } from '@/lib/ai/costos'
+import { db } from '@/lib/db'
+import { usosIa } from '@/lib/db/schema'
 import { MAX_PAGINAS_PDF, type PreguntaDetectada } from '@/lib/validation/import'
 
 // ---------------------------------------------------------------------------
@@ -30,9 +33,38 @@ export type ResultadoAnalisis =
  * cada intento deja traza en los logs (un "inicio" sin su "fin" delata una
  * petición cortada por infraestructura).
  */
+/**
+ * Registra el uso de IA en `usos_ia` para el panel de costos del admin. Nunca
+ * lanza: un fallo al registrar no debe romper el análisis que ya funcionó.
+ */
+async function registrarUsoIa(
+  userId: number,
+  accion: string,
+  uso: UsoDeteccion,
+  detalle: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await db.insert(usosIa).values({
+      userId,
+      accion,
+      modelo: uso.modelo,
+      inputTokens: uso.inputTokens,
+      outputTokens: uso.outputTokens,
+      cacheCreationTokens: uso.cacheCreationTokens,
+      cacheReadTokens: uso.cacheReadTokens,
+      costoMicroUsd: calcularCostoMicroUsd(uso.modelo, uso),
+      detalle,
+    })
+  } catch (err) {
+    console.error('[importar] no se pudo registrar el uso de IA:', err)
+  }
+}
+
 export async function analizarArchivo(
   archivo: File,
   asignatura: string,
+  /** Usuario que originó el análisis (para el registro de costos). */
+  userId: number,
 ): Promise<ResultadoAnalisis> {
   if (!(archivo instanceof File) || archivo.size === 0) {
     return { ok: false, error: 'Sube un documento (PDF, DOCX o imagen).' }
@@ -86,11 +118,22 @@ export async function analizarArchivo(
   )
 
   try {
-    const preguntas = await detectarPreguntas(documento.bloques, asignatura)
+    const { preguntas, uso } = await detectarPreguntas(documento.bloques, asignatura)
+    const duracionSegundos = Number(((Date.now() - inicio) / 1000).toFixed(1))
     console.log(
-      `[importar] fin OK: preguntas=${preguntas.length} ` +
-        `en ${((Date.now() - inicio) / 1000).toFixed(1)}s`,
+      `[importar] fin OK: preguntas=${preguntas.length} en ${duracionSegundos}s`,
     )
+    if (uso) {
+      await registrarUsoIa(userId, 'importar_documento', uso, {
+        archivo: archivo.name,
+        tipo: archivo.type,
+        tamanoKb: Math.round(archivo.size / 1024),
+        asignatura,
+        imagenes: documento.imagenes.length,
+        preguntas: preguntas.length,
+        duracionSegundos,
+      })
+    }
     return { ok: true, preguntas, imagenes: documento.imagenes }
   } catch (err) {
     // Log con detalle para poder diagnosticar en los logs del servidor (Azure App
