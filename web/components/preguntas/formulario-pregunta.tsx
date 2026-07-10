@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ImagePlus } from 'lucide-react'
 import { crearPregunta, actualizarPregunta } from '@/lib/actions/preguntas'
 import type { ResultadoPregunta } from '@/lib/actions/pregunta-fields'
 import {
@@ -50,6 +51,7 @@ function CampoImagen({
   existente?: string | null
 }) {
   const [preview, setPreview] = useState<string | null>(null)
+  const [nombreArchivo, setNombreArchivo] = useState<string | null>(null)
   const src = preview ?? (existente ? urlImagen(existente) : null)
 
   return (
@@ -64,15 +66,30 @@ function CampoImagen({
           className="max-h-28 w-fit rounded-md border border-border object-contain"
         />
       ) : null}
+      {/* Botón claro de subida; el input real queda oculto (sr-only) pero
+          dentro del form, así el archivo viaja igual en el FormData. */}
+      <label
+        htmlFor={name}
+        className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-border bg-muted/30 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/60 hover:text-foreground"
+      >
+        <ImagePlus className="size-3.5" aria-hidden />
+        {src ? 'Cambiar imagen' : 'Agregar imagen'}
+      </label>
+      {nombreArchivo ? (
+        <span className="max-w-44 truncate text-xs text-muted-foreground">
+          {nombreArchivo}
+        </span>
+      ) : null}
       <input
         id={name}
         name={name}
         type="file"
         accept="image/png,image/jpeg"
-        className="max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
+        className="sr-only"
         onChange={(e) => {
           const f = e.target.files?.[0]
           setPreview(f ? URL.createObjectURL(f) : null)
+          setNombreArchivo(f?.name ?? null)
         }}
       />
     </div>
