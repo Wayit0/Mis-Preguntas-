@@ -154,6 +154,11 @@ function formDataDePregunta(
     fd.set('C', p.C)
     fd.set('D', p.D)
     fd.set('E', p.E)
+    setImagenSiExiste(fd, 'imagen_A', p.imagenA)
+    setImagenSiExiste(fd, 'imagen_B', p.imagenB)
+    setImagenSiExiste(fd, 'imagen_C', p.imagenC)
+    setImagenSiExiste(fd, 'imagen_D', p.imagenD)
+    setImagenSiExiste(fd, 'imagen_E', p.imagenE)
     // `crearPregunta` exige una correcta A–E para selección múltiple; si la
     // detección no la trae, usamos 'A' como valor por defecto seguro.
     const correcta = (LETRAS as readonly string[]).includes(p.correcta)

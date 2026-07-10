@@ -43,6 +43,18 @@ const textoOpcional = z.string().nullish()
  */
 const indiceImagenOpcional = z.number().int().nullish()
 
+/**
+ * Imagen incrustada asociada a UNA alternativa: la letra (A–E) y el índice del
+ * marcador `[IMAGEN_n]`. Se pide como un arreglo compacto en vez de 5 campos
+ * `imagenAIndice`…`imagenEIndice`: esa forma expandida hacía que la API
+ * rechazara la petición con `400 "Schema is too complex."`; el arreglo añade
+ * sólo 2 propiedades hoja al esquema.
+ */
+const imagenAlternativaSchema = z.object({
+  letra: z.enum(['A', 'B', 'C', 'D', 'E']),
+  indice: z.number().int(),
+})
+
 /** Una pregunta tal cual la entrega el modelo (forma laxa, pre-criba). */
 export const preguntaDetectadaSchema = z.object({
   pregunta: z.string(),
@@ -60,6 +72,9 @@ export const preguntaDetectadaSchema = z.object({
   // la que depende el enunciado, si aplica (ver comentario de
   // `indiceImagenOpcional`).
   imagenPreguntaIndice: indiceImagenOpcional,
+  // Imágenes de las alternativas (si alguna alternativa ES una imagen o
+  // depende de una), como pares {letra, indice}. Null/vacío si no aplica.
+  imagenesAlternativas: z.array(imagenAlternativaSchema).nullish(),
 })
 
 /** Forma estructurada que pedimos al modelo (raíz del structured output). */
@@ -132,6 +147,14 @@ export const preguntaImportInputSchema = z.object({
   nivel: textoGuardar,
   tipo: z.enum(TIPOS_PREGUNTA_IMPORT).default('seleccion_multiple'),
   imagenPregunta: imagenParaGuardarSchema,
+  // Imágenes por alternativa, ya resueltas por el cliente desde los índices de
+  // `imagenesAlternativas`. Este schema NO viaja al modelo (es cliente→server
+  // action), así que los 5 campos no chocan con el límite de structured outputs.
+  imagenA: imagenParaGuardarSchema,
+  imagenB: imagenParaGuardarSchema,
+  imagenC: imagenParaGuardarSchema,
+  imagenD: imagenParaGuardarSchema,
+  imagenE: imagenParaGuardarSchema,
 })
 
 /** Payload de la confirmación: asignatura + preguntas seleccionadas. */

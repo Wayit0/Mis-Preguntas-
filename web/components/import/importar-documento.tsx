@@ -51,7 +51,15 @@ interface PreguntaEditable {
   nivel: string
   tipo: TipoPregunta
   imagenPregunta: ImagenParaGuardar | null
+  imagenA: ImagenParaGuardar | null
+  imagenB: ImagenParaGuardar | null
+  imagenC: ImagenParaGuardar | null
+  imagenD: ImagenParaGuardar | null
+  imagenE: ImagenParaGuardar | null
 }
+
+/** Columna de imagen editable de una alternativa (`imagenA`…`imagenE`). */
+type CampoImagenAlternativa = `imagen${(typeof LETRAS)[number]}`
 
 /** Resuelve un índice de imagen (el que puso la IA) al objeto correspondiente. */
 function resolverImagen(
@@ -76,6 +84,10 @@ function aEditable(
     : tipo === 'seleccion_multiple'
       ? 'A'
       : ''
+  // Imagen por alternativa desde los pares {letra, indice} que puso la IA.
+  const porLetra = new Map(
+    (p.imagenesAlternativas ?? []).map((ia) => [ia.letra, ia.indice]),
+  )
   return {
     id: `det-${contador++}`,
     incluir: true,
@@ -91,6 +103,11 @@ function aEditable(
     nivel: p.nivel ?? '',
     tipo,
     imagenPregunta: resolverImagen(p.imagenPreguntaIndice, imagenesDisponibles),
+    imagenA: resolverImagen(porLetra.get('A'), imagenesDisponibles),
+    imagenB: resolverImagen(porLetra.get('B'), imagenesDisponibles),
+    imagenC: resolverImagen(porLetra.get('C'), imagenesDisponibles),
+    imagenD: resolverImagen(porLetra.get('D'), imagenesDisponibles),
+    imagenE: resolverImagen(porLetra.get('E'), imagenesDisponibles),
   }
 }
 
@@ -206,6 +223,11 @@ export function ImportarDocumento({
           nivel: p.nivel,
           tipo: p.tipo,
           imagenPregunta: p.imagenPregunta,
+          imagenA: p.imagenA,
+          imagenB: p.imagenB,
+          imagenC: p.imagenC,
+          imagenD: p.imagenD,
+          imagenE: p.imagenE,
         })),
       })
       if (!resultado.ok) {
@@ -345,23 +367,37 @@ export function ImportarDocumento({
 
                   {esSeleccion ? (
                     <div className="flex flex-col gap-2">
-                      {LETRAS.map((letra) => (
-                        <div
-                          key={letra}
-                          className="flex flex-col gap-1.5"
-                        >
-                          <Label htmlFor={`alt-${p.id}-${letra}`}>
-                            Alternativa {letra}
-                          </Label>
-                          <Input
-                            id={`alt-${p.id}-${letra}`}
-                            value={p[letra]}
-                            onChange={(e) =>
-                              actualizar(p.id, { [letra]: e.target.value })
-                            }
-                          />
-                        </div>
-                      ))}
+                      {LETRAS.map((letra) => {
+                        const campoImagen =
+                          `imagen${letra}` as CampoImagenAlternativa
+                        const imagenAlt = p[campoImagen]
+                        return (
+                          <div
+                            key={letra}
+                            className="flex flex-col gap-1.5"
+                          >
+                            <Label htmlFor={`alt-${p.id}-${letra}`}>
+                              Alternativa {letra}
+                            </Label>
+                            <Input
+                              id={`alt-${p.id}-${letra}`}
+                              value={p[letra]}
+                              onChange={(e) =>
+                                actualizar(p.id, { [letra]: e.target.value })
+                              }
+                            />
+                            {imagenAlt ? (
+                              <MiniaturaImagen
+                                imagen={imagenAlt}
+                                alt={`Imagen de la alternativa ${letra}`}
+                                onQuitar={() =>
+                                  actualizar(p.id, { [campoImagen]: null })
+                                }
+                              />
+                            ) : null}
+                          </div>
+                        )
+                      })}
                       <div className="flex flex-col gap-1.5">
                         <Label>Respuesta correcta</Label>
                         <Select

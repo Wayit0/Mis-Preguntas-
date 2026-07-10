@@ -51,10 +51,16 @@ zip.folder('word').file('document.xml', documentXml)
 const docxBuffer = await zip.generateAsync({ type: 'nodebuffer' })
 writeFileSync(join(here, 'sample.docx'), docxBuffer)
 
-// PNG real de 1x1 px (transparente).
-const pngBase64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-const pngBuffer = Buffer.from(pngBase64, 'base64')
+// PNG real de 4x4 px generado con sharp: garantiza que la MISMA libvips que
+// usa `redimensionarONulo` en runtime puede decodificarlo (un base64 1x1
+// hardcodeado dejó de decodificar tras una actualización de libvips y hacía
+// fallar los tests de extracción de imágenes).
+const sharp = require('sharp')
+const pngBuffer = await sharp({
+  create: { width: 4, height: 4, channels: 4, background: { r: 200, g: 30, b: 30, alpha: 1 } },
+})
+  .png()
+  .toBuffer()
 writeFileSync(join(here, 'sample.png'), pngBuffer)
 
 // ---------------------------------------------------------------------------

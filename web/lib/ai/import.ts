@@ -54,6 +54,14 @@ indica su número n en "imagenPreguntaIndice"; si no aplica ninguna imagen, deja
 el campo en null. Al transcribir el enunciado, quita el marcador "[IMAGEN_n]" \
 del texto (la referencia ya queda registrada en ese campo).
 
+Si una ALTERNATIVA es una imagen o depende de una (p. ej. alternativas que son \
+gráficos o figuras), regístralo en "imagenesAlternativas" como un arreglo de \
+pares {"letra": "A"…"E", "indice": n}; deja el texto de esa alternativa con su \
+rótulo o descripción si existe (o una cadena vacía) y quita el marcador \
+"[IMAGEN_n]". Si ninguna alternativa lleva imagen, deja "imagenesAlternativas" \
+en null. Una misma imagen no puede ser a la vez del enunciado y de una \
+alternativa: asígnala a donde corresponda según el documento.
+
 Reglas:
 - No inventes preguntas, alternativas ni respuestas: extrae únicamente lo que \
 aparece en el documento.

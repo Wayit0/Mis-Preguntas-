@@ -109,6 +109,42 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
     expect(preguntas.every((p) => p.pregunta.trim().length > 0)).toBe(true)
   })
 
+  it('conserva imagenesAlternativas ({letra, indice}) al cribar', async () => {
+    mocks.parse.mockResolvedValue({
+      stop_reason: 'end_turn',
+      parsed_output: {
+        preguntas: [
+          {
+            pregunta: '¿Qué gráfico representa un MRU?',
+            A: '',
+            B: '',
+            C: 'Ninguno de los anteriores',
+            D: null,
+            E: null,
+            correcta: 'A',
+            explicacion: '',
+            materia: null,
+            nivel: null,
+            tipo: 'seleccion_multiple',
+            imagenPreguntaIndice: null,
+            imagenesAlternativas: [
+              { letra: 'A', indice: 0 },
+              { letra: 'B', indice: 1 },
+            ],
+          },
+        ],
+      },
+    })
+
+    const preguntas = await detectarPreguntas(bloques, 'Física')
+
+    expect(preguntas).toHaveLength(1)
+    expect(preguntas[0].imagenesAlternativas).toEqual([
+      { letra: 'A', indice: 0 },
+      { letra: 'B', indice: 1 },
+    ])
+  })
+
   it('propaga el error si la llamada al modelo falla', async () => {
     mocks.parse.mockRejectedValueOnce(new Error('fallo de red'))
 
