@@ -134,6 +134,50 @@ export async function joinByCode(code: string): Promise<ResultadoColegio> {
 }
 
 /**
+ * crearMiColegio: un profesor SIN colegio crea el suyo (self-service) y queda
+ * como su school_admin. Mismo efecto que la creación desde /admin
+ * (`crearColegio` en admin.ts) + designación de admin, pero acotado al propio
+ * usuario: no puede elegir a otro admin ni crear colegios en serie (ya
+ * perteneciendo a uno, se rechaza). Su contenido personal se adopta al colegio
+ * (igual que al unirse por código/invitación). El dominio de correo NO se
+ * configura aquí: se hace después en "Mi Colegio", con sus propias reglas.
+ */
+export async function crearMiColegio(
+  nombre: string,
+): Promise<ResultadoColegio> {
+  const actor = await getActor()
+  if (!actor) return { error: 'Debes iniciar sesión.' }
+
+  if (actor.role === 'global_admin') {
+    return { error: 'Los administradores globales crean colegios desde el panel de administración.' }
+  }
+  if (actor.colegioId !== null) {
+    return { error: 'Ya perteneces a un colegio.' }
+  }
+
+  const limpio = (nombre ?? '').trim()
+  if (!limpio) return { error: 'El nombre del colegio es obligatorio.' }
+
+  const joinCode = await generarJoinCodeUnico()
+  await db.transaction(async (tx) => {
+    const [colegio] = await tx
+      .insert(colegios)
+      .values({ nombre: limpio, joinCode })
+      .returning({ id: colegios.id })
+    await tx
+      .update(usuarios)
+      .set({ colegioId: colegio.id, role: 'school_admin' })
+      .where(eq(usuarios.id, actor.userId))
+    await adoptarContenidoAlColegio(tx, actor.userId, colegio.id)
+  })
+
+  revalidatePath('/cuenta')
+  revalidatePath('/dashboard')
+  revalidatePath('/colegio')
+  return { ok: true }
+}
+
+/**
  * invitarPorEmail: sólo el school_admin de SU colegio (o un global_admin que
  * administre ese colegio) crea una invitación pendiente con token. No envía
  * email real: la invitación queda disponible para aceptarse. Idempotente: si ya
@@ -427,6 +471,33 @@ export async function configurarColegio(
     const otro = await colegioPorDominio(dominio)
     if (otro && otro.id !== colegioId) {
       return { error: 'Ese dominio ya está en uso por otro colegio.' }
+    }
+    // Con la creación self-service de colegios, reclamar un dominio absorbe a
+    // los futuros registros de ese dominio: un school_admin (no global) sólo
+    // puede reclamar el dominio de SU propio correo, y con el correo verificado.
+    // Se exige únicamente al CAMBIAR el dominio (no al re-guardar el actual),
+    // para no bloquear colegios existentes configurados por un global_admin.
+    const colegioActual = await obtenerColegio(colegioId)
+    const dominioCambia = dominio !== (colegioActual?.dominio ?? null)
+    if (dominioCambia && actor.role !== 'global_admin') {
+      const dominioActor = actor.email.split('@')[1]?.trim().toLowerCase() ?? ''
+      if (dominio !== dominioActor) {
+        return {
+          error:
+            'Sólo puedes usar el dominio de tu propio correo institucional ' +
+            `(@${dominioActor || '…'}). Pide a soporte configurar otro dominio.`,
+        }
+      }
+      const [fila] = await db
+        .select({ emailVerified: usuarios.emailVerified })
+        .from(usuarios)
+        .where(eq(usuarios.id, actor.userId))
+        .limit(1)
+      if (!fila?.emailVerified) {
+        return {
+          error: 'Verifica tu correo antes de configurar el dominio del colegio.',
+        }
+      }
     }
     cambios.dominio = dominio
   } else {

@@ -3,6 +3,7 @@ import { requireActor } from '@/lib/authz'
 import { invitacionesPendientesPorEmail } from '@/lib/queries/colegio'
 import { ChangePasswordForm } from '@/components/auth/change-password-form'
 import { UnirseColegio } from '@/components/colegio/unirse-colegio'
+import { CrearColegio } from '@/components/colegio/crear-colegio'
 
 // Página de cuenta. Además del cambio de contraseña, ofrece a los profesores
 // SIN colegio el punto de entrada para unirse (por código o invitación).
@@ -19,7 +20,12 @@ export default async function CuentaPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-5">
-      {mostrarUnirse ? <UnirseColegio invitaciones={invitaciones} /> : null}
+      {mostrarUnirse ? (
+        <>
+          <UnirseColegio invitaciones={invitaciones} />
+          <CrearColegio />
+        </>
+      ) : null}
 
       <ChangePasswordForm />
       <Link
