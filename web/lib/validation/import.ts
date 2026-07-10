@@ -44,16 +44,40 @@ const textoOpcional = z.string().nullish()
 const indiceImagenOpcional = z.number().int().nullish()
 
 /**
- * Imagen incrustada asociada a UNA alternativa: la letra (A–E) y el índice del
- * marcador `[IMAGEN_n]`. Se pide como un arreglo compacto en vez de 5 campos
- * `imagenAIndice`…`imagenEIndice`: esa forma expandida hacía que la API
- * rechazara la petición con `400 "Schema is too complex."`; el arreglo añade
- * sólo 2 propiedades hoja al esquema.
+ * Imágenes asociadas a alternativas, como STRING compacto "LETRA:INDICE"
+ * separado por comas (ej: "A:0,B:1"), o null si ninguna alternativa lleva
+ * imagen. Historia de este formato: 5 campos `imagenAIndice`…`imagenEIndice`
+ * daban `400 "Schema is too complex."`; un arreglo de objetos {letra, indice}
+ * daba `400 "Grammar compilation timed out."` (visto en producción). Un string
+ * plano añade complejidad mínima a la gramática del structured output; el
+ * parseo/validación real lo hace {@link parsearImagenesAlternativas}.
  */
-const imagenAlternativaSchema = z.object({
-  letra: z.enum(['A', 'B', 'C', 'D', 'E']),
-  indice: z.number().int(),
-})
+const imagenesAlternativasSchema = z.string().nullish()
+
+/** Un par letra→índice ya parseado y validado. */
+export interface ImagenAlternativa {
+  letra: 'A' | 'B' | 'C' | 'D' | 'E'
+  indice: number
+}
+
+/**
+ * Parsea el string compacto "A:0,B:1" a pares {letra, indice} válidos. Entradas
+ * malformadas (letras fuera de A–E, índices no numéricos, basura) se descartan
+ * en silencio: una referencia inválida simplemente no resuelve a ninguna
+ * imagen, igual que un índice fuera de rango.
+ */
+export function parsearImagenesAlternativas(
+  valor: string | null | undefined,
+): ImagenAlternativa[] {
+  if (!valor) return []
+  const pares: ImagenAlternativa[] = []
+  for (const tramo of valor.split(',')) {
+    const m = tramo.trim().match(/^([A-E])\s*:\s*(\d+)$/)
+    if (!m) continue
+    pares.push({ letra: m[1] as ImagenAlternativa['letra'], indice: Number(m[2]) })
+  }
+  return pares
+}
 
 /** Una pregunta tal cual la entrega el modelo (forma laxa, pre-criba). */
 export const preguntaDetectadaSchema = z.object({
@@ -73,8 +97,8 @@ export const preguntaDetectadaSchema = z.object({
   // `indiceImagenOpcional`).
   imagenPreguntaIndice: indiceImagenOpcional,
   // Imágenes de las alternativas (si alguna alternativa ES una imagen o
-  // depende de una), como pares {letra, indice}. Null/vacío si no aplica.
-  imagenesAlternativas: z.array(imagenAlternativaSchema).nullish(),
+  // depende de una), como string compacto "A:0,B:1". Null si no aplica.
+  imagenesAlternativas: imagenesAlternativasSchema,
 })
 
 /** Forma estructurada que pedimos al modelo (raíz del structured output). */

@@ -15,6 +15,7 @@ vi.mock('@anthropic-ai/sdk', () => {
 })
 
 import { detectarPreguntas } from '@/lib/ai/import'
+import { parsearImagenesAlternativas } from '@/lib/validation/import'
 import type { BloqueContenido } from '@/lib/docparse/extract'
 
 const bloques: BloqueContenido[] = [{ type: 'text', text: 'documento de prueba' }]
@@ -109,7 +110,7 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
     expect(preguntas.every((p) => p.pregunta.trim().length > 0)).toBe(true)
   })
 
-  it('conserva imagenesAlternativas ({letra, indice}) al cribar', async () => {
+  it('conserva imagenesAlternativas (string compacto "A:0,B:1") al cribar', async () => {
     mocks.parse.mockResolvedValue({
       stop_reason: 'end_turn',
       parsed_output: {
@@ -127,10 +128,7 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
             nivel: null,
             tipo: 'seleccion_multiple',
             imagenPreguntaIndice: null,
-            imagenesAlternativas: [
-              { letra: 'A', indice: 0 },
-              { letra: 'B', indice: 1 },
-            ],
+            imagenesAlternativas: 'A:0,B:1',
           },
         ],
       },
@@ -139,10 +137,24 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
     const preguntas = await detectarPreguntas(bloques, 'Física')
 
     expect(preguntas).toHaveLength(1)
-    expect(preguntas[0].imagenesAlternativas).toEqual([
+    expect(preguntas[0].imagenesAlternativas).toBe('A:0,B:1')
+  })
+
+  it('parsearImagenesAlternativas: pares válidos, espacios, basura y null', () => {
+    expect(parsearImagenesAlternativas('A:0,B:1')).toEqual([
       { letra: 'A', indice: 0 },
       { letra: 'B', indice: 1 },
     ])
+    expect(parsearImagenesAlternativas(' C : 2 ')).toEqual([
+      { letra: 'C', indice: 2 },
+    ])
+    // Letras fuera de A–E, índices no numéricos y tramos vacíos se descartan.
+    expect(parsearImagenesAlternativas('F:0,A:x,,B:3')).toEqual([
+      { letra: 'B', indice: 3 },
+    ])
+    expect(parsearImagenesAlternativas(null)).toEqual([])
+    expect(parsearImagenesAlternativas(undefined)).toEqual([])
+    expect(parsearImagenesAlternativas('')).toEqual([])
   })
 
   it('propaga el error si la llamada al modelo falla', async () => {
