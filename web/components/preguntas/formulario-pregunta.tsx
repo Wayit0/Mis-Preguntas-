@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { LatexText } from './latex-text'
+import { InsertarEcuacion } from './insertar-ecuacion'
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -141,6 +142,12 @@ export function FormularioPregunta({
   const nivelResuelto =
     nivelBase === 'Otro' ? nivelOtro.trim() || 'Otro' : nivelBase
   const esSeleccion = tipo === 'seleccion_multiple'
+
+  /** Añade una ecuación `$...$` al final del valor actual de un campo. */
+  function conEcuacion(valor: string, latexDelimitado: string): string {
+    if (!valor.trim()) return latexDelimitado
+    return `${valor}${valor.endsWith(' ') ? '' : ' '}${latexDelimitado}`
+  }
 
   const alternativas: {
     letra: string
@@ -317,6 +324,9 @@ export function FormularioPregunta({
                 required
               />
             </div>
+            <InsertarEcuacion
+              onInsert={(latex) => setEnunciado((v) => conEcuacion(v, latex))}
+            />
             {enunciado.trim() ? (
               <div className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-sm">
                 <span className="text-xs text-muted-foreground">
@@ -386,6 +396,9 @@ export function FormularioPregunta({
                         className="text-xs text-muted-foreground"
                       />
                     ) : null}
+                    <InsertarEcuacion
+                      onInsert={(latex) => set(conEcuacion(valor, latex))}
+                    />
                   </div>
                   <div className="sm:w-44">
                     <CampoImagen

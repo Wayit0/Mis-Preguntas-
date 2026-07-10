@@ -7,9 +7,10 @@ import {
   Image,
   StyleSheet,
   renderToBuffer,
+  type TextProps,
 } from '@react-pdf/renderer'
 import sharp from 'sharp'
-import { latexToPng } from '@/lib/latex/render'
+import { latexToPng, latexToPngConDims } from '@/lib/latex/render'
 import { getImageStream } from '@/lib/storage/blob'
 
 /**
@@ -148,12 +149,76 @@ async function prepararImagenBlob(
   }
 }
 
+/**
+ * Un tramo de una línea de texto: texto plano o una fórmula LaTeX ya
+ * rasterizada a PNG con dimensiones a escala del texto circundante.
+ */
+type SegmentoLinea =
+  | { tipo: 'texto'; valor: string }
+  | { tipo: 'formula'; img: ImagenPreparada }
+
+/** Mismo patrón que `LatexText` en pantalla: `$...$` inline y `$$...$$` bloque. */
+const REGEX_LATEX = /(\$\$[^$]+\$\$|\$[^$]+\$)/g
+
+/**
+ * Divide un texto con fórmulas `$...$` en segmentos renderizables en el PDF.
+ * Devuelve `null` si el texto no contiene ninguna fórmula válida (el llamador
+ * usa entonces un `<Text>` plano, el camino común). Una fórmula que no
+ * rasteriza se deja como texto crudo, igual que el resto de la prueba: nunca
+ * rompe la generación.
+ */
+async function prepararSegmentos(
+  texto: string,
+  fontSizePt: number,
+): Promise<SegmentoLinea[] | null> {
+  if (!texto.includes('$')) return null
+  const partes = texto.split(REGEX_LATEX)
+  if (partes.length <= 1) return null
+
+  const segmentos: SegmentoLinea[] = []
+  let hayFormula = false
+  for (const parte of partes) {
+    if (!parte) continue
+    const esBloque = parte.startsWith('$$') && parte.endsWith('$$') && parte.length > 4
+    const esInline =
+      !esBloque && parte.startsWith('$') && parte.endsWith('$') && parte.length > 2
+    if (esBloque || esInline) {
+      const expr = parte.slice(esBloque ? 2 : 1, esBloque ? -2 : -1)
+      try {
+        const png = await latexToPngConDims(expr)
+        // A escala del texto: 1em = tamaño de fuente. Cap al ancho útil.
+        let width = png.emWidth * fontSizePt
+        let height = png.emHeight * fontSizePt
+        if (width > MAX_W_ALTERNATIVA) {
+          height = (height * MAX_W_ALTERNATIVA) / width
+          width = MAX_W_ALTERNATIVA
+        }
+        segmentos.push({ tipo: 'formula', img: { data: png.data, width, height } })
+        hayFormula = true
+        continue
+      } catch {
+        // Cae al texto crudo de abajo.
+      }
+    }
+    segmentos.push({ tipo: 'texto', valor: parte })
+  }
+  return hayFormula ? segmentos : null
+}
+
 /** Una pregunta con sus imágenes ya preparadas y su número correlativo. */
 interface PreguntaPreparada {
   numero: number
   enunciado: string
+  /** Segmentos texto/fórmula del enunciado, o null si no hay LaTeX. */
+  enunciadoSegmentos: SegmentoLinea[] | null
   tipo: string
-  alternativas: { letra: Letra; texto: string; imagen: ImagenPreparada | null }[]
+  alternativas: {
+    letra: Letra
+    texto: string
+    /** Segmentos texto/fórmula de la alternativa, o null si no hay LaTeX. */
+    segmentos: SegmentoLinea[] | null
+    imagen: ImagenPreparada | null
+  }[]
   imagenEnunciado: ImagenPreparada | null
 }
 
@@ -186,6 +251,11 @@ const ANCHO_IMG_ALTERNATIVA: Record<string, number> = {
 function anchoImagen(tabla: Record<string, number>, tamano?: string | null): number {
   return tabla[tamano ?? ''] ?? tabla.mediano
 }
+
+// Tamaños de fuente (pt) del enunciado y las alternativas; también dimensionan
+// las fórmulas LaTeX inline (1em de fórmula = tamaño de fuente del texto).
+const FONT_ENUNCIADO   = 11
+const FONT_ALTERNATIVA = 10
 
 /** Agrupa un array en sub-arrays de tamaño `n`. */
 function chunk<T>(arr: T[], n: number): T[][] {
@@ -223,7 +293,8 @@ async function prepararPregunta(
         MAX_H_ALTERNATIVA,
       )
       if (alternativaTieneContenido(texto, imagen)) {
-        alternativas.push({ letra, texto, imagen })
+        const segmentos = await prepararSegmentos(texto, FONT_ALTERNATIVA)
+        alternativas.push({ letra, texto, segmentos, imagen })
       }
     }
   }
@@ -231,6 +302,7 @@ async function prepararPregunta(
   return {
     numero,
     enunciado: p.enunciado,
+    enunciadoSegmentos: await prepararSegmentos(p.enunciado, FONT_ENUNCIADO),
     tipo,
     alternativas,
     imagenEnunciado,
@@ -296,6 +368,10 @@ const styles = StyleSheet.create({
   preguntaFila: { flexDirection: 'row', marginTop: 12, marginBottom: 3 },
   preguntaNumero: { fontFamily: 'Helvetica-Bold', fontSize: 11, marginRight: 3 },
   preguntaEnunciado: { fontFamily: 'Helvetica-Bold', fontSize: 11, flex: 1 },
+  // Estilos de palabra suelta dentro de TextoConFormulas (sin flex: cada
+  // palabra es un <Text> propio dentro del View row+wrap).
+  palabraEnunciado: { fontFamily: 'Helvetica-Bold', fontSize: 11 },
+  palabraAlternativa: { fontSize: 10 },
   imagenPregunta: { marginTop: 4, marginBottom: 6 },
   // Fila letra + texto de alternativa
   alternativaFila: { flexDirection: 'row', marginLeft: 18, marginBottom: 3 },
@@ -332,6 +408,53 @@ function lineasDesarrollo(tipo: string): number {
   return 0
 }
 
+/**
+ * Línea de texto con fórmulas intercaladas. react-pdf no soporta imágenes
+ * inline dentro de <Text>, así que se emula el flujo con un View row+wrap:
+ * cada palabra va en su propio <Text> (para que el conjunto haga wrap) y cada
+ * fórmula como <Image> centrada verticalmente respecto de la línea.
+ */
+function TextoConFormulas({
+  segmentos,
+  estilo,
+}: {
+  segmentos: SegmentoLinea[]
+  estilo: TextProps['style']
+}) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        flex: 1,
+      }}
+    >
+      {segmentos.flatMap((seg, i) => {
+        if (seg.tipo === 'formula') {
+          return [
+            <ImagenPdf
+              key={`f-${i}`}
+              img={seg.img}
+              style={{ marginHorizontal: 1 }}
+            />,
+          ]
+        }
+        // Conservar los espacios como separadores: cada palabra lleva su
+        // espacio siguiente, así el wrap se produce entre palabras.
+        return seg.valor
+          .split(/\s+/)
+          .filter((w) => w.length > 0)
+          .map((w, j) => (
+            <Text key={`t-${i}-${j}`} style={estilo}>
+              {w}{' '}
+            </Text>
+          ))
+      })}
+    </View>
+  )
+}
+
 function BloquePregunta({ p }: { p: PreguntaPreparada }) {
   const lineas = lineasDesarrollo(p.tipo)
   return (
@@ -343,7 +466,14 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
       <View style={{ width: AREA_UTIL, height: 0 }} />
       <View style={styles.preguntaFila}>
         <Text style={styles.preguntaNumero}>{p.numero}.</Text>
-        <Text style={styles.preguntaEnunciado}>{p.enunciado}</Text>
+        {p.enunciadoSegmentos ? (
+          <TextoConFormulas
+            segmentos={p.enunciadoSegmentos}
+            estilo={styles.palabraEnunciado}
+          />
+        ) : (
+          <Text style={styles.preguntaEnunciado}>{p.enunciado}</Text>
+        )}
       </View>
       {p.imagenEnunciado ? (
         <ImagenPdf img={p.imagenEnunciado} style={styles.imagenPregunta} />
@@ -357,7 +487,14 @@ function BloquePregunta({ p }: { p: PreguntaPreparada }) {
           <View key={alt.letra}>
             <View style={styles.alternativaFila}>
               <Text style={styles.alternativaLetra}>{alt.letra})</Text>
-              <Text style={styles.alternativaTexto}>{alt.texto}</Text>
+              {alt.segmentos ? (
+                <TextoConFormulas
+                  segmentos={alt.segmentos}
+                  estilo={styles.palabraAlternativa}
+                />
+              ) : (
+                <Text style={styles.alternativaTexto}>{alt.texto}</Text>
+              )}
             </View>
             {alt.imagen ? (
               <ImagenPdf img={alt.imagen} style={styles.imagenAlternativa} />

@@ -37,4 +37,38 @@ describe('pdf/prueba', () => {
     expect(buffer.length).toBeGreaterThan(1024)
     expect(buffer.subarray(0, 4).toString('ascii')).toBe('%PDF')
   })
+
+  it('renderiza fórmulas $...$ en enunciado y alternativas (fórmula → PNG embebido)', async () => {
+    const base = {
+      titulo: 'Prueba',
+      asignatura: 'Física',
+      preguntas: [
+        {
+          enunciado: 'Si $v_0 = 2\\,m/s$, ¿cuál es la energía cinética?',
+          tipo: 'seleccion_multiple',
+          A: '$\\frac{1}{2}mv^2$',
+          B: '$mgh$',
+          C: 'No se puede saber',
+          correcta: 'A',
+        },
+      ],
+    }
+    const conFormulas = await generarPruebaPdf(base)
+    const sinFormulas = await generarPruebaPdf({
+      ...base,
+      preguntas: [
+        {
+          ...base.preguntas[0],
+          enunciado: 'Si v0 = 2 m/s, ¿cuál es la energía cinética?',
+          A: '(1/2)mv2',
+          B: 'mgh',
+        },
+      ],
+    })
+
+    expect(conFormulas.subarray(0, 4).toString('ascii')).toBe('%PDF')
+    // Los PNG de las 3 fórmulas embebidas deben abultar el PDF notoriamente
+    // frente a la misma prueba en texto plano.
+    expect(conFormulas.length).toBeGreaterThan(sinFormulas.length + 2000)
+  })
 })
