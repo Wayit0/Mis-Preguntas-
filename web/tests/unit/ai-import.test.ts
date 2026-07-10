@@ -165,4 +165,18 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
     )
     expect(mocks.parse).toHaveBeenCalledTimes(1)
   })
+
+  it('reintenta UNA vez ante "Grammar compilation timed out" y usa la 2ª respuesta', async () => {
+    mocks.parse
+      .mockRejectedValueOnce(
+        new Error('400 {"type":"error","error":{"message":"Grammar compilation timed out."}}'),
+      )
+      .mockResolvedValueOnce({
+        stop_reason: 'end_turn',
+        parsed_output: { preguntas: [] },
+      })
+
+    await expect(detectarPreguntas(bloques, 'Física')).resolves.toEqual([])
+    expect(mocks.parse).toHaveBeenCalledTimes(2)
+  })
 })

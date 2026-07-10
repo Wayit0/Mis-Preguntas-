@@ -142,15 +142,30 @@ export async function detectarPreguntas(
     `Extrae todas las preguntas del documento adjunto. ` +
     `La asignatura es "${asignatura}".`
 
-  const res = await client.messages.parse({
-    model: MODELO,
-    max_tokens: 16000,
-    system: SISTEMA,
-    messages: [
-      { role: 'user', content: [...contentBlocks, { type: 'text', text: instruccion }] },
-    ],
-    output_config: { format: zodOutputFormat(PreguntasDetectadasSchema) },
-  })
+  const llamar = () =>
+    client.messages.parse({
+      model: MODELO,
+      max_tokens: 16000,
+      system: SISTEMA,
+      messages: [
+        { role: 'user', content: [...contentBlocks, { type: 'text', text: instruccion }] },
+      ],
+      output_config: { format: zodOutputFormat(PreguntasDetectadasSchema) },
+    })
+
+  // "Grammar compilation timed out" (400) es un fallo de compilación de la
+  // gramática del structured output en frío; la API la cachea una vez
+  // compilada, así que un único reintento suele bastar. Cualquier otro error
+  // se propaga (el SDK ya reintenta solo los 429/5xx).
+  let res: Awaited<ReturnType<typeof llamar>>
+  try {
+    res = await llamar()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : ''
+    if (!msg.includes('Grammar compilation timed out')) throw err
+    console.warn('[importar] grammar timeout; reintentando una vez…')
+    res = await llamar()
+  }
 
   if (res.stop_reason === 'refusal') return []
 
