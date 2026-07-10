@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { CheckCircle2, FileText, Loader2 } from 'lucide-react'
 
 import {
   analizarDocumento,
@@ -13,9 +14,10 @@ import {
   LETRAS,
   type TipoPregunta,
 } from '@/lib/validation/pregunta'
-import type {
-  ImagenParaGuardar,
-  PreguntaDetectada,
+import {
+  parsearImagenesAlternativas,
+  type ImagenParaGuardar,
+  type PreguntaDetectada,
 } from '@/lib/validation/import'
 import type { ImagenExtraida } from '@/lib/docparse/extract'
 import { ASIGNATURAS } from '@/components/shell/subjects'
@@ -84,9 +86,12 @@ function aEditable(
     : tipo === 'seleccion_multiple'
       ? 'A'
       : ''
-  // Imagen por alternativa desde los pares {letra, indice} que puso la IA.
+  // Imagen por alternativa desde el string compacto "A:0,B:1" que puso la IA.
   const porLetra = new Map(
-    (p.imagenesAlternativas ?? []).map((ia) => [ia.letra, ia.indice]),
+    parsearImagenesAlternativas(p.imagenesAlternativas).map((ia) => [
+      ia.letra,
+      ia.indice,
+    ]),
   )
   return {
     id: `det-${contador++}`,
@@ -137,6 +142,106 @@ function MiniaturaImagen({
 
 type Fase = 'subir' | 'analizando' | 'revisar' | 'guardando'
 
+/**
+ * Etapas mostradas durante el análisis. El análisis es UNA llamada al servidor
+ * (sin progreso real), así que las etapas avanzan por tiempo transcurrido:
+ * dan una señal honesta de "estamos trabajando" sin inventar precisión. La
+ * detección con IA es lo que domina el tiempo total (20-60 s con documentos
+ * largos), por eso concentra la mayor parte de la línea de tiempo.
+ */
+const ETAPAS_ANALISIS = [
+  { hastaMs: 2_000, texto: 'Leyendo el documento' },
+  { hastaMs: 6_000, texto: 'Extrayendo texto e imágenes' },
+  { hastaMs: 45_000, texto: 'Detectando preguntas con la IA' },
+  { hastaMs: Infinity, texto: 'Casi listo, ordenando las preguntas' },
+] as const
+
+/** Panel de progreso mientras la IA analiza el documento. */
+function ProgresoAnalisis({ nombreArchivo }: { nombreArchivo: string }) {
+  const [transcurrido, setTranscurrido] = useState(0)
+
+  useEffect(() => {
+    const inicio = Date.now()
+    const timer = setInterval(() => setTranscurrido(Date.now() - inicio), 250)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Avance asintótico hacia 92%: rápido al inicio y se frena al final, sin
+  // llegar nunca a 100 (eso ocurre cuando el servidor responde y cambia la fase).
+  const progreso = Math.min(92, Math.round(100 * (1 - Math.exp(-transcurrido / 15_000))))
+  const etapaActual = ETAPAS_ANALISIS.findIndex((e) => transcurrido < e.hastaMs)
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-5">
+        <div className="flex items-center gap-3">
+          <Loader2 className="size-5 shrink-0 animate-spin text-primary" aria-hidden />
+          <div className="flex min-w-0 flex-col">
+            <p className="text-sm font-medium text-foreground">
+              Analizando el documento…
+            </p>
+            {nombreArchivo ? (
+              <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
+                <FileText className="size-3 shrink-0" aria-hidden />
+                {nombreArchivo}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        <div
+          role="progressbar"
+          aria-valuenow={progreso}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          className="h-2 w-full overflow-hidden rounded-full bg-muted"
+        >
+          <div
+            className="h-full rounded-full bg-primary transition-all duration-300"
+            style={{ width: `${progreso}%` }}
+          />
+        </div>
+
+        <ul className="flex flex-col gap-1.5" aria-live="polite">
+          {ETAPAS_ANALISIS.map((etapa, i) => {
+            const completada = i < etapaActual
+            const activa = i === etapaActual
+            // La etapa de reserva ("casi listo") sólo aparece si se alcanza.
+            if (i === ETAPAS_ANALISIS.length - 1 && !activa) return null
+            return (
+              <li
+                key={etapa.texto}
+                className={`flex items-center gap-2 text-sm ${
+                  activa
+                    ? 'font-medium text-foreground'
+                    : completada
+                      ? 'text-muted-foreground'
+                      : 'text-muted-foreground/50'
+                }`}
+              >
+                {completada ? (
+                  <CheckCircle2 className="size-4 shrink-0 text-primary" aria-hidden />
+                ) : activa ? (
+                  <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                ) : (
+                  <span className="size-4 shrink-0 rounded-full border border-border" aria-hidden />
+                )}
+                {etapa.texto}
+                {activa ? '…' : ''}
+              </li>
+            )
+          })}
+        </ul>
+
+        <p className="text-xs text-muted-foreground">
+          Esto puede tomar hasta un minuto según el largo del documento. No
+          cierres esta página.
+        </p>
+      </CardContent>
+    </Card>
+  )
+}
+
 export function ImportarDocumento({
   asignaturaInicial,
 }: {
@@ -151,6 +256,7 @@ export function ImportarDocumento({
   const [error, setError] = useState<string | null>(null)
   const [aviso, setAviso] = useState<string | null>(null)
   const [preguntas, setPreguntas] = useState<PreguntaEditable[]>([])
+  const [nombreArchivo, setNombreArchivo] = useState('')
 
   const seleccionadas = preguntas.filter((p) => p.incluir).length
 
@@ -166,6 +272,7 @@ export function ImportarDocumento({
       return
     }
     formData.set('asignatura', asignatura)
+    setNombreArchivo(archivo.name)
 
     setFase('analizando')
     try {
@@ -502,11 +609,18 @@ export function ImportarDocumento({
   }
 
   // ───────────────────────────── Fase: subir ─────────────────────────────
+  // Durante el análisis se muestra el panel de progreso; el formulario queda
+  // MONTADO pero oculto para no perder el archivo elegido si el análisis falla
+  // y hay que volver a intentar.
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       {encabezado}
 
-      <Card>
+      {fase === 'analizando' ? (
+        <ProgresoAnalisis nombreArchivo={nombreArchivo} />
+      ) : null}
+
+      <Card className={fase === 'analizando' ? 'hidden' : undefined}>
         <CardContent>
           <form onSubmit={onAnalizar} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
