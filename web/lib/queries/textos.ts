@@ -28,6 +28,23 @@ export async function cargarTextosPropios(
 }
 
 /**
+ * Carga un texto por id con guard de propiedad: devuelve la fila sólo si es del
+ * usuario, o `null` en caso contrario (no existe o es de otro).
+ */
+export async function cargarTextoPorId(
+  id: number,
+  userId: number,
+): Promise<Texto | null> {
+  if (!Number.isFinite(id)) return null
+  const [fila] = await db
+    .select()
+    .from(textos)
+    .where(and(eq(textos.id, id), eq(textos.userId, userId)))
+    .limit(1)
+  return fila ?? null
+}
+
+/**
  * Preguntas asociadas a un texto (`texto_id = textoId`), ordenadas por id. Igual
  * que `cargar_preguntas_de_texto` en app.py. Tolera ids no numéricos.
  */

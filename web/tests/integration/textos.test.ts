@@ -18,10 +18,11 @@ vi.mock('next/cache', () => ({
 
 // Importar DESPUÉS de declarar los mocks (vi.mock se hoistea, pero mantenemos el
 // orden por claridad).
-const { guardarTexto, eliminarTexto } = await import('@/lib/actions/textos')
-const { cargarTextosPropios, cargarPreguntasDeTexto } = await import(
-  '@/lib/queries/textos'
+const { guardarTexto, actualizarTexto, eliminarTexto } = await import(
+  '@/lib/actions/textos'
 )
+const { cargarTextosPropios, cargarPreguntasDeTexto, cargarTextoPorId } =
+  await import('@/lib/queries/textos')
 
 // Crea un usuario con email único (los tests comparten la base Postgres docker).
 async function crearUsuario(prefijo: string) {
@@ -38,6 +39,46 @@ beforeEach(() => {
 })
 
 describe('Mis Textos (CRUD + desasociar preguntas al borrar)', () => {
+  it('edita un texto propio y rechaza editar uno ajeno', async () => {
+    const dueno = await crearUsuario('textos-editar')
+    const otro = await crearUsuario('textos-intruso')
+    currentUserId = dueno.id
+
+    const res = await guardarTexto({
+      asignatura: 'Lenguaje',
+      titulo: 'Original',
+      contenido: 'Contenido original.',
+      compartida: 0,
+    })
+    const textoId = (res as { id: number }).id
+
+    // El dueño edita.
+    const edicion = await actualizarTexto(textoId, {
+      asignatura: 'Lenguaje',
+      titulo: 'Editado',
+      contenido: 'Contenido corregido.',
+      compartida: 1,
+    })
+    expect('id' in edicion).toBe(true)
+
+    const actualizado = await cargarTextoPorId(textoId, dueno.id)
+    expect(actualizado?.titulo).toBe('Editado')
+    expect(actualizado?.contenido).toBe('Contenido corregido.')
+    expect(actualizado?.compartida).toBe(1)
+
+    // Un intruso no puede editar (guard de propiedad).
+    currentUserId = otro.id
+    const rechazo = await actualizarTexto(textoId, {
+      asignatura: 'Lenguaje',
+      titulo: 'Hackeado',
+      contenido: 'x',
+      compartida: 0,
+    })
+    expect(rechazo).toEqual({ error: 'No tienes permiso para editar este texto.' })
+    // cargarTextoPorId también respeta la propiedad.
+    expect(await cargarTextoPorId(textoId, otro.id)).toBeNull()
+  })
+
   it('crea un texto, le asocia una pregunta y lo ve en la lista', async () => {
     const u = await crearUsuario('textos-ver')
     currentUserId = u.id

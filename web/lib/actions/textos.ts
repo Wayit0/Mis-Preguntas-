@@ -44,6 +44,44 @@ export async function guardarTexto(
 }
 
 /**
+ * Actualiza un texto del usuario (guard de propiedad). Valida con el mismo
+ * schema del alta; las preguntas asociadas no se tocan.
+ */
+export async function actualizarTexto(
+  id: number,
+  input: Record<string, unknown>,
+): Promise<ResultadoTexto> {
+  const session = await getSession()
+  if (!session) return { error: 'Debes iniciar sesión.' }
+  const userId = Number(session.user.id)
+  if (!Number.isFinite(id)) return { error: 'Texto no encontrado.' }
+
+  const [existente] = await db
+    .select({ id: textos.id })
+    .from(textos)
+    .where(and(eq(textos.id, id), eq(textos.userId, userId)))
+    .limit(1)
+  if (!existente) return { error: 'No tienes permiso para editar este texto.' }
+
+  const parsed = textoSchema.safeParse(input)
+  if (!parsed.success) return { error: primerErrorTexto(parsed.error) }
+  const data = parsed.data
+
+  await db
+    .update(textos)
+    .set({
+      asignatura: data.asignatura,
+      titulo: data.titulo,
+      contenido: data.contenido,
+      compartida: data.compartida,
+    })
+    .where(and(eq(textos.id, id), eq(textos.userId, userId)))
+
+  revalidatePath('/textos')
+  return { id }
+}
+
+/**
  * Elimina un texto del usuario (guard de propiedad). Como en app.py, primero
  * desasocia las preguntas que lo referencian (texto_id = NULL) y luego borra el
  * texto; ambas operaciones van en una transacción para que sea atómico. Las

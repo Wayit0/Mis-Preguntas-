@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { guardarTexto } from '@/lib/actions/textos'
+import { guardarTexto, actualizarTexto } from '@/lib/actions/textos'
 import { VISIBILIDAD_TEXTO } from '@/lib/validation/texto'
+import type { Texto } from '@/lib/queries/textos'
 import { ASIGNATURAS } from '@/components/shell/subjects'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,17 +26,21 @@ import { Card, CardContent } from '@/components/ui/card'
  */
 export function FormularioTexto({
   asignaturaInicial,
+  texto,
 }: {
   asignaturaInicial?: string
+  /** Si se pasa, el formulario edita ese texto en vez de crear uno nuevo. */
+  texto?: Texto
 }) {
   const router = useRouter()
+  const esEdicion = Boolean(texto)
 
   const [asignatura, setAsignatura] = useState(
-    asignaturaInicial ?? ASIGNATURAS[0].nombre,
+    texto?.asignatura ?? asignaturaInicial ?? ASIGNATURAS[0].nombre,
   )
-  const [titulo, setTitulo] = useState('')
-  const [contenido, setContenido] = useState('')
-  const [compartida, setCompartida] = useState('0')
+  const [titulo, setTitulo] = useState(texto?.titulo ?? '')
+  const [contenido, setContenido] = useState(texto?.contenido ?? '')
+  const [compartida, setCompartida] = useState(String(texto?.compartida ?? 0))
 
   const [error, setError] = useState<string | null>(null)
   const [pendiente, setPendiente] = useState(false)
@@ -46,12 +51,10 @@ export function FormularioTexto({
     setPendiente(true)
 
     try {
-      const resultado = await guardarTexto({
-        asignatura,
-        titulo,
-        contenido,
-        compartida,
-      })
+      const input = { asignatura, titulo, contenido, compartida }
+      const resultado = texto
+        ? await actualizarTexto(texto.id, input)
+        : await guardarTexto(input)
 
       if ('error' in resultado) {
         setError(resultado.error)
@@ -153,7 +156,11 @@ export function FormularioTexto({
           disabled={pendiente}
           className="w-full sm:w-auto"
         >
-          {pendiente ? 'Guardando…' : 'Guardar texto'}
+          {pendiente
+            ? 'Guardando…'
+            : esEdicion
+              ? 'Guardar cambios'
+              : 'Guardar texto'}
         </Button>
         <Button
           type="button"

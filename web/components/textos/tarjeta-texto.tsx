@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
@@ -51,6 +52,16 @@ export function TarjetaTexto({
         </div>
 
         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+          <Link
+            href={`/textos/${texto.id}/editar`}
+            className={buttonVariants({
+              variant: 'outline',
+              size: 'sm',
+              className: 'h-9 px-3 sm:h-7 sm:px-2.5',
+            })}
+          >
+            ✏️ Editar
+          </Link>
           <form action={eliminarTexto.bind(null, texto.id)}>
             <button
               type="submit"
