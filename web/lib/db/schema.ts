@@ -148,6 +148,10 @@ export const pruebas = pgTable('pruebas', {
   colegio: text('colegio'),
   profesor: text('profesor'),
   instrucciones: text('instrucciones'),
+  // Formato del PDF: 'estandar' | 'ib' (estilo examen de Bachillerato
+  // Internacional: A4, tipografía serif, caja de instrucciones, líneas
+  // punteadas de respuesta).
+  formato: text('formato').notNull().default('estandar'),
   // Expresiones LaTeX del formulario.
   formulas: jsonb('formulas').$type<string[]>().notNull().default([]),
   // IDs de preguntas sueltas seleccionadas — el ORDEN importa (orden del PDF).

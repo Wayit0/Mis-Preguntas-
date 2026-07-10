@@ -1,0 +1,1 @@
+ALTER TABLE "pruebas" ADD COLUMN "formato" text DEFAULT 'estandar' NOT NULL;

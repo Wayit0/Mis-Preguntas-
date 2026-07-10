@@ -64,6 +64,13 @@
       "when": 1783671376262,
       "tag": "0008_fixed_anthem",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783672116741,
+      "tag": "0009_talented_synch",
+      "breakpoints": true
     }
   ]
 }

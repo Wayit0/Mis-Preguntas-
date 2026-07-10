@@ -7,12 +7,24 @@ import { z } from 'zod'
 // (campos repetidos del FormData), igual que hace el generador de PDF.
 // ---------------------------------------------------------------------------
 
+/** Formatos de PDF disponibles para una prueba. */
+export const FORMATOS_PRUEBA = ['estandar', 'ib'] as const
+export type FormatoPrueba = (typeof FORMATOS_PRUEBA)[number]
+
+/** Etiquetas legibles para cada formato. */
+export const ETIQUETA_FORMATO: Record<FormatoPrueba, string> = {
+  estandar: 'Estándar',
+  ib: 'IB (Bachillerato Internacional)',
+}
+
 export const pruebaSchema = z.object({
   asignatura: z.string().trim().min(1, 'La asignatura es obligatoria'),
   titulo: z.string().trim().default(''),
   colegio: z.string().trim().default(''),
   profesor: z.string().trim().default(''),
   instrucciones: z.string().trim().default(''),
+  // Un valor desconocido (formularios antiguos sin el campo) cae a 'estandar'.
+  formato: z.enum(FORMATOS_PRUEBA).catch('estandar').default('estandar'),
 })
 
 /** Input ya validado del encabezado de una prueba. */
@@ -27,6 +39,7 @@ export function extraerCamposPrueba(formData: FormData): Record<string, unknown>
     colegio: t('colegio'),
     profesor: t('profesor'),
     instrucciones: t('instrucciones'),
+    formato: t('formato') || 'estandar',
   }
 }
 

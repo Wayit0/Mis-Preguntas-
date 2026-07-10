@@ -25,6 +25,8 @@ export interface OpcionesPrueba {
   colegio?: string
   profesor?: string
   instrucciones?: string
+  /** Formato del PDF: 'estandar' (default) | 'ib'. */
+  formato?: string
   formulas?: string[]
   /** IDs de preguntas sueltas — el ORDEN determina el orden en el PDF. */
   preguntasIds: number[]
@@ -189,6 +191,7 @@ export async function construirPruebaPdf(
     profesor: opts.profesor ?? '',
     logo: opts.logo ?? null,
     instrucciones: opts.instrucciones ?? '',
+    formato: opts.formato ?? 'estandar',
     formulas: opts.formulas ?? [],
     textos,
     preguntas,

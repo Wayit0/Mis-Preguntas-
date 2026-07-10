@@ -38,6 +38,39 @@ describe('pdf/prueba', () => {
     expect(buffer.subarray(0, 4).toString('ascii')).toBe('%PDF')
   })
 
+  it('genera un PDF válido en formato IB (A4, Times, caja de instrucciones)', async () => {
+    const buffer = await generarPruebaPdf({
+      titulo: 'Prueba de Física — Nivel Medio',
+      asignatura: 'Física',
+      colegio: 'Colegio de Prueba',
+      profesor: 'Profe Test',
+      instrucciones:
+        'No abras esta prueba hasta que se te indique.\nResponde todas las preguntas.',
+      formato: 'ib',
+      preguntas: [
+        {
+          enunciado: '¿Cuál es la unidad de la aceleración en el SI?',
+          tipo: 'seleccion_multiple',
+          A: 'm/s',
+          B: 'm/s²',
+          C: 'kg·m',
+          correcta: 'B',
+        },
+        {
+          enunciado: 'Explica el principio de inercia.',
+          tipo: 'desarrollo_largo',
+        },
+      ],
+    })
+
+    expect(buffer.subarray(0, 4).toString('ascii')).toBe('%PDF')
+    // El PDF IB usa Times (serif), no Helvetica: la fuente debe aparecer en el
+    // catálogo del documento.
+    const contenido = buffer.toString('latin1')
+    expect(contenido).toContain('Times-Roman')
+    expect(contenido).toContain('Times-Bold')
+  })
+
   it('renderiza fórmulas $...$ en enunciado y alternativas (fórmula → PNG embebido)', async () => {
     const base = {
       titulo: 'Prueba',
