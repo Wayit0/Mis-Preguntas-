@@ -2,8 +2,10 @@
 
 import { getSession } from '@/lib/get-session'
 import {
+  contarPaginasPdf,
   esTipoSoportado,
   extraerBloquesDocumento,
+  MIME_PDF,
   type DocumentoExtraido,
   type ImagenExtraida,
 } from '@/lib/docparse/extract'
@@ -12,6 +14,7 @@ import { crearPregunta } from '@/lib/actions/preguntas'
 import { LETRAS } from '@/lib/validation/pregunta'
 import {
   guardarImportSchema,
+  MAX_PAGINAS_PDF,
   type GuardarImportInput,
   type ImagenParaGuardar,
   type PreguntaDetectada,
@@ -58,6 +61,23 @@ export async function analizarDocumento(
     return {
       ok: false,
       error: 'Tipo de archivo no soportado. Usa PDF, Word (DOCX) o una imagen.',
+    }
+  }
+
+  // Límite de páginas para PDF: corta ANTES de llamar a la IA, con un mensaje
+  // accionable. Si el PDF no se puede parsear (contarPaginasPdf → null), se
+  // deja pasar: la extracción/IA darán su propio error si está dañado.
+  if (archivo.type === MIME_PDF) {
+    const paginas = await contarPaginasPdf(
+      new Uint8Array(await archivo.arrayBuffer()),
+    )
+    if (paginas !== null && paginas > MAX_PAGINAS_PDF) {
+      return {
+        ok: false,
+        error:
+          `El PDF tiene ${paginas} páginas y el máximo es ${MAX_PAGINAS_PDF}. ` +
+          'Divide el documento e impórtalo por partes.',
+      }
     }
   }
 

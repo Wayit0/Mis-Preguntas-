@@ -1,5 +1,6 @@
 import mammoth from 'mammoth'
 import sharp from 'sharp'
+import { PDFDocument } from 'pdf-lib'
 
 /**
  * Extracción de documentos para la importación con IA (Fase 7).
@@ -93,6 +94,23 @@ export const MIMES_SOPORTADOS: readonly string[] = [
 
 export function esTipoSoportado(mime: string): boolean {
   return MIMES_SOPORTADOS.includes(mime)
+}
+
+/**
+ * Cuenta las páginas de un PDF. Devuelve `null` si los bytes no se pueden
+ * parsear como PDF (documento dañado o cifrado ilegible): en ese caso el
+ * llamador decide (la importación lo deja pasar y será la extracción/IA la que
+ * falle con su propio mensaje).
+ */
+export async function contarPaginasPdf(
+  bytes: Buffer | Uint8Array,
+): Promise<number | null> {
+  try {
+    const doc = await PDFDocument.load(bytes, { ignoreEncryption: true })
+    return doc.getPageCount()
+  } catch {
+    return null
+  }
 }
 
 /** Error claro para tipos de archivo no soportados. */

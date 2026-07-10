@@ -15,6 +15,7 @@ import {
   type TipoPregunta,
 } from '@/lib/validation/pregunta'
 import {
+  MAX_PAGINAS_PDF,
   parsearImagenesAlternativas,
   type ImagenParaGuardar,
   type PreguntaDetectada,
@@ -652,7 +653,8 @@ export function ImportarDocumento({
                 className="max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
               />
               <p className="text-xs text-muted-foreground">
-                Formatos aceptados: PDF, Word (DOCX) e imágenes (PNG, JPG).
+                Formatos aceptados: PDF (máx. {MAX_PAGINAS_PDF} páginas), Word
+                (DOCX) e imágenes (PNG, JPG).
               </p>
             </div>
 

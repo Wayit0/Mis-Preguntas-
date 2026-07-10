@@ -25,6 +25,15 @@ import { TIPOS_PREGUNTA } from '@/lib/validation/pregunta'
 /** Tipos de pregunta soportados (idénticos al MVP / a `pregunta.ts`). */
 export const TIPOS_PREGUNTA_IMPORT = TIPOS_PREGUNTA
 
+/**
+ * Máximo de páginas aceptado para un PDF en la importación con IA. La API de
+ * Anthropic corta en 100 páginas, pero mucho antes de eso el análisis se hace
+ * lento y caro sin que una prueba escolar real lo necesite. Vive aquí (módulo
+ * sin dependencias de servidor) para que la UI muestre el mismo número que la
+ * action valida.
+ */
+export const MAX_PAGINAS_PDF = 30
+
 /** Acepta string, null o ausente (lo que devuelva el modelo). */
 const textoOpcional = z.string().nullish()
 

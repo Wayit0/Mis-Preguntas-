@@ -4,7 +4,10 @@ import { dirname, join } from 'node:path'
 
 import { describe, it, expect } from 'vitest'
 
+import { PDFDocument } from 'pdf-lib'
+
 import {
+  contarPaginasPdf,
   extraerBloquesDocumento,
   TipoArchivoNoSoportadoError,
   MIME_DOCX,
@@ -80,6 +83,17 @@ describe('docparse/extract', () => {
     await expect(
       extraerBloquesDocumento({ data: Buffer.from('x'), mime: 'application/zip' }),
     ).rejects.toBeInstanceOf(TipoArchivoNoSoportadoError)
+  })
+
+  it('contarPaginasPdf: cuenta páginas reales y devuelve null con bytes que no son PDF', async () => {
+    const doc = await PDFDocument.create()
+    doc.addPage()
+    doc.addPage()
+    doc.addPage()
+    const bytes = await doc.save()
+
+    expect(await contarPaginasPdf(bytes)).toBe(3)
+    expect(await contarPaginasPdf(Buffer.from('no soy un pdf'))).toBeNull()
   })
 
   it('DOCX con una imagen incrustada → marcador [IMAGEN_0] + bloques de imagen', async () => {
