@@ -108,6 +108,9 @@ export const preguntas = pgTable('preguntas', {
   imagenE: text('imagen_E'),
   tipo: text('tipo').default('seleccion_multiple'),
   textoId: integer('texto_id'),
+  // Tamaño de las imágenes de la pregunta en el PDF impreso:
+  // 'chico' | 'mediano' | 'grande'. Aplica al enunciado y a las alternativas.
+  imagenTamano: text('imagen_tamano').notNull().default('mediano'),
 })
 
 export const textos = pgTable('textos', {

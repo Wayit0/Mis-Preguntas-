@@ -55,6 +55,8 @@ export interface PreguntaPdf {
   imagen_C?: string | null
   imagen_D?: string | null
   imagen_E?: string | null
+  /** Tamaño de las imágenes en el PDF: 'chico' | 'mediano' | 'grande'. */
+  imagen_tamano?: string | null
   /** Si pertenece a un texto de comprensión, su id (para agruparla). */
   texto_id?: number | null
 }
@@ -166,6 +168,25 @@ const MAX_W_LOGO        = 38            // alto objetivo; ancho se deriva de la 
 const MAX_H_ENUNCIADO   = 300           // pt — proporcional al ancho completo (16:9 ≈ 288pt)
 const MAX_H_ALTERNATIVA = 240           // pt
 
+// Ancho objetivo de las imágenes según el tamaño elegido en la pregunta
+// (`preguntas.imagen_tamano`). 'mediano' es el estándar: legible sin ocupar la
+// página entera; 'grande' conserva el comportamiento histórico (ancho completo).
+const ANCHO_IMG_ENUNCIADO: Record<string, number> = {
+  chico: 180,
+  mediano: 320,
+  grande: MAX_W_ENUNCIADO,
+}
+const ANCHO_IMG_ALTERNATIVA: Record<string, number> = {
+  chico: 130,
+  mediano: 240,
+  grande: MAX_W_ALTERNATIVA,
+}
+
+/** Normaliza el tamaño guardado (default 'mediano' si falta o es desconocido). */
+function anchoImagen(tabla: Record<string, number>, tamano?: string | null): number {
+  return tabla[tamano ?? ''] ?? tabla.mediano
+}
+
 /** Agrupa un array en sub-arrays de tamaño `n`. */
 function chunk<T>(arr: T[], n: number): T[][] {
   const out: T[][] = []
@@ -182,7 +203,11 @@ async function prepararPregunta(
   numero: number,
 ): Promise<PreguntaPreparada> {
   const tipo = p.tipo || 'seleccion_multiple'
-  const imagenEnunciado = await prepararImagenBlob(p.imagen_pregunta, MAX_W_ENUNCIADO, MAX_H_ENUNCIADO)
+  const imagenEnunciado = await prepararImagenBlob(
+    p.imagen_pregunta,
+    anchoImagen(ANCHO_IMG_ENUNCIADO, p.imagen_tamano),
+    MAX_H_ENUNCIADO,
+  )
 
   const alternativas: PreguntaPreparada['alternativas'] = []
   if (tipo === 'seleccion_multiple') {
@@ -192,7 +217,11 @@ async function prepararPregunta(
         | string
         | null
         | undefined
-      const imagen = await prepararImagenBlob(claveImg, MAX_W_ALTERNATIVA, MAX_H_ALTERNATIVA)
+      const imagen = await prepararImagenBlob(
+        claveImg,
+        anchoImagen(ANCHO_IMG_ALTERNATIVA, p.imagen_tamano),
+        MAX_H_ALTERNATIVA,
+      )
       if (alternativaTieneContenido(texto, imagen)) {
         alternativas.push({ letra, texto, imagen })
       }

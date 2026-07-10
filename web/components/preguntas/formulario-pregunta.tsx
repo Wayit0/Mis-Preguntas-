@@ -9,7 +9,10 @@ import {
   ETIQUETA_TIPO,
   LETRAS,
   NIVELES_SUGERIDOS,
+  TAMANOS_IMAGEN,
+  ETIQUETA_TAMANO_IMAGEN,
   type TipoPregunta,
+  type TamanoImagen,
 } from '@/lib/validation/pregunta'
 import type { Pregunta } from '@/lib/queries/preguntas'
 import { ASIGNATURAS } from '@/components/shell/subjects'
@@ -120,6 +123,9 @@ export function FormularioPregunta({
   const [nivelBase, setNivelBase] = useState(nivel0.base)
   const [nivelOtro, setNivelOtro] = useState(nivel0.otro)
   const [correcta, setCorrecta] = useState(pregunta?.correcta ?? 'A')
+  const [imagenTamano, setImagenTamano] = useState<TamanoImagen>(
+    (pregunta?.imagenTamano as TamanoImagen) ?? 'mediano',
+  )
   const [compartida, setCompartida] = useState((pregunta?.compartida ?? 0) > 0)
 
   const [enunciado, setEnunciado] = useState(pregunta?.pregunta ?? '')
@@ -324,6 +330,35 @@ export function FormularioPregunta({
               label="Imagen del enunciado (opcional)"
               existente={pregunta?.imagenPregunta}
             />
+            <div className="flex flex-col gap-1.5">
+              <Label>Tamaño de las imágenes al imprimir</Label>
+              <Select
+                name="imagen_tamano"
+                value={imagenTamano}
+                onValueChange={(v) => setImagenTamano(v as TamanoImagen)}
+              >
+                <SelectTrigger
+                  aria-label="Tamaño de las imágenes al imprimir"
+                  className="w-full sm:w-56"
+                >
+                  <SelectValue>
+                    {(v: string) =>
+                      ETIQUETA_TAMANO_IMAGEN[v as TamanoImagen] ?? v
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {TAMANOS_IMAGEN.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {ETIQUETA_TAMANO_IMAGEN[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">
+                Aplica a la imagen del enunciado y de las alternativas en el PDF.
+              </span>
+            </div>
           </CardContent>
         </Card>
 

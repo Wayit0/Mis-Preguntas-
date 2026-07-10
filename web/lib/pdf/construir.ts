@@ -62,6 +62,7 @@ function aPreguntaPdf(fila: typeof tablaPreguntas.$inferSelect): PreguntaPdf {
     imagen_C: fila.imagenC,
     imagen_D: fila.imagenD,
     imagen_E: fila.imagenE,
+    imagen_tamano: fila.imagenTamano,
     texto_id: fila.textoId,
   }
 }

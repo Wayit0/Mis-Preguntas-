@@ -27,6 +27,17 @@ export const ETIQUETA_TIPO: Record<TipoPregunta, string> = {
 export const LETRAS = ['A', 'B', 'C', 'D', 'E'] as const
 export type Letra = (typeof LETRAS)[number]
 
+/** Tamaños de imagen en el PDF impreso. */
+export const TAMANOS_IMAGEN = ['chico', 'mediano', 'grande'] as const
+export type TamanoImagen = (typeof TAMANOS_IMAGEN)[number]
+
+/** Etiquetas legibles para cada tamaño de imagen. */
+export const ETIQUETA_TAMANO_IMAGEN: Record<TamanoImagen, string> = {
+  chico: 'Chico',
+  mediano: 'Mediano',
+  grande: 'Grande (ancho completo)',
+}
+
 /** Niveles sugeridos (el último, "Otro", habilita un campo libre). */
 export const NIVELES_SUGERIDOS = [
   'PAES',
@@ -56,6 +67,7 @@ export const preguntaSchema = z
     correcta: opcional,
     explicacion: opcional,
     tipo: z.enum(TIPOS_PREGUNTA).default('seleccion_multiple'),
+    imagenTamano: z.enum(TAMANOS_IMAGEN).default('mediano'),
     // 0 = privada, 1 = compartida (con colaboradores). Se acepta hasta 2 por
     // compatibilidad con el MVP (2 = pública), aunque la UI usa 0/1.
     compartida: z.coerce.number().int().min(0).max(2).default(0),
