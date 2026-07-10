@@ -44,6 +44,10 @@ export const usuarios = pgTable('usuarios', {
   banned: boolean('banned'),
   banReason: text('ban_reason'),
   banExpires: timestamp('ban_expires'),
+  // Últimas instrucciones usadas en una prueba guardada. Se actualizan solas al
+  // guardar una prueba con instrucciones y pre-rellenan el generador de la
+  // siguiente (reutilizables "igual que el logo" del colegio).
+  instruccionesDefault: text('instrucciones_default'),
 })
 
 // ---------------------------------------------------------------------------

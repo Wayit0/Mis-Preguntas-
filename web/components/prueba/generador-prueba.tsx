@@ -313,6 +313,7 @@ export function GeneradorPrueba({
   materias,
   textos,
   colegioInicial = '',
+  instruccionesInicial = null,
   logoColegioUrl = null,
   pruebaInicial,
 }: {
@@ -322,6 +323,8 @@ export function GeneradorPrueba({
   materias: string[]
   textos: TextoSeleccionable[]
   colegioInicial?: string | null
+  /** Instrucciones por defecto del usuario (las de su última prueba), o null. */
+  instruccionesInicial?: string | null
   /** URL del logo del colegio (para el preview de la casilla), o null. */
   logoColegioUrl?: string | null
   /** Si se pasa, el editor modifica esa prueba en vez de crear una nueva. */
@@ -338,7 +341,8 @@ export function GeneradorPrueba({
     pruebaInicial?.profesor || profesorInicial,
   )
   const [instrucciones, setInstrucciones] = useState(
-    pruebaInicial?.instrucciones ?? '',
+    // En edición mandan las de la prueba; en una nueva, el default del usuario.
+    pruebaInicial ? (pruebaInicial.instrucciones ?? '') : (instruccionesInicial ?? ''),
   )
   const [formulas, setFormulas] = useState<string[]>(
     pruebaInicial?.formulas ?? [],

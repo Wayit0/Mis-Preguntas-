@@ -3,7 +3,7 @@
 import { and, eq } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { pruebas } from '@/lib/db/schema'
+import { pruebas, usuarios } from '@/lib/db/schema'
 import { getSession } from '@/lib/get-session'
 import { deleteBlob, uploadImage } from '@/lib/storage/blob'
 import { colegioIdDeUsuario } from '@/lib/queries/visibilidad'
@@ -39,6 +39,22 @@ async function subirLogo(formData: FormData): Promise<string | null> {
 /** Casilla "Incluir el logo del colegio": true salvo que llegue '0'. */
 function leerUsarLogoColegio(formData: FormData): boolean {
   return formData.get('usarLogoColegio') !== '0'
+}
+
+/**
+ * Recuerda las instrucciones como default del usuario ("igual que el logo"):
+ * al guardar una prueba con instrucciones, la siguiente prueba nueva las
+ * pre-rellena. Guardar sin instrucciones no borra el default.
+ */
+async function recordarInstrucciones(
+  userId: number,
+  instrucciones: string | null,
+): Promise<void> {
+  if (!instrucciones) return
+  await db
+    .update(usuarios)
+    .set({ instruccionesDefault: instrucciones })
+    .where(eq(usuarios.id, userId))
 }
 
 /** Extrae la selección (fórmulas + ids de preguntas/textos) del FormData. */
@@ -89,6 +105,8 @@ export async function guardarPrueba(
       usarLogoColegio: leerUsarLogoColegio(formData),
     })
     .returning({ id: pruebas.id })
+
+  await recordarInstrucciones(userId, oNull(data.instrucciones))
 
   revalidatePath('/mis-pruebas')
   return { id: fila.id }
@@ -143,6 +161,8 @@ export async function actualizarPrueba(
       updatedAt: new Date(),
     })
     .where(and(eq(pruebas.id, id), eq(pruebas.userId, userId)))
+
+  await recordarInstrucciones(userId, oNull(data.instrucciones))
 
   revalidatePath('/mis-pruebas')
   return { id }

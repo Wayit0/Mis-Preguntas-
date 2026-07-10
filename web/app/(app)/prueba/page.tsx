@@ -1,7 +1,10 @@
 import { redirect } from 'next/navigation'
 import { getActor } from '@/lib/authz'
 import { resolverAsignatura } from '@/lib/asignatura'
-import { cargarDatosGenerador } from '@/lib/queries/pruebas'
+import {
+  cargarDatosGenerador,
+  instruccionesDefaultDeUsuario,
+} from '@/lib/queries/pruebas'
 import { obtenerColegioPorUsuario } from '@/lib/queries/colegio'
 import { imageUrl } from '@/lib/storage/blob'
 import { GeneradorPrueba } from '@/components/prueba/generador-prueba'
@@ -31,10 +34,12 @@ export default async function PruebaPage() {
     )
   }
 
-  const [{ preguntas, materias, textos }, colegio] = await Promise.all([
-    cargarDatosGenerador(userId, asignatura),
-    obtenerColegioPorUsuario(userId),
-  ])
+  const [{ preguntas, materias, textos }, colegio, instrucciones] =
+    await Promise.all([
+      cargarDatosGenerador(userId, asignatura),
+      obtenerColegioPorUsuario(userId),
+      instruccionesDefaultDeUsuario(userId),
+    ])
 
   return (
     <GeneradorPrueba
@@ -44,6 +49,7 @@ export default async function PruebaPage() {
       materias={materias}
       textos={textos}
       colegioInicial={colegio?.nombre ?? ''}
+      instruccionesInicial={instrucciones}
       logoColegioUrl={colegio?.logo ? imageUrl(colegio.logo) : null}
     />
   )

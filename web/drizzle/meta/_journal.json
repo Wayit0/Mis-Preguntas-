@@ -57,6 +57,13 @@
       "when": 1783670495825,
       "tag": "0007_clear_groot",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783671376262,
+      "tag": "0008_fixed_anthem",
+      "breakpoints": true
     }
   ]
 }
