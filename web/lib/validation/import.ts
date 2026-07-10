@@ -32,7 +32,7 @@ export const TIPOS_PREGUNTA_IMPORT = TIPOS_PREGUNTA
  * sin dependencias de servidor) para que la UI muestre el mismo número que la
  * action valida.
  */
-export const MAX_PAGINAS_PDF = 30
+export const MAX_PAGINAS_PDF = 10
 
 /** Acepta string, null o ausente (lo que devuelva el modelo). */
 const textoOpcional = z.string().nullish()
