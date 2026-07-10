@@ -4,10 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, FileText, Loader2 } from 'lucide-react'
 
-import {
-  analizarDocumento,
-  guardarPreguntasImportadas,
-} from '@/lib/actions/import'
+import { guardarPreguntasImportadas } from '@/lib/actions/import'
+import type { ResultadoAnalisis } from '@/lib/import/analizar'
 import {
   TIPOS_PREGUNTA,
   ETIQUETA_TIPO,
@@ -144,6 +142,57 @@ function MiniaturaImagen({
 type Fase = 'subir' | 'analizando' | 'revisar' | 'guardando'
 
 /**
+ * Llama a `/api/importar` y lee la respuesta ndjson en streaming: ignora los
+ * keepalives `{"ping":true}` (que mantienen viva la conexión durante un
+ * análisis largo; ver el route handler) y devuelve la línea final
+ * `{"resultado":{...}}`.
+ */
+async function analizarEnStreaming(formData: FormData): Promise<ResultadoAnalisis> {
+  const res = await fetch('/api/importar', { method: 'POST', body: formData })
+  if (!res.ok || !res.body) {
+    const texto = (await res.text().catch(() => '')).trim()
+    return {
+      ok: false,
+      error: texto || 'Ocurrió un error al analizar el documento. Inténtalo de nuevo.',
+    }
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let resultado: ResultadoAnalisis | null = null
+
+  const procesarLinea = (linea: string) => {
+    if (!linea.trim()) return
+    try {
+      const obj = JSON.parse(linea)
+      if (obj && typeof obj === 'object' && 'resultado' in obj) {
+        resultado = obj.resultado as ResultadoAnalisis
+      }
+    } catch {
+      // Línea parcial o ruido: se ignora.
+    }
+  }
+
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const lineas = buffer.split('\n')
+    buffer = lineas.pop() ?? ''
+    lineas.forEach(procesarLinea)
+  }
+  procesarLinea(buffer)
+
+  return (
+    resultado ?? {
+      ok: false,
+      error: 'La conexión se cortó antes de terminar el análisis. Inténtalo de nuevo.',
+    }
+  )
+}
+
+/**
  * Etapas mostradas durante el análisis. El análisis es UNA llamada al servidor
  * (sin progreso real), así que las etapas avanzan por tiempo transcurrido:
  * dan una señal honesta de "estamos trabajando" sin inventar precisión. La
@@ -277,7 +326,7 @@ export function ImportarDocumento({
 
     setFase('analizando')
     try {
-      const resultado = await analizarDocumento(formData)
+      const resultado = await analizarEnStreaming(formData)
       if (!resultado.ok) {
         setError(resultado.error)
         setFase('subir')
