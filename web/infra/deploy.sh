@@ -47,6 +47,26 @@ if [[ -n "${CLIENT_IP}" ]]; then
   params+=("clientIp=${CLIENT_IP}")
 fi
 
+# Opcionales (login social + correo). Sólo se pasan si están definidos; vacíos =
+# el Bicep no crea el secreto ni el app setting. También se pueden gestionar por
+# `az keyvault secret set` / `az webapp config appsettings set` sin redeploy
+# (ver web/docs/oauth-y-correo.md).
+for var in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET MICROSOFT_CLIENT_ID \
+           MICROSOFT_CLIENT_SECRET RESEND_API_KEY EMAIL_FROM; do
+  val="${!var:-}"
+  if [[ -n "${val}" ]]; then
+    # Nombre de param en camelCase (googleClientId, resendApiKey, emailFrom, ...).
+    case "${var}" in
+      GOOGLE_CLIENT_ID) params+=("googleClientId=${val}") ;;
+      GOOGLE_CLIENT_SECRET) params+=("googleClientSecret=${val}") ;;
+      MICROSOFT_CLIENT_ID) params+=("microsoftClientId=${val}") ;;
+      MICROSOFT_CLIENT_SECRET) params+=("microsoftClientSecret=${val}") ;;
+      RESEND_API_KEY) params+=("resendApiKey=${val}") ;;
+      EMAIL_FROM) params+=("emailFrom=${val}") ;;
+    esac
+  fi
+done
+
 # 1) Validación previa (NO crea recursos): muestra el diff de lo que se crearía.
 echo ">> what-if (no crea recursos)"
 az deployment sub what-if \

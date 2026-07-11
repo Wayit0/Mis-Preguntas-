@@ -14,7 +14,12 @@ import {
   verifications,
 } from '@/lib/db/schema'
 import { hashPw, verifyPw, LEGACY } from '@/lib/auth-password'
-import { enviarVerificacionCorreo } from '@/lib/email/enviar'
+import { enviarVerificacionCorreo, enviarResetPassword } from '@/lib/email/enviar'
+import {
+  registrarAcceso,
+  ipDeForwardedFor,
+  type MetodoAcceso,
+} from '@/lib/auth-access-log'
 
 // ---------------------------------------------------------------------------
 // Control de acceso (access control) del plugin admin.
@@ -85,6 +90,96 @@ async function asociarColegioPorDominio(userId: number): Promise<void> {
     .where(and(eq(usuarios.id, userId), isNull(usuarios.colegioId)))
 }
 
+// ---------------------------------------------------------------------------
+// Login social (Google/Microsoft). Los proveedores se activan SÓLO si sus
+// credenciales están en el entorno, para que local/QA sin credenciales no rompa
+// el arranque. Las consts locales permiten a TS estrechar a `string` dentro del
+// spread condicional de `socialProviders`. `proveedoresSocialesHabilitados()` es
+// la fuente de verdad que la UI usa para mostrar sólo los botones configurados.
+// ---------------------------------------------------------------------------
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET
+const MICROSOFT_CLIENT_ID = process.env.MICROSOFT_CLIENT_ID
+const MICROSOFT_CLIENT_SECRET = process.env.MICROSOFT_CLIENT_SECRET
+// `proveedoresSocialesHabilitados()` (para la UI) vive en `lib/auth-social.ts`
+// —módulo liviano— y evalúa las mismas variables de entorno.
+
+// ---------------------------------------------------------------------------
+// Registro de accesos (login). Corre en el after-hook de better-auth para cada
+// intento por email/contraseña o por proveedor social. Éxito se detecta con
+// `ctx.context.newSession` (la sesión recién creada, no-null tanto en email como
+// en el callback social). El fallo de email/contraseña se registra con el correo
+// del body y el código del error. Nunca lanza (registrarAcceso captura todo).
+// ---------------------------------------------------------------------------
+async function registrarAccesoDesdeContexto(ctx: {
+  path?: string
+  body?: unknown
+  headers?: Headers
+  context: { newSession?: unknown; returned?: unknown }
+}): Promise<void> {
+  const path = ctx.path ?? ''
+  let metodo: MetodoAcceso | null = null
+  if (path === '/sign-in/email') metodo = 'password'
+  else if (path === '/callback/google') metodo = 'google'
+  else if (path === '/callback/microsoft') metodo = 'microsoft'
+  if (!metodo) return
+
+  const uaHeader = ctx.headers?.get('user-agent') ?? null
+  const ipHeader = ipDeForwardedFor(ctx.headers?.get('x-forwarded-for'))
+
+  const newSession = ctx.context.newSession as
+    | {
+        user?: { id?: string | number; email?: string }
+        session?: { ipAddress?: string | null; userAgent?: string | null }
+      }
+    | null
+    | undefined
+  const returned = ctx.context.returned as
+    | { token?: string; user?: { id?: string | number; email?: string } }
+    | undefined
+
+  const bodyEmail = (ctx.body as { email?: string } | undefined)?.email
+
+  // Éxito: la sesión recién creada (social + email) o el {token,user} devuelto
+  // por /sign-in/email. Cualquiera de las dos señales confirma el login.
+  const userExito =
+    newSession?.user?.id != null
+      ? newSession.user
+      : returned?.token && returned.user?.id != null
+        ? returned.user
+        : null
+
+  if (userExito?.id != null) {
+    await registrarAcceso({
+      userId: Number(userExito.id),
+      email: userExito.email ?? bodyEmail ?? '',
+      metodo,
+      exito: true,
+      ipAddress: newSession?.session?.ipAddress ?? ipHeader,
+      userAgent: newSession?.session?.userAgent ?? uaHeader,
+    })
+    return
+  }
+
+  // Sin sesión nueva ⇒ intento fallido. Sólo lo registramos con certeza para
+  // email/contraseña, donde tenemos el correo del body; los fallos de social no
+  // siempre llegan hasta aquí (redirigen con ?error=... sin pasar por este hook).
+  if (metodo === 'password' && bodyEmail) {
+    const err = ctx.context.returned as
+      | { status?: string; body?: { code?: string } }
+      | undefined
+    const motivo = err?.body?.code ?? err?.status ?? null
+    await registrarAcceso({
+      email: bodyEmail,
+      metodo,
+      exito: false,
+      motivo: typeof motivo === 'string' ? motivo : null,
+      ipAddress: ipHeader,
+      userAgent: uaHeader,
+    })
+  }
+}
+
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: 'pg',
@@ -140,6 +235,31 @@ export const auth = betterAuth({
     // contraseña debe tener al menos 6 caracteres").
     minPasswordLength: 6,
     password: { hash: hashPw, verify: verifyPw },
+    // Recuperación de contraseña. `requestPasswordReset` genera un token y llama
+    // a esta función con la `url` que, al abrirse, valida el token y redirige a
+    // la página /restablecer con ?token=... (o ?error=INVALID_TOKEN). La nueva
+    // contraseña se hashea con el mismo scrypt de arriba (password.hash).
+    sendResetPassword: async ({ user, url }) => {
+      await enviarResetPassword(user.email, user.name ?? '', url)
+    },
+    resetPasswordTokenExpiresIn: 60 * 60, // 1 hora
+  },
+  // Login social. Cada proveedor se incluye SÓLO si tiene credenciales (spread
+  // condicional). 'common' en Microsoft admite cuentas personales (Outlook) y de
+  // trabajo/colegio (M365). Callbacks: /api/auth/callback/{google,microsoft}.
+  socialProviders: {
+    ...(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET
+      ? { google: { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET } }
+      : {}),
+    ...(MICROSOFT_CLIENT_ID && MICROSOFT_CLIENT_SECRET
+      ? {
+          microsoft: {
+            clientId: MICROSOFT_CLIENT_ID,
+            clientSecret: MICROSOFT_CLIENT_SECRET,
+            tenantId: 'common',
+          },
+        }
+      : {}),
   },
   // Verificación de correo. NO exigimos verificar para iniciar sesión
   // (requireEmailVerification queda en false por defecto): así los usuarios
@@ -176,8 +296,28 @@ export const auth = betterAuth({
   // la persistimos. Se hace en el after-hook del endpoint /sign-in/email porque
   // es el único punto donde tenemos a la vez (a) la contraseña en claro recién
   // validada (ctx.body) y (b) el usuario autenticado (ctx.context.returned).
+  // Auto-asociación al colegio para usuarios creados vía login social. El flujo
+  // social crea el usuario con emailVerified=true (lo prueba el proveedor) y NO
+  // pasa por `afterEmailVerification`, donde vive la asociación del flujo por
+  // email. Aquí asociamos SÓLO si el usuario nace verificado: los registros por
+  // email/contraseña nacen no verificados y siguen esperando la verificación.
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user: { id?: string | number; emailVerified?: boolean }) => {
+          if (user.emailVerified === true && user.id != null) {
+            await asociarColegioPorDominio(Number(user.id))
+          }
+        },
+      },
+    },
+  },
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
+      // Bitácora de accesos (éxito y fallo, email y social). Va primero porque
+      // debe registrar también los fallos, que salen temprano abajo.
+      await registrarAccesoDesdeContexto(ctx)
+
       const returned = ctx.context.returned as
         | { token?: string; user?: { id?: string | number } }
         | undefined

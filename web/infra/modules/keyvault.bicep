@@ -31,6 +31,29 @@ param anthropicApiKey string
 @description('Connection string del Storage Account.')
 param storageConnection string
 
+// --- Secretos opcionales (login social + correo). Vacío = no se crea el secreto,
+// así un deploy que no los pase no falla ni los borra. Se pueden gestionar por
+// CLI (az keyvault secret set) sin tocar el Bicep. ---
+@secure()
+@description('Google OAuth client id.')
+param googleClientId string = ''
+
+@secure()
+@description('Google OAuth client secret.')
+param googleClientSecret string = ''
+
+@secure()
+@description('Microsoft OAuth client id (Application/client ID de Entra).')
+param microsoftClientId string = ''
+
+@secure()
+@description('Microsoft OAuth client secret.')
+param microsoftClientSecret string = ''
+
+@secure()
+@description('API key de Resend (correo transaccional).')
+param resendApiKey string = ''
+
 // Rol integrado "Key Vault Secrets User".
 var keyVaultSecretsUserRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
 
@@ -86,6 +109,47 @@ resource secretStorage 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   name: 'storage-connection'
   properties: {
     value: storageConnection
+  }
+}
+
+// Secretos opcionales: sólo se crean si se pasó un valor no vacío.
+resource secretGoogleId 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (googleClientId != '') {
+  parent: keyVault
+  name: 'google-client-id'
+  properties: {
+    value: googleClientId
+  }
+}
+
+resource secretGoogleSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (googleClientSecret != '') {
+  parent: keyVault
+  name: 'google-client-secret'
+  properties: {
+    value: googleClientSecret
+  }
+}
+
+resource secretMicrosoftId 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (microsoftClientId != '') {
+  parent: keyVault
+  name: 'microsoft-client-id'
+  properties: {
+    value: microsoftClientId
+  }
+}
+
+resource secretMicrosoftSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (microsoftClientSecret != '') {
+  parent: keyVault
+  name: 'microsoft-client-secret'
+  properties: {
+    value: microsoftClientSecret
+  }
+}
+
+resource secretResend 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (resendApiKey != '') {
+  parent: keyVault
+  name: 'resend-api-key'
+  properties: {
+    value: resendApiKey
   }
 }
 

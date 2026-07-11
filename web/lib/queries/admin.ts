@@ -1,6 +1,6 @@
-import { asc, count, desc, eq, gte, sql } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { colegios, usosIa, usuarios } from '@/lib/db/schema'
+import { accesos, colegios, usosIa, usuarios } from '@/lib/db/schema'
 
 // ---------------------------------------------------------------------------
 // Lecturas para la administración global (Parte E.2). Son funciones puras: el
@@ -141,5 +141,72 @@ export async function resumenUsosIa(): Promise<ResumenUsosIa> {
     totalMicroUsd: Number(total?.micro ?? 0),
     mesMicroUsd: Number(mes?.micro ?? 0),
     totalUsos: Number(total?.usos ?? 0),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Accesos / logins (pestaña «Accesos» del panel de administración). Bitácora
+// append-only alimentada por el after-hook de better-auth (ver lib/auth.ts).
+// ---------------------------------------------------------------------------
+
+/** Un acceso (login) con el nombre del usuario si aún existe. */
+export interface AccesoAdmin {
+  id: number
+  usuarioNombre: string | null
+  email: string
+  metodo: string
+  exito: boolean
+  motivo: string | null
+  ipAddress: string | null
+  userAgent: string | null
+  createdAt: Date | null
+}
+
+/** Totales de accesos: histórico + éxitos/fallos de los últimos 7 días. */
+export interface ResumenAccesos {
+  total: number
+  exitos7d: number
+  fallos7d: number
+}
+
+/** Últimos accesos (más recientes primero), con el nombre del usuario. */
+export async function listarAccesos(limite = 100): Promise<AccesoAdmin[]> {
+  return db
+    .select({
+      id: accesos.id,
+      usuarioNombre: usuarios.nombre,
+      email: accesos.email,
+      metodo: accesos.metodo,
+      exito: accesos.exito,
+      motivo: accesos.motivo,
+      ipAddress: accesos.ipAddress,
+      userAgent: accesos.userAgent,
+      createdAt: accesos.createdAt,
+    })
+    .from(accesos)
+    .leftJoin(usuarios, eq(usuarios.id, accesos.userId))
+    .orderBy(desc(accesos.createdAt), desc(accesos.id))
+    .limit(limite)
+}
+
+/** Total de accesos + éxitos y fallos de los últimos 7 días. */
+export async function resumenAccesos(): Promise<ResumenAccesos> {
+  const hace7d = new Date()
+  hace7d.setDate(hace7d.getDate() - 7)
+
+  const [total] = await db.select({ n: sql<number>`count(*)` }).from(accesos)
+  const [exitos] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(accesos)
+    .where(and(gte(accesos.createdAt, hace7d), eq(accesos.exito, true)))
+  const [fallos] = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(accesos)
+    .where(and(gte(accesos.createdAt, hace7d), eq(accesos.exito, false)))
+
+  return {
+    total: Number(total?.n ?? 0),
+    exitos7d: Number(exitos?.n ?? 0),
+    fallos7d: Number(fallos?.n ?? 0),
   }
 }

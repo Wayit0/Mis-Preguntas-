@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { z } from 'zod'
 import { authClient } from '@/lib/auth-client'
@@ -10,12 +11,20 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
+import { BotonesSociales } from '@/components/auth/botones-sociales'
+import type { ProveedorSocial } from '@/lib/auth-social'
 
 type Modo = 'login' | 'registro'
 
 const emailSchema = z.string().email()
 
-export function AuthCard({ modoInicial = 'login' }: { modoInicial?: Modo }) {
+export function AuthCard({
+  modoInicial = 'login',
+  proveedores = [],
+}: {
+  modoInicial?: Modo
+  proveedores?: ProveedorSocial[]
+}) {
   const router = useRouter()
   const [modo, setModo] = useState<Modo>(modoInicial)
   const [nombre, setNombre] = useState('')
@@ -145,6 +154,12 @@ export function AuthCard({ modoInicial = 'login' }: { modoInicial?: Modo }) {
             </p>
           </div>
 
+          <BotonesSociales
+            proveedores={proveedores}
+            onError={setError}
+            deshabilitado={cargando}
+          />
+
           {modo === 'registro' && (
             <div className="flex flex-col gap-2">
               <Label htmlFor="nombre">Nombre</Label>
@@ -194,6 +209,17 @@ export function AuthCard({ modoInicial = 'login' }: { modoInicial?: Modo }) {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+
+          {modo === 'login' && (
+            <div className="-mt-1 text-right">
+              <Link
+                href="/recuperar"
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </Link>
+            </div>
+          )}
 
           {modo === 'registro' && (
             <div className="flex flex-col gap-2">

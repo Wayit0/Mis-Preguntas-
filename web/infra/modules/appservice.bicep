@@ -30,8 +30,33 @@ param blobContainer string = 'uploads'
 @description('SecretUris de Key Vault para las references de app settings.')
 param keyVaultSecretUris object
 
+@description('SecretUris OPCIONALES (login social + correo). Cadena vacía en una clave = no se agrega ese app setting (evita referenciar un secreto inexistente).')
+param optionalSecretUris object = {}
+
+@description('Remitente de correo (EMAIL_FROM). Vacío = usa el default del código.')
+param emailFrom string = ''
+
 // Host por defecto (la URL pública). El dominio custom se gestiona más adelante.
 var defaultHost = '${appName}.azurewebsites.net'
+
+// App settings opcionales: sólo se agregan cuando su SecretUri viene con valor.
+// Si el secreto no existe todavía, referenciarlo dejaría la env var con el
+// string de la reference sin resolver (rompería la detección por presencia), por
+// eso se omiten hasta configurarlos (por Bicep o por `az` CLI).
+var gId = optionalSecretUris.?googleClientId ?? ''
+var gSecret = optionalSecretUris.?googleClientSecret ?? ''
+var mId = optionalSecretUris.?microsoftClientId ?? ''
+var mSecret = optionalSecretUris.?microsoftClientSecret ?? ''
+var resendUri = optionalSecretUris.?resendApiKey ?? ''
+
+var optionalAppSettings = concat(
+  gId != '' ? [ { name: 'GOOGLE_CLIENT_ID', value: '@Microsoft.KeyVault(SecretUri=${gId})' } ] : [],
+  gSecret != '' ? [ { name: 'GOOGLE_CLIENT_SECRET', value: '@Microsoft.KeyVault(SecretUri=${gSecret})' } ] : [],
+  mId != '' ? [ { name: 'MICROSOFT_CLIENT_ID', value: '@Microsoft.KeyVault(SecretUri=${mId})' } ] : [],
+  mSecret != '' ? [ { name: 'MICROSOFT_CLIENT_SECRET', value: '@Microsoft.KeyVault(SecretUri=${mSecret})' } ] : [],
+  resendUri != '' ? [ { name: 'RESEND_API_KEY', value: '@Microsoft.KeyVault(SecretUri=${resendUri})' } ] : [],
+  emailFrom != '' ? [ { name: 'EMAIL_FROM', value: emailFrom } ] : []
+)
 
 resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: planName
@@ -62,7 +87,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
       ftpsState: 'Disabled'
       minTlsVersion: '1.2'
       appCommandLine: startupCommand
-      appSettings: [
+      appSettings: concat([
         // --- Secretos vía Key Vault references (resueltos en runtime con la MI) ---
         {
           name: 'DATABASE_URL'
@@ -86,6 +111,11 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
           value: 'https://${defaultHost}'
         }
         {
+          // baseURL del cliente better-auth (browser). Mismo host público.
+          name: 'NEXT_PUBLIC_BETTER_AUTH_URL'
+          value: 'https://${defaultHost}'
+        }
+        {
           name: 'BLOB_CONTAINER'
           value: blobContainer
         }
@@ -97,7 +127,7 @@ resource webApp 'Microsoft.Web/sites@2024-04-01' = {
           name: 'WEBSITE_NODE_DEFAULT_VERSION'
           value: '~22'
         }
-      ]
+      ], optionalAppSettings)
     }
   }
 }

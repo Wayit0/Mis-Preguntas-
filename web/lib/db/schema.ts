@@ -196,6 +196,29 @@ export const usosIa = pgTable('usos_ia', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
+// ---------------------------------------------------------------------------
+// Registro de accesos (para el panel de administración global). Cada intento de
+// inicio de sesión —por email/contraseña o por proveedor social— inserta una
+// fila con el resultado (éxito/fallo), el método, la IP y el navegador. Es
+// append-only y sirve de bitácora de seguridad. `userId` es nullable: en un
+// fallo puede no existir un usuario; `email` se guarda directo para que la fila
+// siga siendo legible aunque el usuario se elimine o el correo no exista.
+// ---------------------------------------------------------------------------
+
+export const accesos = pgTable('accesos', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id'),
+  email: text('email').notNull(),
+  // Método del acceso: 'password' | 'google' | 'microsoft'.
+  metodo: text('metodo').notNull(),
+  exito: boolean('exito').notNull(),
+  // Código del error en los intentos fallidos (ej: 'INVALID_EMAIL_OR_PASSWORD').
+  motivo: text('motivo'),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
 export const colaboraciones = pgTable(
   'colaboraciones',
   {

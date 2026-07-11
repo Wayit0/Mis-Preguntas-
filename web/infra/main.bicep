@@ -48,6 +48,32 @@ param betterAuthSecret string
 @description('API key de Anthropic.')
 param anthropicApiKey string
 
+// --- Login social + correo (opcionales). Vacío = no se crea el secreto ni el
+// app setting, así el deploy no falla si aún no hay credenciales. Se pueden
+// gestionar también por `az` CLI sin redeploy. ---
+@secure()
+@description('Google OAuth client id.')
+param googleClientId string = ''
+
+@secure()
+@description('Google OAuth client secret.')
+param googleClientSecret string = ''
+
+@secure()
+@description('Microsoft OAuth client id (Application/client ID de Entra).')
+param microsoftClientId string = ''
+
+@secure()
+@description('Microsoft OAuth client secret.')
+param microsoftClientSecret string = ''
+
+@secure()
+@description('API key de Resend (correo transaccional).')
+param resendApiKey string = ''
+
+@description('Remitente de correo (EMAIL_FROM). Vacío = default del código.')
+param emailFrom string = ''
+
 @description('IP pública del cliente para una regla de firewall temporal de migración. Vacío = no se crea.')
 param clientIp string = ''
 
@@ -70,6 +96,16 @@ var keyVaultSecretUris = {
   betterAuthSecret: 'https://${keyVaultName}${keyVaultDns}/secrets/better-auth-secret'
   anthropicApiKey: 'https://${keyVaultName}${keyVaultDns}/secrets/anthropic-api-key'
   storageConnection: 'https://${keyVaultName}${keyVaultDns}/secrets/storage-connection'
+}
+
+// SecretUris opcionales: cadena vacía cuando el secreto no se aprovisiona, para
+// que appservice NO agregue un app setting que referencie un secreto inexistente.
+var optionalSecretUris = {
+  googleClientId: googleClientId != '' ? 'https://${keyVaultName}${keyVaultDns}/secrets/google-client-id' : ''
+  googleClientSecret: googleClientSecret != '' ? 'https://${keyVaultName}${keyVaultDns}/secrets/google-client-secret' : ''
+  microsoftClientId: microsoftClientId != '' ? 'https://${keyVaultName}${keyVaultDns}/secrets/microsoft-client-id' : ''
+  microsoftClientSecret: microsoftClientSecret != '' ? 'https://${keyVaultName}${keyVaultDns}/secrets/microsoft-client-secret' : ''
+  resendApiKey: resendApiKey != '' ? 'https://${keyVaultName}${keyVaultDns}/secrets/resend-api-key' : ''
 }
 
 // --- Resource Group --------------------------------------------------------
@@ -112,6 +148,8 @@ module appservice 'modules/appservice.bicep' = {
     planName: planName
     appName: appName
     keyVaultSecretUris: keyVaultSecretUris
+    optionalSecretUris: optionalSecretUris
+    emailFrom: emailFrom
   }
 }
 
@@ -133,6 +171,11 @@ module keyvault 'modules/keyvault.bicep' = {
     betterAuthSecret: betterAuthSecret
     anthropicApiKey: anthropicApiKey
     storageConnection: storage.outputs.connectionString
+    googleClientId: googleClientId
+    googleClientSecret: googleClientSecret
+    microsoftClientId: microsoftClientId
+    microsoftClientSecret: microsoftClientSecret
+    resendApiKey: resendApiKey
   }
 }
 

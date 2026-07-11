@@ -26,6 +26,9 @@ export function mensajeErrorAuth(
       return 'La contraseña debe tener al menos 6 caracteres'
     case 'INVALID_EMAIL':
       return 'Correo electrónico no válido'
+    case 'INVALID_TOKEN':
+    case 'TOKEN_EXPIRED':
+      return 'El enlace de recuperación no es válido o expiró. Solicítalo de nuevo.'
     default:
       return fallback
   }

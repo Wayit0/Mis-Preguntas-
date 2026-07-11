@@ -5,6 +5,8 @@ import {
   listarUsuarios,
   listarUsosIa,
   resumenUsosIa,
+  listarAccesos,
+  resumenAccesos,
 } from '@/lib/queries/admin'
 import { formatearUsd } from '@/lib/ai/costos'
 import { cn } from '@/lib/utils'
@@ -15,11 +17,12 @@ import { CrearColegio } from '@/components/admin/crear-colegio'
 import { EditarColegio } from '@/components/admin/editar-colegio'
 import { FilaUsuario } from '@/components/admin/fila-usuario'
 
-type Tab = 'colegios' | 'usuarios' | 'costos'
+type Tab = 'colegios' | 'usuarios' | 'costos' | 'accesos'
 
 function normalizarTab(valor?: string): Tab {
   if (valor === 'usuarios') return 'usuarios'
   if (valor === 'costos') return 'costos'
+  if (valor === 'accesos') return 'accesos'
   return 'colegios'
 }
 
@@ -47,6 +50,7 @@ export default async function AdminPage({
     { id: 'colegios', etiqueta: 'Colegios' },
     { id: 'usuarios', etiqueta: 'Usuarios' },
     { id: 'costos', etiqueta: 'Costos de IA' },
+    { id: 'accesos', etiqueta: 'Accesos' },
   ]
 
   return (
@@ -89,8 +93,10 @@ export default async function AdminPage({
         <ColegiosTab />
       ) : tabActual === 'usuarios' ? (
         <UsuariosTab />
-      ) : (
+      ) : tabActual === 'costos' ? (
         <CostosTab />
+      ) : (
+        <AccesosTab />
       )}
     </div>
   )
@@ -281,6 +287,126 @@ async function CostosTab() {
                           : ''}
                       </div>
                     ) : null}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}
+
+/** Etiquetas legibles para los métodos de acceso registrados en `accesos`. */
+const ETIQUETA_METODO: Record<string, string> = {
+  password: '✉️ Correo',
+  google: '🔵 Google',
+  microsoft: '🪟 Microsoft',
+}
+
+/** Resume un user-agent a "Navegador · SO", o el crudo recortado si no calza. */
+function resumirUserAgent(ua: string | null): string | null {
+  if (!ua) return null
+  const nav = /Edg\//.test(ua)
+    ? 'Edge'
+    : /OPR\//.test(ua)
+      ? 'Opera'
+      : /Chrome\//.test(ua)
+        ? 'Chrome'
+        : /Firefox\//.test(ua)
+          ? 'Firefox'
+          : /Safari\//.test(ua)
+            ? 'Safari'
+            : null
+  const so = /Windows/.test(ua)
+    ? 'Windows'
+    : /Android/.test(ua)
+      ? 'Android'
+      : /iPhone|iPad|iPod/.test(ua)
+        ? 'iOS'
+        : /Mac OS X|Macintosh/.test(ua)
+          ? 'macOS'
+          : /Linux/.test(ua)
+            ? 'Linux'
+            : null
+  const partes = [nav, so].filter(Boolean)
+  return partes.length ? partes.join(' · ') : ua.slice(0, 40)
+}
+
+async function AccesosTab() {
+  const [resumen, filas] = await Promise.all([
+    resumenAccesos(),
+    listarAccesos(100),
+  ])
+
+  const tarjetas = [
+    { etiqueta: 'Accesos totales', valor: String(resumen.total) },
+    { etiqueta: 'Exitosos (7 días)', valor: String(resumen.exitos7d) },
+    { etiqueta: 'Fallidos (7 días)', valor: String(resumen.fallos7d) },
+  ]
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {tarjetas.map((t) => (
+          <Card key={t.etiqueta}>
+            <CardContent className="flex flex-col gap-0.5">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t.etiqueta}
+              </span>
+              <span className="font-heading text-2xl font-bold text-foreground">
+                {t.valor}
+              </span>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="font-heading text-base font-semibold text-foreground">
+          Últimos accesos{' '}
+          {filas.length === 100 ? '(últimos 100)' : `(${filas.length})`}
+        </h2>
+        {filas.length === 0 ? (
+          <EstadoVacio mensaje="Aún no hay accesos registrados. Aparecerán aquí cuando alguien inicie sesión." />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filas.map((a) => {
+              const ua = resumirUserAgent(a.userAgent)
+              return (
+                <Card key={a.id}>
+                  <CardContent className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {a.usuarioNombre ?? (a.exito ? 'Usuario eliminado' : 'Sin cuenta')}
+                          <span className="ml-1.5 font-normal text-muted-foreground">
+                            {a.email}
+                          </span>
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {ETIQUETA_METODO[a.metodo] ?? a.metodo} ·{' '}
+                          {formatearFecha(a.createdAt)}
+                        </span>
+                      </div>
+                      {a.exito ? (
+                        <Badge
+                          variant="outline"
+                          className="border-emerald-500/40 text-emerald-600 dark:text-emerald-400"
+                        >
+                          Éxito
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive">Fallido</Badge>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      {a.ipAddress ? <span>IP: {a.ipAddress}</span> : null}
+                      {ua ? <span>{ua}</span> : null}
+                      {!a.exito && a.motivo ? <span>Motivo: {a.motivo}</span> : null}
+                    </div>
                   </CardContent>
                 </Card>
               )
