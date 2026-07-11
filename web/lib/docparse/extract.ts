@@ -1,5 +1,13 @@
+import { inflateSync } from 'node:zlib'
 import mammoth from 'mammoth'
 import sharp from 'sharp'
+import {
+  PDFArray,
+  PDFDocument,
+  PDFName,
+  PDFNumber,
+  PDFRawStream,
+} from 'pdf-lib'
 
 /**
  * Extracción de documentos para la importación con IA (Fase 7).
@@ -93,6 +101,23 @@ export const MIMES_SOPORTADOS: readonly string[] = [
 
 export function esTipoSoportado(mime: string): boolean {
   return MIMES_SOPORTADOS.includes(mime)
+}
+
+/**
+ * Cuenta las páginas de un PDF. Devuelve `null` si los bytes no se pueden
+ * parsear como PDF (documento dañado o cifrado ilegible): en ese caso el
+ * llamador decide (la importación lo deja pasar y será la extracción/IA la que
+ * falle con su propio mensaje).
+ */
+export async function contarPaginasPdf(
+  bytes: Buffer | Uint8Array,
+): Promise<number | null> {
+  try {
+    const doc = await PDFDocument.load(bytes, { ignoreEncryption: true })
+    return doc.getPageCount()
+  } catch {
+    return null
+  }
 }
 
 /** Error claro para tipos de archivo no soportados. */
@@ -244,6 +269,179 @@ async function extraerDocx(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PDF: imágenes incrustadas (XObjects /Image)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Máximo de imágenes incrustadas que se extraen de un PDF. */
+const MAX_IMAGENES_PDF = 20
+/** Lado mínimo (px) para considerar una imagen: filtra iconos/viñetas/logos. */
+const LADO_MINIMO_IMAGEN_PDF = 48
+
+/**
+ * Deshace los predictores PNG (filtros por fila: None/Sub/Up/Average/Paeth) de
+ * un stream FlateDecode con `Predictor >= 10`. Devuelve los píxeles crudos.
+ */
+function deshacerPredictorPng(
+  data: Buffer,
+  width: number,
+  height: number,
+  channels: number,
+): Buffer {
+  const rowBytes = width * channels
+  const out = Buffer.alloc(rowBytes * height)
+  let prev = Buffer.alloc(rowBytes)
+
+  for (let y = 0; y < height; y++) {
+    const tipo = data[y * (rowBytes + 1)]
+    const fila = data.subarray(y * (rowBytes + 1) + 1, (y + 1) * (rowBytes + 1))
+    const actual = out.subarray(y * rowBytes, (y + 1) * rowBytes)
+    for (let x = 0; x < rowBytes; x++) {
+      const izq = x >= channels ? actual[x - channels] : 0
+      const arriba = prev[x]
+      const diag = x >= channels ? prev[x - channels] : 0
+      let v = fila[x]
+      switch (tipo) {
+        case 1: v = (v + izq) & 0xff; break
+        case 2: v = (v + arriba) & 0xff; break
+        case 3: v = (v + ((izq + arriba) >> 1)) & 0xff; break
+        case 4: {
+          // Paeth
+          const p = izq + arriba - diag
+          const pa = Math.abs(p - izq)
+          const pb = Math.abs(p - arriba)
+          const pc = Math.abs(p - diag)
+          const pred = pa <= pb && pa <= pc ? izq : pb <= pc ? arriba : diag
+          v = (v + pred) & 0xff
+          break
+        }
+        // case 0 (None) y desconocidos: el byte va tal cual.
+      }
+      actual[x] = v
+    }
+    prev = actual
+  }
+  return out
+}
+
+/**
+ * Decodifica un XObject de imagen de un PDF a un PNG/JPEG que sharp pueda
+ * procesar, o `null` si el formato no está soportado (JPX, CCITT, CMYK,
+ * bits ≠ 8, etc.). Soporta los dos casos que cubren la gran mayoría de las
+ * pruebas escolares (Word→PDF): DCTDecode (JPEG tal cual) y FlateDecode
+ * (píxeles crudos, con o sin predictores PNG).
+ */
+async function decodificarImagenPdf(
+  stream: PDFRawStream,
+): Promise<{ data: Buffer; mediaType: MediaTypeImagen } | null> {
+  const dict = stream.dict
+  const width = dict.lookup(PDFName.of('Width'), PDFNumber).asNumber()
+  const height = dict.lookup(PDFName.of('Height'), PDFNumber).asNumber()
+  if (!width || !height) return null
+  if (width < LADO_MINIMO_IMAGEN_PDF || height < LADO_MINIMO_IMAGEN_PDF) {
+    return null
+  }
+
+  // Filter puede ser un nombre o un arreglo de nombres.
+  const filtroObj = dict.lookup(PDFName.of('Filter'))
+  const filtros: string[] = []
+  if (filtroObj instanceof PDFName) filtros.push(filtroObj.decodeText())
+  if (filtroObj instanceof PDFArray) {
+    for (const f of filtroObj.asArray()) {
+      if (f instanceof PDFName) filtros.push(f.decodeText())
+    }
+  }
+
+  // JPEG incrustado: los bytes del stream SON el archivo JPEG.
+  if (filtros.includes('DCTDecode')) {
+    return { data: Buffer.from(stream.getContents()), mediaType: 'image/jpeg' }
+  }
+
+  // Píxeles crudos comprimidos con zlib.
+  if (filtros.length === 1 && filtros[0] === 'FlateDecode') {
+    const bits = dict.lookupMaybe(PDFName.of('BitsPerComponent'), PDFNumber)
+    if (bits && bits.asNumber() !== 8) return null
+
+    let crudo: Buffer
+    try {
+      crudo = inflateSync(Buffer.from(stream.getContents()))
+    } catch {
+      return null
+    }
+
+    // Canales por tamaño (evita parsear ColorSpace/ICC): sin predictor el
+    // stream mide width*height*canales; con predictores PNG cada fila lleva
+    // un byte extra de tipo de filtro.
+    const porPixel = crudo.length / (width * height)
+    let channels: 1 | 3 | null = porPixel === 1 ? 1 : porPixel === 3 ? 3 : null
+    if (channels === null) {
+      const conPredictor = (c: number) => (width * c + 1) * height
+      if (crudo.length === conPredictor(3)) {
+        crudo = deshacerPredictorPng(crudo, width, height, 3)
+        channels = 3
+      } else if (crudo.length === conPredictor(1)) {
+        crudo = deshacerPredictorPng(crudo, width, height, 1)
+        channels = 1
+      } else {
+        // 4 canales = CMYK u otro layout no soportado: se descarta.
+        return null
+      }
+    }
+
+    try {
+      const png = await sharp(crudo, {
+        raw: { width, height, channels },
+      })
+        .png()
+        .toBuffer()
+      return { data: png, mediaType: 'image/png' }
+    } catch {
+      return null
+    }
+  }
+
+  return null
+}
+
+/**
+ * Extrae las imágenes incrustadas de un PDF (XObjects `/Image`), redimensiona
+ * a los límites de visión de la API y descarta en silencio los formatos no
+ * soportados y las imágenes decorativas diminutas. Nunca lanza: ante un PDF
+ * ilegible devuelve un arreglo vacío (el documento igual viaja completo a la
+ * IA como bloque `document`).
+ */
+async function extraerImagenesPdf(bytes: Buffer): Promise<ImagenExtraida[]> {
+  let doc: PDFDocument
+  try {
+    doc = await PDFDocument.load(bytes, { ignoreEncryption: true })
+  } catch {
+    return []
+  }
+
+  const imagenes: ImagenExtraida[] = []
+  for (const [, obj] of doc.context.enumerateIndirectObjects()) {
+    if (imagenes.length >= MAX_IMAGENES_PDF) break
+    if (!(obj instanceof PDFRawStream)) continue
+    if (obj.dict.lookupMaybe(PDFName.of('Subtype'), PDFName) !== PDFName.of('Image')) {
+      continue
+    }
+    try {
+      const decodificada = await decodificarImagenPdf(obj)
+      if (!decodificada) continue
+      const redimensionada = await redimensionarONulo(decodificada.data)
+      if (!redimensionada) continue
+      imagenes.push({
+        indice: imagenes.length,
+        mediaType: decodificada.mediaType,
+        base64: redimensionada.toString('base64'),
+      })
+    } catch {
+      // Una imagen problemática no debe tumbar la extracción del resto.
+    }
+  }
+  return imagenes
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // API principal
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -275,19 +473,30 @@ export async function extraerBloquesDocumento(
   }
 
   if (mime === MIME_PDF) {
-    return {
-      bloques: [
-        {
-          type: 'document',
-          source: {
-            type: 'base64',
-            media_type: MIME_PDF,
-            data: bytes.toString('base64'),
-          },
+    // Claude LEE las figuras dentro del PDF de forma nativa, pero para poder
+    // re-subirlas como imagen de la pregunta/alternativa necesitamos los bytes
+    // de cada una: se extraen los XObjects y se adjuntan numerados después del
+    // documento (sin marcadores en el texto, a diferencia del DOCX: la IA las
+    // asocia visualmente).
+    const imagenes = await extraerImagenesPdf(bytes)
+    const bloques: BloqueContenido[] = [
+      {
+        type: 'document',
+        source: {
+          type: 'base64',
+          media_type: MIME_PDF,
+          data: bytes.toString('base64'),
         },
-      ],
-      imagenes: [],
+      },
+    ]
+    for (const img of imagenes) {
+      bloques.push({ type: 'text', text: `Imagen ${img.indice}:` })
+      bloques.push({
+        type: 'image',
+        source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+      })
     }
+    return { bloques, imagenes }
   }
 
   if ((MIMES_IMAGEN as readonly string[]).includes(mime)) {

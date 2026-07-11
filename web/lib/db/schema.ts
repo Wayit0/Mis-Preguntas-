@@ -44,6 +44,10 @@ export const usuarios = pgTable('usuarios', {
   banned: boolean('banned'),
   banReason: text('ban_reason'),
   banExpires: timestamp('ban_expires'),
+  // Últimas instrucciones usadas en una prueba guardada. Se actualizan solas al
+  // guardar una prueba con instrucciones y pre-rellenan el generador de la
+  // siguiente (reutilizables "igual que el logo" del colegio).
+  instruccionesDefault: text('instrucciones_default'),
 })
 
 // ---------------------------------------------------------------------------
@@ -108,6 +112,9 @@ export const preguntas = pgTable('preguntas', {
   imagenE: text('imagen_E'),
   tipo: text('tipo').default('seleccion_multiple'),
   textoId: integer('texto_id'),
+  // Tamaño de las imágenes de la pregunta en el PDF impreso:
+  // 'chico' | 'mediano' | 'grande'. Aplica al enunciado y a las alternativas.
+  imagenTamano: text('imagen_tamano').notNull().default('mediano'),
 })
 
 export const textos = pgTable('textos', {
@@ -141,6 +148,10 @@ export const pruebas = pgTable('pruebas', {
   colegio: text('colegio'),
   profesor: text('profesor'),
   instrucciones: text('instrucciones'),
+  // Formato del PDF: 'estandar' | 'ib' (estilo examen de Bachillerato
+  // Internacional: A4, tipografía serif, caja de instrucciones, líneas
+  // punteadas de respuesta).
+  formato: text('formato').notNull().default('estandar'),
   // Expresiones LaTeX del formulario.
   formulas: jsonb('formulas').$type<string[]>().notNull().default([]),
   // IDs de preguntas sueltas seleccionadas — el ORDEN importa (orden del PDF).
@@ -158,6 +169,31 @@ export const pruebas = pgTable('pruebas', {
   pdfGeneradoEn: timestamp('pdf_generado_en'),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+})
+
+// ---------------------------------------------------------------------------
+// Registro de usos de IA (para el panel de costos del admin global). Cada
+// llamada a la API de Anthropic inserta una fila con los tokens reales que
+// reportó la API y el costo calculado con los precios vigentes al momento del
+// uso (snapshot: si los precios cambian, el histórico no se recalcula).
+// ---------------------------------------------------------------------------
+
+export const usosIa = pgTable('usos_ia', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  // Acción que originó el uso (ej: 'importar_documento').
+  accion: text('accion').notNull(),
+  modelo: text('modelo').notNull(),
+  inputTokens: integer('input_tokens').notNull().default(0),
+  outputTokens: integer('output_tokens').notNull().default(0),
+  cacheCreationTokens: integer('cache_creation_tokens').notNull().default(0),
+  cacheReadTokens: integer('cache_read_tokens').notNull().default(0),
+  // Costo en microdólares (USD * 1e6): entero exacto, sin problemas de coma
+  // flotante ni de serialización de numeric.
+  costoMicroUsd: integer('costo_micro_usd').notNull().default(0),
+  // Contexto legible del uso (archivo, páginas, imágenes, preguntas, duración).
+  detalle: jsonb('detalle').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
 export const colaboraciones = pgTable(

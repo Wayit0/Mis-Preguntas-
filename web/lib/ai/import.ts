@@ -23,6 +23,22 @@ import {
 /** Modelo de extracción (id exacto, sin sufijo de fecha). */
 const MODELO = 'claude-opus-4-8'
 
+/** Uso de tokens de una detección (para el registro de costos del admin). */
+export interface UsoDeteccion {
+  modelo: string
+  inputTokens: number
+  outputTokens: number
+  cacheCreationTokens: number
+  cacheReadTokens: number
+}
+
+/** Resultado de la detección: preguntas válidas + uso real reportado por la API. */
+export interface ResultadoDeteccion {
+  preguntas: PreguntaDetectada[]
+  /** null cuando no hubo llamada real (fixture de e2e). */
+  uso: UsoDeteccion | null
+}
+
 /** Instrucciones de extracción (en español, es-CL). */
 const SISTEMA = `Eres un asistente experto en educación chilena. Recibirás el \
 contenido de un documento (texto, PDF o imagen) que contiene preguntas de una \
@@ -37,22 +53,37 @@ LaTeX entre signos $...$ si aparecen.
 "desarrollo_largo" si requiere una respuesta extensa o argumentada.
 - Para las de selección múltiple, completa "A", "B", "C", "D" y "E" con el \
 texto de cada alternativa (deja en null las que no existan) e indica en \
-"correcta" la LETRA de la alternativa correcta SÓLO si el documento la señala; \
-en caso contrario usa null.
+"correcta" la LETRA de la alternativa correcta: la que el documento señale o, \
+si el documento no la trae, RESUÉLVELA tú con rigor (desarrolla el cálculo o \
+razonamiento antes de decidir) y indícala.
 - Para las de desarrollo, deja las alternativas y "correcta" en null.
-- "explicacion": la explicación, pauta o solución si aparece en el documento; \
-si no aparece, deja una cadena vacía.
+- "explicacion": la explicación, pauta o solución si aparece en el documento. \
+Si no aparece y tú resolviste la pregunta, escribe aquí una pauta breve de \
+cómo se llega a la respuesta (máximo 2-3 líneas).
 - "materia" y "nivel": complétalos sólo si el documento los indica claramente; \
 si no, déjalos en null.
 
 El documento puede incluir imágenes incrustadas (diagramas, gráficos, figuras \
-geométricas, etc.). Cada una aparece en el texto como un marcador \
-"[IMAGEN_n]" (n = 0, 1, 2…) en el lugar exacto donde estaba, y luego se adjunta \
-la imagen correspondiente con la etiqueta "Imagen n:". Si el enunciado de una \
-pregunta depende de una de esas imágenes (es decir, no se entiende sin verla), \
-indica su número n en "imagenPreguntaIndice"; si no aplica ninguna imagen, deja \
-el campo en null. Al transcribir el enunciado, quita el marcador "[IMAGEN_n]" \
-del texto (la referencia ya queda registrada en ese campo).
+geométricas, etc.). Según el tipo de documento se presentan así:
+- En documentos de texto, cada imagen aparece como un marcador "[IMAGEN_n]" \
+(n = 0, 1, 2…) en el lugar exacto donde estaba, y luego se adjunta la imagen \
+con la etiqueta "Imagen n:". Al transcribir el enunciado, quita el marcador \
+"[IMAGEN_n]" del texto.
+- En PDFs no hay marcadores: las mismas imágenes del documento se adjuntan \
+numeradas ("Imagen n:") después del PDF; compáralas visualmente con las \
+figuras que ves dentro del PDF para saber a qué pregunta pertenece cada una.
+Si el enunciado de una pregunta depende de una de esas imágenes (es decir, no \
+se entiende sin verla), indica su número n en "imagenPreguntaIndice"; si no \
+aplica ninguna imagen, deja el campo en null.
+
+Si una ALTERNATIVA es una imagen o depende de una (p. ej. alternativas que son \
+gráficos o figuras), regístralo en "imagenesAlternativas" como un texto \
+compacto "LETRA:n" separado por comas, por ejemplo "A:0,B:1" (alternativa A \
+usa la imagen 0 y la B la imagen 1); deja el texto de esa alternativa con su \
+rótulo o descripción si existe (o una cadena vacía) y quita el marcador \
+"[IMAGEN_n]". Si ninguna alternativa lleva imagen, deja "imagenesAlternativas" \
+en null. Una misma imagen no puede ser a la vez del enunciado y de una \
+alternativa: asígnala a donde corresponda según el documento.
 
 Reglas:
 - No inventes preguntas, alternativas ni respuestas: extrae únicamente lo que \
@@ -121,10 +152,10 @@ const FIXTURE_FAKE: readonly unknown[] = [
 export async function detectarPreguntas(
   contentBlocks: BloqueContenido[],
   asignatura: string,
-): Promise<PreguntaDetectada[]> {
+): Promise<ResultadoDeteccion> {
   // Camino de prueba: sin tocar la red ni la API real de Anthropic.
   if (process.env.IMPORT_AI_FAKE) {
-    return cribarPreguntas(FIXTURE_FAKE)
+    return { preguntas: cribarPreguntas(FIXTURE_FAKE), uso: null }
   }
 
   const client = new Anthropic() // lee ANTHROPIC_API_KEY del entorno
@@ -133,20 +164,44 @@ export async function detectarPreguntas(
     `Extrae todas las preguntas del documento adjunto. ` +
     `La asignatura es "${asignatura}".`
 
-  const res = await client.messages.parse({
-    model: MODELO,
-    max_tokens: 16000,
-    system: SISTEMA,
-    messages: [
-      { role: 'user', content: [...contentBlocks, { type: 'text', text: instruccion }] },
-    ],
-    output_config: { format: zodOutputFormat(PreguntasDetectadasSchema) },
-  })
+  const llamar = () =>
+    client.messages.parse({
+      model: MODELO,
+      max_tokens: 16000,
+      system: SISTEMA,
+      messages: [
+        { role: 'user', content: [...contentBlocks, { type: 'text', text: instruccion }] },
+      ],
+      output_config: { format: zodOutputFormat(PreguntasDetectadasSchema) },
+    })
 
-  if (res.stop_reason === 'refusal') return []
+  // "Grammar compilation timed out" (400) es un fallo de compilación de la
+  // gramática del structured output en frío; la API la cachea una vez
+  // compilada, así que un único reintento suele bastar. Cualquier otro error
+  // se propaga (el SDK ya reintenta solo los 429/5xx).
+  let res: Awaited<ReturnType<typeof llamar>>
+  try {
+    res = await llamar()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : ''
+    if (!msg.includes('Grammar compilation timed out')) throw err
+    console.warn('[importar] grammar timeout; reintentando una vez…')
+    res = await llamar()
+  }
+
+  // Uso real reportado por la API (para el panel de costos del admin).
+  const uso: UsoDeteccion = {
+    modelo: MODELO,
+    inputTokens: res.usage.input_tokens ?? 0,
+    outputTokens: res.usage.output_tokens ?? 0,
+    cacheCreationTokens: res.usage.cache_creation_input_tokens ?? 0,
+    cacheReadTokens: res.usage.cache_read_input_tokens ?? 0,
+  }
+
+  if (res.stop_reason === 'refusal') return { preguntas: [], uso }
 
   const data = res.parsed_output
-  if (!data) return []
+  if (!data) return { preguntas: [], uso }
 
-  return cribarPreguntas(data.preguntas)
+  return { preguntas: cribarPreguntas(data.preguntas), uso }
 }

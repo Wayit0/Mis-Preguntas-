@@ -25,6 +25,8 @@ export interface OpcionesPrueba {
   colegio?: string
   profesor?: string
   instrucciones?: string
+  /** Formato del PDF: 'estandar' (default) | 'ib'. */
+  formato?: string
   formulas?: string[]
   /** IDs de preguntas sueltas — el ORDEN determina el orden en el PDF. */
   preguntasIds: number[]
@@ -62,21 +64,24 @@ function aPreguntaPdf(fila: typeof tablaPreguntas.$inferSelect): PreguntaPdf {
     imagen_C: fila.imagenC,
     imagen_D: fila.imagenD,
     imagen_E: fila.imagenE,
+    imagen_tamano: fila.imagenTamano,
     texto_id: fila.textoId,
   }
 }
 
 /**
- * Construye el PDF de una prueba a partir de una selección de preguntas (y,
- * opcionalmente, textos) del usuario. Todas las queries filtran por `userId`
- * (guard de propiedad), respetan el orden de selección y excluyen las preguntas
- * ya incluidas por un texto. Lanza `PruebaSinPreguntasError` si no hay ninguna
- * pregunta; cualquier otro fallo lo propaga (error de renderizado).
+ * Resuelve la selección de una prueba (ids de preguntas/textos) a los datos que
+ * consume el generador de PDF. Todas las queries filtran por `userId` (guard de
+ * propiedad), respetan el orden de selección y excluyen las preguntas ya
+ * incluidas por un texto. Los textos referenciados por preguntas seleccionadas
+ * se incluyen aunque no estén marcados, para que una pregunta de comprensión
+ * nunca se imprima sin su texto. Lanza `PruebaSinPreguntasError` si la
+ * selección queda vacía.
  */
-export async function construirPruebaPdf(
+export async function resolverContenidoPrueba(
   userId: number,
-  opts: OpcionesPrueba,
-): Promise<Buffer> {
+  opts: Pick<OpcionesPrueba, 'preguntasIds' | 'textosIds'>,
+): Promise<{ textos: TextoPdf[]; preguntas: PreguntaPdf[] }> {
   const idsTextos = opts.textosIds
   const idsPreguntas = opts.preguntasIds
 
@@ -132,10 +137,52 @@ export async function construirPruebaPdf(
     }
   }
 
+  // Textos referenciados por preguntas seleccionadas pero NO marcados
+  // explícitamente. `generarPruebaPdf` agrupa por `texto_id`, así que basta con
+  // añadir el texto a la lista.
+  const idsTextosIncluidos = new Set(textosPdf.map((t) => t.id))
+  const idsTextosFaltantes = [
+    ...new Set(
+      preguntasSueltas
+        .map((p) => p.texto_id)
+        .filter((id): id is number => id != null && !idsTextosIncluidos.has(id)),
+    ),
+  ]
+  if (idsTextosFaltantes.length > 0) {
+    const filas = await db
+      .select()
+      .from(tablaTextos)
+      .where(
+        and(eq(tablaTextos.userId, userId), inArray(tablaTextos.id, idsTextosFaltantes)),
+      )
+      .orderBy(tablaTextos.id)
+    for (const t of filas) {
+      textosPdf.push({ id: t.id, titulo: t.titulo, contenido: t.contenido })
+    }
+  }
+
   // Válida si hay al menos un texto o una pregunta (un texto puede ir solo).
   if (textosPdf.length === 0 && preguntasSueltas.length === 0) {
     throw new PruebaSinPreguntasError()
   }
+
+  return {
+    textos: textosPdf,
+    // Orden: primero las de textos (agrupadas), luego las sueltas.
+    preguntas: [...preguntasDeTextos, ...preguntasSueltas],
+  }
+}
+
+/**
+ * Construye el PDF de una prueba a partir de una selección de preguntas (y,
+ * opcionalmente, textos) del usuario. Ver `resolverContenidoPrueba` para las
+ * reglas de resolución; cualquier fallo de renderizado se propaga.
+ */
+export async function construirPruebaPdf(
+  userId: number,
+  opts: OpcionesPrueba,
+): Promise<Buffer> {
+  const { textos, preguntas } = await resolverContenidoPrueba(userId, opts)
 
   return generarPruebaPdf({
     titulo: opts.titulo ?? '',
@@ -144,10 +191,10 @@ export async function construirPruebaPdf(
     profesor: opts.profesor ?? '',
     logo: opts.logo ?? null,
     instrucciones: opts.instrucciones ?? '',
+    formato: opts.formato ?? 'estandar',
     formulas: opts.formulas ?? [],
-    textos: textosPdf,
-    // Orden: primero las de textos (agrupadas), luego las sueltas.
-    preguntas: [...preguntasDeTextos, ...preguntasSueltas],
+    textos,
+    preguntas,
   })
 }
 

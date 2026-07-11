@@ -40,6 +40,8 @@ export function extraerCampos(formData: FormData): Record<string, unknown> {
     correcta: t('correcta'),
     explicacion: t('explicacion'),
     tipo: t('tipo') || 'seleccion_multiple',
+    // '' (formularios sin el campo, p. ej. importación) cae al default del schema.
+    imagenTamano: t('imagen_tamano') || 'mediano',
     compartida: t('compartida') || '0',
   }
 }
@@ -85,5 +87,6 @@ export function camposDb(data: PreguntaInput) {
     explicacion: oNull(data.explicacion),
     compartida: data.compartida,
     tipo: data.tipo,
+    imagenTamano: data.imagenTamano,
   }
 }

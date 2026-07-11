@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ImagePlus } from 'lucide-react'
 import { crearPregunta, actualizarPregunta } from '@/lib/actions/preguntas'
 import type { ResultadoPregunta } from '@/lib/actions/pregunta-fields'
 import {
@@ -9,7 +10,10 @@ import {
   ETIQUETA_TIPO,
   LETRAS,
   NIVELES_SUGERIDOS,
+  TAMANOS_IMAGEN,
+  ETIQUETA_TAMANO_IMAGEN,
   type TipoPregunta,
+  type TamanoImagen,
 } from '@/lib/validation/pregunta'
 import type { Pregunta } from '@/lib/queries/preguntas'
 import { ASIGNATURAS } from '@/components/shell/subjects'
@@ -27,6 +31,7 @@ import {
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { LatexText } from './latex-text'
+import { InsertarEcuacion } from './insertar-ecuacion'
 
 /* eslint-disable @next/next/no-img-element */
 
@@ -46,6 +51,7 @@ function CampoImagen({
   existente?: string | null
 }) {
   const [preview, setPreview] = useState<string | null>(null)
+  const [nombreArchivo, setNombreArchivo] = useState<string | null>(null)
   const src = preview ?? (existente ? urlImagen(existente) : null)
 
   return (
@@ -60,15 +66,30 @@ function CampoImagen({
           className="max-h-28 w-fit rounded-md border border-border object-contain"
         />
       ) : null}
+      {/* Botón claro de subida; el input real queda oculto (sr-only) pero
+          dentro del form, así el archivo viaja igual en el FormData. */}
+      <label
+        htmlFor={name}
+        className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-border bg-muted/30 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/60 hover:text-foreground"
+      >
+        <ImagePlus className="size-3.5" aria-hidden />
+        {src ? 'Cambiar imagen' : 'Agregar imagen'}
+      </label>
+      {nombreArchivo ? (
+        <span className="max-w-44 truncate text-xs text-muted-foreground">
+          {nombreArchivo}
+        </span>
+      ) : null}
       <input
         id={name}
         name={name}
         type="file"
         accept="image/png,image/jpeg"
-        className="max-w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-2.5 file:py-1 file:text-sm file:font-medium file:text-secondary-foreground"
+        className="sr-only"
         onChange={(e) => {
           const f = e.target.files?.[0]
           setPreview(f ? URL.createObjectURL(f) : null)
+          setNombreArchivo(f?.name ?? null)
         }}
       />
     </div>
@@ -120,6 +141,9 @@ export function FormularioPregunta({
   const [nivelBase, setNivelBase] = useState(nivel0.base)
   const [nivelOtro, setNivelOtro] = useState(nivel0.otro)
   const [correcta, setCorrecta] = useState(pregunta?.correcta ?? 'A')
+  const [imagenTamano, setImagenTamano] = useState<TamanoImagen>(
+    (pregunta?.imagenTamano as TamanoImagen) ?? 'mediano',
+  )
   const [compartida, setCompartida] = useState((pregunta?.compartida ?? 0) > 0)
 
   const [enunciado, setEnunciado] = useState(pregunta?.pregunta ?? '')
@@ -135,6 +159,12 @@ export function FormularioPregunta({
   const nivelResuelto =
     nivelBase === 'Otro' ? nivelOtro.trim() || 'Otro' : nivelBase
   const esSeleccion = tipo === 'seleccion_multiple'
+
+  /** Añade una ecuación `$...$` al final del valor actual de un campo. */
+  function conEcuacion(valor: string, latexDelimitado: string): string {
+    if (!valor.trim()) return latexDelimitado
+    return `${valor}${valor.endsWith(' ') ? '' : ' '}${latexDelimitado}`
+  }
 
   const alternativas: {
     letra: string
@@ -311,6 +341,9 @@ export function FormularioPregunta({
                 required
               />
             </div>
+            <InsertarEcuacion
+              onInsert={(latex) => setEnunciado((v) => conEcuacion(v, latex))}
+            />
             {enunciado.trim() ? (
               <div className="rounded-md border border-dashed border-border bg-muted/40 px-3 py-2 text-sm">
                 <span className="text-xs text-muted-foreground">
@@ -324,6 +357,35 @@ export function FormularioPregunta({
               label="Imagen del enunciado (opcional)"
               existente={pregunta?.imagenPregunta}
             />
+            <div className="flex flex-col gap-1.5">
+              <Label>Tamaño de las imágenes al imprimir</Label>
+              <Select
+                name="imagen_tamano"
+                value={imagenTamano}
+                onValueChange={(v) => setImagenTamano(v as TamanoImagen)}
+              >
+                <SelectTrigger
+                  aria-label="Tamaño de las imágenes al imprimir"
+                  className="w-full sm:w-56"
+                >
+                  <SelectValue>
+                    {(v: string) =>
+                      ETIQUETA_TAMANO_IMAGEN[v as TamanoImagen] ?? v
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {TAMANOS_IMAGEN.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {ETIQUETA_TAMANO_IMAGEN[t]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">
+                Aplica a la imagen del enunciado y de las alternativas en el PDF.
+              </span>
+            </div>
           </CardContent>
         </Card>
 
@@ -351,6 +413,9 @@ export function FormularioPregunta({
                         className="text-xs text-muted-foreground"
                       />
                     ) : null}
+                    <InsertarEcuacion
+                      onInsert={(latex) => set(conEcuacion(valor, latex))}
+                    />
                   </div>
                   <div className="sm:w-44">
                     <CampoImagen

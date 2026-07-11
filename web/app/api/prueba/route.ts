@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       colegio: (form.get('colegio') ?? '').toString(),
       profesor: (form.get('profesor') ?? '').toString(),
       instrucciones: (form.get('instrucciones') ?? '').toString(),
+      formato: (form.get('formato') ?? '').toString(),
       formulas: form
         .getAll('formula')
         .map((f) => f.toString())

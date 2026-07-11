@@ -49,6 +49,15 @@ export interface LatexToPngOptions {
   color?: string
 }
 
+/** PNG de una fórmula junto con sus dimensiones tipográficas (en em). */
+export interface LatexPng {
+  data: Buffer
+  /** Ancho de la fórmula en em (multiplicar por el tamaño de fuente en pt). */
+  emWidth: number
+  /** Alto de la fórmula en em. */
+  emHeight: number
+}
+
 /**
  * Convierte una expresión LaTeX en un PNG (texto negro, fondo transparente).
  *
@@ -60,6 +69,18 @@ export async function latexToPng(
   expr: string,
   opts: LatexToPngOptions = {},
 ): Promise<Buffer> {
+  return (await latexToPngConDims(expr, opts)).data
+}
+
+/**
+ * Igual que `latexToPng`, pero devuelve además las dimensiones de la fórmula en
+ * em (derivadas del viewBox de MathJax). Con ellas el PDF puede incrustar la
+ * fórmula A ESCALA del texto circundante: `widthPt = emWidth * fontSizePt`.
+ */
+export async function latexToPngConDims(
+  expr: string,
+  opts: LatexToPngOptions = {},
+): Promise<LatexPng> {
   const scale = opts.scale && opts.scale > 0 ? opts.scale : 2
   const color = opts.color ?? '#000000'
 
@@ -80,11 +101,15 @@ export async function latexToPng(
   // (en unidades MathJax) y fijamos width/height explícitos en px.
   const viewBox = svg.match(/viewBox="([^"]+)"/)
   let pngBufferSvg = svg
+  let emWidth = 1
+  let emHeight = 1
   if (viewBox) {
     const parts = viewBox[1].split(/\s+/).map(Number)
     const vbWidth = parts[2]
     const vbHeight = parts[3]
     if (Number.isFinite(vbWidth) && Number.isFinite(vbHeight)) {
+      emWidth = vbWidth / MATHJAX_UNITS_PER_EM
+      emHeight = vbHeight / MATHJAX_UNITS_PER_EM
       const pxPerUnit = (BASE_EM_PX / MATHJAX_UNITS_PER_EM) * scale
       const widthPx = Math.max(1, Math.round(vbWidth * pxPerUnit))
       const heightPx = Math.max(1, Math.round(vbHeight * pxPerUnit))
@@ -96,9 +121,10 @@ export async function latexToPng(
   }
 
   try {
-    return await sharp(Buffer.from(pngBufferSvg, 'utf8'), { density: 300 })
+    const data = await sharp(Buffer.from(pngBufferSvg, 'utf8'), { density: 300 })
       .png()
       .toBuffer()
+    return { data, emWidth, emHeight }
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(

@@ -1,0 +1,1 @@
+ALTER TABLE "preguntas" ADD COLUMN "imagen_tamano" text DEFAULT 'mediano' NOT NULL;

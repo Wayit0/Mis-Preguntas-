@@ -15,6 +15,7 @@ vi.mock('@anthropic-ai/sdk', () => {
 })
 
 import { detectarPreguntas } from '@/lib/ai/import'
+import { parsearImagenesAlternativas } from '@/lib/validation/import'
 import type { BloqueContenido } from '@/lib/docparse/extract'
 
 const bloques: BloqueContenido[] = [{ type: 'text', text: 'documento de prueba' }]
@@ -60,31 +61,44 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
           },
         ],
       },
+      usage: { input_tokens: 1200, output_tokens: 300 },
     })
 
-    const preguntas = await detectarPreguntas(bloques, 'Matemáticas')
+    const { preguntas, uso } = await detectarPreguntas(bloques, 'Matemáticas')
 
     expect(preguntas).toHaveLength(1)
     expect(preguntas[0].pregunta).toBe('¿Cuánto es 2 + 2?')
     expect(preguntas[0].correcta).toBe('B')
     expect(preguntas[0].tipo).toBe('seleccion_multiple')
+    expect(uso?.modelo).toBe('claude-opus-4-8')
     expect(mocks.parse).toHaveBeenCalledTimes(1)
   })
 
   it('devuelve [] cuando parsed_output es null', async () => {
-    mocks.parse.mockResolvedValue({ stop_reason: 'end_turn', parsed_output: null })
-    await expect(detectarPreguntas(bloques, 'Física')).resolves.toEqual([])
+    mocks.parse.mockResolvedValue({
+      stop_reason: 'end_turn',
+      parsed_output: null,
+      usage: { input_tokens: 10, output_tokens: 0 },
+    })
+    const res = await detectarPreguntas(bloques, 'Física')
+    expect(res.preguntas).toEqual([])
   })
 
   it('devuelve [] cuando el modelo rechaza (stop_reason "refusal")', async () => {
-    mocks.parse.mockResolvedValue({ stop_reason: 'refusal', parsed_output: null })
-    await expect(detectarPreguntas(bloques, 'Física')).resolves.toEqual([])
+    mocks.parse.mockResolvedValue({
+      stop_reason: 'refusal',
+      parsed_output: null,
+      usage: { input_tokens: 10, output_tokens: 0 },
+    })
+    const res = await detectarPreguntas(bloques, 'Física')
+    expect(res.preguntas).toEqual([])
   })
 
   it('llama al modelo correcto y adjunta la asignatura como último bloque de texto', async () => {
     mocks.parse.mockResolvedValue({
       stop_reason: 'end_turn',
       parsed_output: { preguntas: [] },
+      usage: { input_tokens: 10, output_tokens: 0 },
     })
 
     await detectarPreguntas(bloques, 'Biología')
@@ -102,11 +116,60 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
   it('usa el fixture y no llama al API cuando IMPORT_AI_FAKE está activo', async () => {
     process.env.IMPORT_AI_FAKE = '1'
 
-    const preguntas = await detectarPreguntas(bloques, 'Física')
+    const { preguntas, uso } = await detectarPreguntas(bloques, 'Física')
 
     expect(mocks.parse).not.toHaveBeenCalled()
+    expect(uso).toBeNull()
     expect(preguntas.length).toBeGreaterThanOrEqual(1)
     expect(preguntas.every((p) => p.pregunta.trim().length > 0)).toBe(true)
+  })
+
+  it('conserva imagenesAlternativas (string compacto "A:0,B:1") al cribar', async () => {
+    mocks.parse.mockResolvedValue({
+      stop_reason: 'end_turn',
+      parsed_output: {
+        preguntas: [
+          {
+            pregunta: '¿Qué gráfico representa un MRU?',
+            A: '',
+            B: '',
+            C: 'Ninguno de los anteriores',
+            D: null,
+            E: null,
+            correcta: 'A',
+            explicacion: '',
+            materia: null,
+            nivel: null,
+            tipo: 'seleccion_multiple',
+            imagenPreguntaIndice: null,
+            imagenesAlternativas: 'A:0,B:1',
+          },
+        ],
+      },
+      usage: { input_tokens: 10, output_tokens: 5 },
+    })
+
+    const { preguntas } = await detectarPreguntas(bloques, 'Física')
+
+    expect(preguntas).toHaveLength(1)
+    expect(preguntas[0].imagenesAlternativas).toBe('A:0,B:1')
+  })
+
+  it('parsearImagenesAlternativas: pares válidos, espacios, basura y null', () => {
+    expect(parsearImagenesAlternativas('A:0,B:1')).toEqual([
+      { letra: 'A', indice: 0 },
+      { letra: 'B', indice: 1 },
+    ])
+    expect(parsearImagenesAlternativas(' C : 2 ')).toEqual([
+      { letra: 'C', indice: 2 },
+    ])
+    // Letras fuera de A–E, índices no numéricos y tramos vacíos se descartan.
+    expect(parsearImagenesAlternativas('F:0,A:x,,B:3')).toEqual([
+      { letra: 'B', indice: 3 },
+    ])
+    expect(parsearImagenesAlternativas(null)).toEqual([])
+    expect(parsearImagenesAlternativas(undefined)).toEqual([])
+    expect(parsearImagenesAlternativas('')).toEqual([])
   })
 
   it('propaga el error si la llamada al modelo falla', async () => {
@@ -116,5 +179,21 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
       'fallo de red',
     )
     expect(mocks.parse).toHaveBeenCalledTimes(1)
+  })
+
+  it('reintenta UNA vez ante "Grammar compilation timed out" y usa la 2ª respuesta', async () => {
+    mocks.parse
+      .mockRejectedValueOnce(
+        new Error('400 {"type":"error","error":{"message":"Grammar compilation timed out."}}'),
+      )
+      .mockResolvedValueOnce({
+        stop_reason: 'end_turn',
+        parsed_output: { preguntas: [] },
+        usage: { input_tokens: 10, output_tokens: 5 },
+      })
+
+    const res = await detectarPreguntas(bloques, 'Física')
+    expect(res.preguntas).toEqual([])
+    expect(mocks.parse).toHaveBeenCalledTimes(2)
   })
 })

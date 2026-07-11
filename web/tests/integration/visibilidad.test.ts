@@ -50,9 +50,11 @@ describe('Visibilidad unificada (Parte D)', () => {
     const a = await crearUsuario('A', col.id)
     const b = await crearUsuario('B', col.id)
 
-    const aComp = await crearPregunta(a.id, 'Física', 1)
-    const aPriv = await crearPregunta(a.id, 'Física', 0)
-    const bComp = await crearPregunta(b.id, 'Química', 1)
+    // Igual que en producción: crearPregunta estampa el colegio del autor en la
+    // pregunta (`colegio_id`), y el auto-colegio ancla la visibilidad ahí.
+    const aComp = await crearPregunta(a.id, 'Física', 1, { colegioId: col.id })
+    const aPriv = await crearPregunta(a.id, 'Física', 0, { colegioId: col.id })
+    const bComp = await crearPregunta(b.id, 'Química', 1, { colegioId: col.id })
 
     // B ve la compartida de A por auto-colegio (sin ninguna colaboración).
     const vistasPorB = await cargarBancoCompartido(b.id)
@@ -62,11 +64,13 @@ describe('Visibilidad unificada (Parte D)', () => {
     // Nombre del autor preservado.
     expect(vistasPorB.find((p) => p.id === aComp.id)?.autor).toBe('A')
 
-    // A ve la compartida de B (mutuo) pero NO su propia compartida.
+    // A ve la compartida de B (mutuo) Y su propia compartida (el Banco
+    // Compartido incluye lo propio marcado "Tuya"; ver cargarBancoCompartido).
     const vistasPorA = await cargarBancoCompartido(a.id)
     const idsA = vistasPorA.map((p) => p.id)
     expect(idsA).toContain(bComp.id)
-    expect(idsA).not.toContain(aComp.id) // lo propio se excluye
+    expect(idsA).toContain(aComp.id)
+    expect(idsA).not.toContain(aPriv.id) // lo privado propio tampoco aparece
 
     // Dashboard concuerda: B cuenta 1 compartida (la de A).
     const statsB = await getDashboardStats(b.id)
@@ -127,8 +131,14 @@ describe('Visibilidad unificada (Parte D)', () => {
 
     const kComp = uniq('comp') + '.png'
     const kPriv = uniq('priv') + '.png'
-    await crearPregunta(autor.id, 'Física', 1, { imagenPregunta: kComp })
-    await crearPregunta(autor.id, 'Física', 0, { imagenPregunta: kPriv })
+    await crearPregunta(autor.id, 'Física', 1, {
+      imagenPregunta: kComp,
+      colegioId: col.id,
+    })
+    await crearPregunta(autor.id, 'Física', 0, {
+      imagenPregunta: kPriv,
+      colegioId: col.id,
+    })
 
     // Dueño ve su imagen (compartida y privada).
     expect(await puedeVerImagen(kComp, autor.id)).toBe(true)

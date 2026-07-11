@@ -4,7 +4,11 @@ import { dirname, join } from 'node:path'
 
 import { describe, it, expect } from 'vitest'
 
+import sharp from 'sharp'
+import { PDFDocument } from 'pdf-lib'
+
 import {
+  contarPaginasPdf,
   extraerBloquesDocumento,
   TipoArchivoNoSoportadoError,
   MIME_DOCX,
@@ -80,6 +84,65 @@ describe('docparse/extract', () => {
     await expect(
       extraerBloquesDocumento({ data: Buffer.from('x'), mime: 'application/zip' }),
     ).rejects.toBeInstanceOf(TipoArchivoNoSoportadoError)
+  })
+
+  it('PDF con imágenes incrustadas → bloque document + imágenes numeradas (JPEG y PNG; filtra diminutas)', async () => {
+    const jpeg = await sharp({
+      create: { width: 120, height: 90, channels: 3, background: { r: 10, g: 120, b: 200 } },
+    })
+      .jpeg()
+      .toBuffer()
+    const png = await sharp({
+      create: { width: 100, height: 100, channels: 3, background: { r: 200, g: 30, b: 30 } },
+    })
+      .png()
+      .toBuffer()
+    // Diminuta (16px): debe filtrarse como decorativa.
+    const icono = await sharp({
+      create: { width: 16, height: 16, channels: 3, background: { r: 0, g: 0, b: 0 } },
+    })
+      .png()
+      .toBuffer()
+
+    const doc = await PDFDocument.create()
+    const page = doc.addPage([400, 400])
+    const imgJpeg = await doc.embedJpg(jpeg)
+    const imgPng = await doc.embedPng(png)
+    const imgIcono = await doc.embedPng(icono)
+    page.drawImage(imgJpeg, { x: 20, y: 250, width: 120, height: 90 })
+    page.drawImage(imgPng, { x: 20, y: 120, width: 100, height: 100 })
+    page.drawImage(imgIcono, { x: 20, y: 80, width: 16, height: 16 })
+    const pdfBytes = Buffer.from(await doc.save())
+
+    const { bloques, imagenes } = await extraerBloquesDocumento({
+      data: pdfBytes,
+      mime: MIME_PDF,
+    })
+
+    expect(imagenes).toHaveLength(2)
+    expect(imagenes.map((i) => i.indice)).toEqual([0, 1])
+    // Cada imagen extraída es decodificable por sharp (round-trip real).
+    for (const img of imagenes) {
+      const meta = await sharp(Buffer.from(img.base64, 'base64')).metadata()
+      expect(meta.width).toBeGreaterThanOrEqual(90)
+    }
+
+    // Bloques: document + (texto "Imagen n:" + imagen) por cada una.
+    expect(bloques[0].type).toBe('document')
+    expect(bloques).toHaveLength(1 + 2 * 2)
+    expect((bloques[1] as BloqueTexto).text).toBe('Imagen 0:')
+    expect((bloques[2] as BloqueImagen).type).toBe('image')
+  })
+
+  it('contarPaginasPdf: cuenta páginas reales y devuelve null con bytes que no son PDF', async () => {
+    const doc = await PDFDocument.create()
+    doc.addPage()
+    doc.addPage()
+    doc.addPage()
+    const bytes = await doc.save()
+
+    expect(await contarPaginasPdf(bytes)).toBe(3)
+    expect(await contarPaginasPdf(Buffer.from('no soy un pdf'))).toBeNull()
   })
 
   it('DOCX con una imagen incrustada → marcador [IMAGEN_0] + bloques de imagen', async () => {

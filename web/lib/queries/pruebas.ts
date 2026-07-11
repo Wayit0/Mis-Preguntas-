@@ -1,6 +1,6 @@
 import { and, desc, eq, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { pruebas } from '@/lib/db/schema'
+import { pruebas, usuarios } from '@/lib/db/schema'
 import { listarPreguntasPropias, opcionesDeFiltros } from '@/lib/queries/preguntas'
 import { cargarTextosPropios, contarPreguntasPorTexto } from '@/lib/queries/textos'
 import type {
@@ -45,6 +45,21 @@ export async function cargarPruebaPorId(
     .where(and(eq(pruebas.id, id), eq(pruebas.userId, userId)))
     .limit(1)
   return fila ?? null
+}
+
+/**
+ * Instrucciones por defecto del usuario (las de su última prueba guardada con
+ * instrucciones), para pre-rellenar el generador. `null` si nunca guardó unas.
+ */
+export async function instruccionesDefaultDeUsuario(
+  userId: number,
+): Promise<string | null> {
+  const [fila] = await db
+    .select({ instruccionesDefault: usuarios.instruccionesDefault })
+    .from(usuarios)
+    .where(eq(usuarios.id, userId))
+    .limit(1)
+  return fila?.instruccionesDefault ?? null
 }
 
 /**

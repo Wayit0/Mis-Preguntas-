@@ -4,6 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { guardarPrueba, actualizarPrueba } from '@/lib/actions/pruebas'
+import {
+  FORMATOS_PRUEBA,
+  ETIQUETA_FORMATO,
+  type FormatoPrueba,
+} from '@/lib/validation/prueba'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -65,6 +70,8 @@ export interface PruebaInicial {
   colegio: string
   profesor: string
   instrucciones: string
+  /** Formato del PDF: 'estandar' | 'ib'. */
+  formato: string
   formulas: string[]
   preguntasIds: number[]
   textosIds: number[]
@@ -313,6 +320,7 @@ export function GeneradorPrueba({
   materias,
   textos,
   colegioInicial = '',
+  instruccionesInicial = null,
   logoColegioUrl = null,
   pruebaInicial,
 }: {
@@ -322,6 +330,8 @@ export function GeneradorPrueba({
   materias: string[]
   textos: TextoSeleccionable[]
   colegioInicial?: string | null
+  /** Instrucciones por defecto del usuario (las de su última prueba), o null. */
+  instruccionesInicial?: string | null
   /** URL del logo del colegio (para el preview de la casilla), o null. */
   logoColegioUrl?: string | null
   /** Si se pasa, el editor modifica esa prueba en vez de crear una nueva. */
@@ -338,7 +348,11 @@ export function GeneradorPrueba({
     pruebaInicial?.profesor || profesorInicial,
   )
   const [instrucciones, setInstrucciones] = useState(
-    pruebaInicial?.instrucciones ?? '',
+    // En edición mandan las de la prueba; en una nueva, el default del usuario.
+    pruebaInicial ? (pruebaInicial.instrucciones ?? '') : (instruccionesInicial ?? ''),
+  )
+  const [formato, setFormato] = useState<FormatoPrueba>(
+    (pruebaInicial?.formato as FormatoPrueba) ?? 'estandar',
   )
   const [formulas, setFormulas] = useState<string[]>(
     pruebaInicial?.formulas ?? [],
@@ -496,6 +510,7 @@ export function GeneradorPrueba({
     fd.set('colegio', colegio)
     fd.set('profesor', profesor)
     fd.set('instrucciones', instrucciones)
+    fd.set('formato', formato)
     const logoFile = logoRef.current?.files?.[0]
     if (logoFile) fd.set('logo', logoFile)
     fd.set('usarLogoColegio', usarLogoColegio ? '1' : '0')
@@ -697,6 +712,40 @@ export function GeneradorPrueba({
                     rows={2}
                     placeholder="Ej: Lee atentamente cada pregunta y marca la alternativa correcta."
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Se guardan con la prueba y quedan como tus instrucciones por
+                    defecto para la próxima.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label>Formato del PDF</Label>
+                  <Select
+                    value={formato}
+                    onValueChange={(v) => setFormato(v as FormatoPrueba)}
+                  >
+                    <SelectTrigger
+                      aria-label="Formato del PDF"
+                      className="w-full sm:w-72"
+                    >
+                      <SelectValue>
+                        {(v: string) =>
+                          ETIQUETA_FORMATO[v as FormatoPrueba] ?? v
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FORMATOS_PRUEBA.map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {ETIQUETA_FORMATO[f]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    El formato IB usa hoja A4, tipografía serif, caja de
+                    instrucciones y líneas de respuesta punteadas.
+                  </p>
                 </div>
               </CardContent>
             </Card>

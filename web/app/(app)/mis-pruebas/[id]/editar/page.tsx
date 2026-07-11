@@ -39,6 +39,7 @@ export default async function EditarPruebaPage({
         colegio: prueba.colegio ?? '',
         profesor: prueba.profesor ?? '',
         instrucciones: prueba.instrucciones ?? '',
+        formato: prueba.formato,
         formulas: prueba.formulas ?? [],
         preguntasIds: prueba.preguntasIds ?? [],
         textosIds: prueba.textosIds ?? [],

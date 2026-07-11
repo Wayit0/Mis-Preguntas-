@@ -309,6 +309,10 @@ describe('Admin de colegio (Parte E.1)', () => {
       .insert(preguntas)
       .values({
         userId: profe.id,
+        // Igual que en producción: la pregunta queda ANCLADA al colegio del
+        // autor al crearse (crearPregunta estampa colegioId); el guard del
+        // banco del colegio autoriza contra este campo.
+        colegioId: colegio.id,
         asignatura: 'Matemática',
         pregunta: 'original',
         correcta: 'A',

@@ -1,112 +1,27 @@
 'use server'
 
 import { getSession } from '@/lib/get-session'
-import {
-  esTipoSoportado,
-  extraerBloquesDocumento,
-  type DocumentoExtraido,
-  type ImagenExtraida,
-} from '@/lib/docparse/extract'
-import { detectarPreguntas } from '@/lib/ai/import'
 import { crearPregunta } from '@/lib/actions/preguntas'
 import { LETRAS } from '@/lib/validation/pregunta'
 import {
   guardarImportSchema,
   type GuardarImportInput,
   type ImagenParaGuardar,
-  type PreguntaDetectada,
 } from '@/lib/validation/import'
 
 // ---------------------------------------------------------------------------
-// Server actions de "Importar Documento con IA" (Fase 7.2).
+// Server action de "Importar Documento con IA" (Fase 7.2): el guardado en lote
+// (`guardarPreguntasImportadas`), reusando `crearPregunta`.
 //
-//  1. `analizarDocumento`  — sube el archivo → docparse → detectarPreguntas.
-//  2. `guardarPreguntasImportadas` — guarda en lote reusando `crearPregunta`.
+// El ANÁLISIS del documento NO vive aquí: es el route handler de streaming
+// `/api/importar` (ver lib/import/analizar.ts) porque puede superar el timeout
+// de inactividad del front-end de Azure y necesita keepalives.
 // ---------------------------------------------------------------------------
-
-/** Resultado del análisis de un documento. */
-export type ResultadoAnalisis =
-  | { ok: true; preguntas: PreguntaDetectada[]; imagenes: ImagenExtraida[] }
-  | { ok: false; error: string }
 
 /** Resultado de la confirmación (guardado en lote). */
 export type ResultadoGuardado =
   | { ok: true; guardadas: number }
   | { ok: false; error: string }
-
-/**
- * Recibe el documento subido (FormData con `archivo` y `asignatura`), lo
- * convierte a content blocks y detecta las preguntas con la IA. No persiste
- * nada: sólo devuelve las preguntas para que el usuario las revise.
- */
-export async function analizarDocumento(
-  formData: FormData,
-): Promise<ResultadoAnalisis> {
-  const session = await getSession()
-  if (!session) return { ok: false, error: 'Debes iniciar sesión.' }
-
-  const archivo = formData.get('archivo')
-  const asignatura = (formData.get('asignatura') ?? '').toString().trim()
-
-  if (!(archivo instanceof File) || archivo.size === 0) {
-    return { ok: false, error: 'Sube un documento (PDF, DOCX o imagen).' }
-  }
-  if (!asignatura) {
-    return { ok: false, error: 'Selecciona una asignatura.' }
-  }
-  if (!esTipoSoportado(archivo.type)) {
-    return {
-      ok: false,
-      error: 'Tipo de archivo no soportado. Usa PDF, Word (DOCX) o una imagen.',
-    }
-  }
-
-  let documento: DocumentoExtraido
-  try {
-    documento = await extraerBloquesDocumento(archivo)
-  } catch {
-    return {
-      ok: false,
-      error: 'No pudimos leer el documento. Verifica que no esté dañado.',
-    }
-  }
-
-  try {
-    const preguntas = await detectarPreguntas(documento.bloques, asignatura)
-    return { ok: true, preguntas, imagenes: documento.imagenes }
-  } catch (err) {
-    // Log con detalle para poder diagnosticar en los logs del servidor (Azure App
-    // Service / Application Insights) qué falló realmente: el mensaje que ve el
-    // profesor es genérico a propósito, pero acá sí queremos el detalle.
-    console.error('[importar] detectarPreguntas falló:', err)
-
-    // Distingue un problema de configuración (clave de Anthropic ausente o
-    // inválida) de un fallo transitorio, para dar un mensaje accionable en vez
-    // de pedir "inténtalo de nuevo" sobre algo que nunca va a funcionar.
-    // - Clave INVÁLIDA → la API responde 401/403 (`err.status`).
-    // - Clave AUSENTE → el SDK lanza ANTES de llamar a la API (sin `.status`),
-    //   con un mensaje que menciona la API key.
-    const status = (err as { status?: number } | null)?.status
-    const mensaje = err instanceof Error ? err.message.toLowerCase() : ''
-    const esProblemaDeClave =
-      status === 401 ||
-      status === 403 ||
-      mensaje.includes('api key') ||
-      mensaje.includes('anthropic_api_key')
-    if (esProblemaDeClave) {
-      return {
-        ok: false,
-        error:
-          'La importación con IA no está configurada: falta o es inválida la ' +
-          'clave de Anthropic. Avísale al administrador del sitio.',
-      }
-    }
-    return {
-      ok: false,
-      error: 'La IA no pudo procesar el documento. Inténtalo de nuevo.',
-    }
-  }
-}
 
 /** Extensión de archivo por mime, para el nombre del `File` reconstruido. */
 const EXT_POR_MIME: Record<string, string> = {
@@ -154,6 +69,11 @@ function formDataDePregunta(
     fd.set('C', p.C)
     fd.set('D', p.D)
     fd.set('E', p.E)
+    setImagenSiExiste(fd, 'imagen_A', p.imagenA)
+    setImagenSiExiste(fd, 'imagen_B', p.imagenB)
+    setImagenSiExiste(fd, 'imagen_C', p.imagenC)
+    setImagenSiExiste(fd, 'imagen_D', p.imagenD)
+    setImagenSiExiste(fd, 'imagen_E', p.imagenE)
     // `crearPregunta` exige una correcta A–E para selección múltiple; si la
     // detección no la trae, usamos 'A' como valor por defecto seguro.
     const correcta = (LETRAS as readonly string[]).includes(p.correcta)

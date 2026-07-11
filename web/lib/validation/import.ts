@@ -25,6 +25,15 @@ import { TIPOS_PREGUNTA } from '@/lib/validation/pregunta'
 /** Tipos de pregunta soportados (idénticos al MVP / a `pregunta.ts`). */
 export const TIPOS_PREGUNTA_IMPORT = TIPOS_PREGUNTA
 
+/**
+ * Máximo de páginas aceptado para un PDF en la importación con IA. La API de
+ * Anthropic corta en 100 páginas, pero mucho antes de eso el análisis se hace
+ * lento y caro sin que una prueba escolar real lo necesite. Vive aquí (módulo
+ * sin dependencias de servidor) para que la UI muestre el mismo número que la
+ * action valida.
+ */
+export const MAX_PAGINAS_PDF = 10
+
 /** Acepta string, null o ausente (lo que devuelva el modelo). */
 const textoOpcional = z.string().nullish()
 
@@ -43,6 +52,42 @@ const textoOpcional = z.string().nullish()
  */
 const indiceImagenOpcional = z.number().int().nullish()
 
+/**
+ * Imágenes asociadas a alternativas, como STRING compacto "LETRA:INDICE"
+ * separado por comas (ej: "A:0,B:1"), o null si ninguna alternativa lleva
+ * imagen. Historia de este formato: 5 campos `imagenAIndice`…`imagenEIndice`
+ * daban `400 "Schema is too complex."`; un arreglo de objetos {letra, indice}
+ * daba `400 "Grammar compilation timed out."` (visto en producción). Un string
+ * plano añade complejidad mínima a la gramática del structured output; el
+ * parseo/validación real lo hace {@link parsearImagenesAlternativas}.
+ */
+const imagenesAlternativasSchema = z.string().nullish()
+
+/** Un par letra→índice ya parseado y validado. */
+export interface ImagenAlternativa {
+  letra: 'A' | 'B' | 'C' | 'D' | 'E'
+  indice: number
+}
+
+/**
+ * Parsea el string compacto "A:0,B:1" a pares {letra, indice} válidos. Entradas
+ * malformadas (letras fuera de A–E, índices no numéricos, basura) se descartan
+ * en silencio: una referencia inválida simplemente no resuelve a ninguna
+ * imagen, igual que un índice fuera de rango.
+ */
+export function parsearImagenesAlternativas(
+  valor: string | null | undefined,
+): ImagenAlternativa[] {
+  if (!valor) return []
+  const pares: ImagenAlternativa[] = []
+  for (const tramo of valor.split(',')) {
+    const m = tramo.trim().match(/^([A-E])\s*:\s*(\d+)$/)
+    if (!m) continue
+    pares.push({ letra: m[1] as ImagenAlternativa['letra'], indice: Number(m[2]) })
+  }
+  return pares
+}
+
 /** Una pregunta tal cual la entrega el modelo (forma laxa, pre-criba). */
 export const preguntaDetectadaSchema = z.object({
   pregunta: z.string(),
@@ -60,6 +105,9 @@ export const preguntaDetectadaSchema = z.object({
   // la que depende el enunciado, si aplica (ver comentario de
   // `indiceImagenOpcional`).
   imagenPreguntaIndice: indiceImagenOpcional,
+  // Imágenes de las alternativas (si alguna alternativa ES una imagen o
+  // depende de una), como string compacto "A:0,B:1". Null si no aplica.
+  imagenesAlternativas: imagenesAlternativasSchema,
 })
 
 /** Forma estructurada que pedimos al modelo (raíz del structured output). */
@@ -132,6 +180,14 @@ export const preguntaImportInputSchema = z.object({
   nivel: textoGuardar,
   tipo: z.enum(TIPOS_PREGUNTA_IMPORT).default('seleccion_multiple'),
   imagenPregunta: imagenParaGuardarSchema,
+  // Imágenes por alternativa, ya resueltas por el cliente desde los índices de
+  // `imagenesAlternativas`. Este schema NO viaja al modelo (es cliente→server
+  // action), así que los 5 campos no chocan con el límite de structured outputs.
+  imagenA: imagenParaGuardarSchema,
+  imagenB: imagenParaGuardarSchema,
+  imagenC: imagenParaGuardarSchema,
+  imagenD: imagenParaGuardarSchema,
+  imagenE: imagenParaGuardarSchema,
 })
 
 /** Payload de la confirmación: asignatura + preguntas seleccionadas. */

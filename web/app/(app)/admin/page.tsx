@@ -1,6 +1,12 @@
 import Link from 'next/link'
 import { requireRole } from '@/lib/authz'
-import { listarColegios, listarUsuarios } from '@/lib/queries/admin'
+import {
+  listarColegios,
+  listarUsuarios,
+  listarUsosIa,
+  resumenUsosIa,
+} from '@/lib/queries/admin'
+import { formatearUsd } from '@/lib/ai/costos'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -9,10 +15,12 @@ import { CrearColegio } from '@/components/admin/crear-colegio'
 import { EditarColegio } from '@/components/admin/editar-colegio'
 import { FilaUsuario } from '@/components/admin/fila-usuario'
 
-type Tab = 'colegios' | 'usuarios'
+type Tab = 'colegios' | 'usuarios' | 'costos'
 
 function normalizarTab(valor?: string): Tab {
-  return valor === 'usuarios' ? 'usuarios' : 'colegios'
+  if (valor === 'usuarios') return 'usuarios'
+  if (valor === 'costos') return 'costos'
+  return 'colegios'
 }
 
 function EstadoVacio({ mensaje }: { mensaje: string }) {
@@ -38,6 +46,7 @@ export default async function AdminPage({
   const tabs: { id: Tab; etiqueta: string }[] = [
     { id: 'colegios', etiqueta: 'Colegios' },
     { id: 'usuarios', etiqueta: 'Usuarios' },
+    { id: 'costos', etiqueta: 'Costos de IA' },
   ]
 
   return (
@@ -76,7 +85,13 @@ export default async function AdminPage({
         })}
       </div>
 
-      {tabActual === 'colegios' ? <ColegiosTab /> : <UsuariosTab />}
+      {tabActual === 'colegios' ? (
+        <ColegiosTab />
+      ) : tabActual === 'usuarios' ? (
+        <UsuariosTab />
+      ) : (
+        <CostosTab />
+      )}
     </div>
   )
 }
@@ -159,5 +174,120 @@ async function UsuariosTab() {
         </div>
       )}
     </section>
+  )
+}
+
+/** Etiquetas legibles para las acciones registradas en `usos_ia`. */
+const ETIQUETA_ACCION: Record<string, string> = {
+  importar_documento: '📄 Importar documento',
+}
+
+function formatearFecha(fecha: Date | null): string {
+  if (!fecha) return '—'
+  return new Intl.DateTimeFormat('es-CL', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+    timeZone: 'America/Santiago',
+  }).format(fecha)
+}
+
+function formatearTokens(n: number): string {
+  return new Intl.NumberFormat('es-CL').format(n)
+}
+
+async function CostosTab() {
+  const [resumen, usos] = await Promise.all([resumenUsosIa(), listarUsosIa(100)])
+
+  const tarjetas = [
+    { etiqueta: 'Gasto total', valor: formatearUsd(resumen.totalMicroUsd) },
+    { etiqueta: 'Gasto este mes', valor: formatearUsd(resumen.mesMicroUsd) },
+    { etiqueta: 'Usos de IA', valor: String(resumen.totalUsos) },
+  ]
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {tarjetas.map((t) => (
+          <Card key={t.etiqueta}>
+            <CardContent className="flex flex-col gap-0.5">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t.etiqueta}
+              </span>
+              <span className="font-heading text-2xl font-bold text-foreground">
+                {t.valor}
+              </span>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="font-heading text-base font-semibold text-foreground">
+          Últimos usos {usos.length === 100 ? '(últimos 100)' : `(${usos.length})`}
+        </h2>
+        {usos.length === 0 ? (
+          <EstadoVacio mensaje="Aún no hay usos de IA registrados. Aparecerán aquí cuando alguien importe un documento." />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {usos.map((u) => {
+              const d = u.detalle ?? {}
+              return (
+                <Card key={u.id}>
+                  <CardContent className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {u.usuarioNombre ?? 'Usuario eliminado'}
+                          <span className="ml-1.5 font-normal text-muted-foreground">
+                            {u.usuarioEmail ?? ''}
+                          </span>
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {ETIQUETA_ACCION[u.accion] ?? u.accion} ·{' '}
+                          {formatearFecha(u.createdAt)}
+                        </span>
+                      </div>
+                      <Badge variant="secondary" className="text-sm">
+                        {formatearUsd(u.costoMicroUsd)}
+                      </Badge>
+                    </div>
+
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span>Modelo: {u.modelo}</span>
+                      <span>Entrada: {formatearTokens(u.inputTokens)} tokens</span>
+                      <span>Salida: {formatearTokens(u.outputTokens)} tokens</span>
+                      {u.cacheReadTokens > 0 ? (
+                        <span>Caché leída: {formatearTokens(u.cacheReadTokens)}</span>
+                      ) : null}
+                      {u.cacheCreationTokens > 0 ? (
+                        <span>Caché escrita: {formatearTokens(u.cacheCreationTokens)}</span>
+                      ) : null}
+                    </div>
+
+                    {typeof d.archivo === 'string' ? (
+                      <div className="rounded-md bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
+                        📎 {d.archivo}
+                        {typeof d.preguntas === 'number'
+                          ? ` · ${d.preguntas} preguntas`
+                          : ''}
+                        {typeof d.imagenes === 'number' && d.imagenes > 0
+                          ? ` · ${d.imagenes} imágenes`
+                          : ''}
+                        {typeof d.duracionSegundos === 'number'
+                          ? ` · ${d.duracionSegundos}s`
+                          : ''}
+                        {typeof d.asignatura === 'string'
+                          ? ` · ${d.asignatura}`
+                          : ''}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </section>
+    </div>
   )
 }
