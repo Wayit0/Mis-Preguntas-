@@ -1,4 +1,4 @@
-import { and, desc, eq, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, isNull, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { pruebas, usuarios } from '@/lib/db/schema'
 import { listarPreguntasPropias, opcionesDeFiltros } from '@/lib/queries/preguntas'
@@ -11,23 +11,51 @@ import type {
 /** Una fila de la tabla `pruebas` tal cual se lee de la base. */
 export type Prueba = typeof pruebas.$inferSelect
 
+export const POR_PAGINA_PRUEBAS = 24
+
+export interface FiltrosPruebas {
+  /** Búsqueda por título. */
+  busqueda?: string
+  /** `undefined` = todas; `null` = sin carpeta; `number` = esa carpeta. */
+  carpetaId?: number | null
+}
+
+export interface PaginaPruebas {
+  items: Prueba[]
+  total: number
+}
+
 /**
- * Pruebas creadas por el usuario, opcionalmente acotadas a una asignatura.
- * Orden descendente por fecha de creación (las más recientes primero); el id
- * resuelve empates cuando `created_at` coincide.
+ * Pruebas del usuario acotadas por asignatura, búsqueda (título) y carpeta,
+ * PAGINADAS. Orden descendente por fecha (id como desempate).
  */
 export async function listarPruebasPropias(
   userId: number,
   asignatura?: string,
-): Promise<Prueba[]> {
+  filtros?: FiltrosPruebas,
+  pagina = 1,
+  porPagina = POR_PAGINA_PRUEBAS,
+): Promise<PaginaPruebas> {
   const conds: SQL[] = [eq(pruebas.userId, userId)]
   if (asignatura) conds.push(eq(pruebas.asignatura, asignatura))
+  if (filtros?.carpetaId === null) conds.push(isNull(pruebas.carpetaId))
+  else if (typeof filtros?.carpetaId === 'number') {
+    conds.push(eq(pruebas.carpetaId, filtros.carpetaId))
+  }
+  if (filtros?.busqueda?.trim()) {
+    conds.push(ilike(pruebas.titulo, `%${filtros.busqueda.trim()}%`))
+  }
+  const where = and(...conds)
 
-  return db
+  const [{ n }] = await db.select({ n: count() }).from(pruebas).where(where)
+  const items = await db
     .select()
     .from(pruebas)
-    .where(and(...conds))
+    .where(where)
     .orderBy(desc(pruebas.createdAt), desc(pruebas.id))
+    .limit(porPagina)
+    .offset(Math.max(0, (pagina - 1) * porPagina))
+  return { items, total: Number(n) }
 }
 
 /**
@@ -77,11 +105,16 @@ export async function cargarDatosGenerador(
   materias: string[]
   textos: TextoSeleccionable[]
 }> {
-  const [lista, opciones, textos] = await Promise.all([
-    listarPreguntasPropias(userId, asignatura),
+  // El generador filtra/pagina en el cliente, así que necesita TODAS las
+  // preguntas y textos del usuario: se pide una página muy grande.
+  const TODO = 100000
+  const [listaPag, opciones, textosPag] = await Promise.all([
+    listarPreguntasPropias(userId, asignatura, undefined, 1, TODO),
     opcionesDeFiltros(userId, asignatura),
-    cargarTextosPropios(userId, asignatura),
+    cargarTextosPropios(userId, asignatura, undefined, 1, TODO),
   ])
+  const lista = listaPag.items
+  const textos = textosPag.items
 
   const conteos = await contarPreguntasPorTexto(textos.map((t) => t.id))
 

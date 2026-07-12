@@ -1,6 +1,9 @@
-import { and, count, desc, eq, gt, ilike, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, gt, ilike, isNull, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { preguntas } from '@/lib/db/schema'
+
+/** Tamaño de página por defecto en las listas paginadas. */
+export const POR_PAGINA_PREGUNTAS = 24
 
 /**
  * La asignatura con más preguntas del usuario. Alimenta el default del contexto
@@ -30,24 +33,34 @@ export interface FiltrosPreguntas {
   estado?: EstadoCompartida
   /** Búsqueda por código (#123) o texto libre en el enunciado. */
   busqueda?: string
+  /**
+   * Filtro por carpeta: `undefined` = todas (no filtra), `null` = sin carpeta
+   * (raíz), `number` = esa carpeta.
+   */
+  carpetaId?: number | null
 }
 
-/**
- * Preguntas creadas por el usuario, opcionalmente acotadas a una asignatura y a
- * los filtros de materia/nivel/estado. Orden descendente por id (las más
- * recientes primero).
- */
-export async function listarPreguntasPropias(
+/** Página de resultados: los ítems de la página + el total (para el paginador). */
+export interface PaginaPreguntas {
+  items: Pregunta[]
+  total: number
+}
+
+function condicionesPreguntas(
   userId: number,
   asignatura?: string,
   filtros?: FiltrosPreguntas,
-): Promise<Pregunta[]> {
+): SQL[] {
   const conds: SQL[] = [eq(preguntas.userId, userId)]
   if (asignatura) conds.push(eq(preguntas.asignatura, asignatura))
   if (filtros?.materia) conds.push(eq(preguntas.materia, filtros.materia))
   if (filtros?.nivel) conds.push(eq(preguntas.nivel, filtros.nivel))
   if (filtros?.estado === 'compartida') conds.push(gt(preguntas.compartida, 0))
   if (filtros?.estado === 'privada') conds.push(eq(preguntas.compartida, 0))
+  if (filtros?.carpetaId === null) conds.push(isNull(preguntas.carpetaId))
+  else if (typeof filtros?.carpetaId === 'number') {
+    conds.push(eq(preguntas.carpetaId, filtros.carpetaId))
+  }
   if (filtros?.busqueda) {
     const term = filtros.busqueda.trim()
     const sinHash = term.replace(/^#/, '')
@@ -58,12 +71,34 @@ export async function listarPreguntasPropias(
       conds.push(ilike(preguntas.pregunta, `%${term}%`))
     }
   }
+  return conds
+}
 
-  return db
+/**
+ * Preguntas del usuario acotadas por asignatura, filtros (materia/nivel/estado/
+ * carpeta) y búsqueda, PAGINADAS. Orden descendente por id (más recientes
+ * primero). Devuelve la página y el total de coincidencias.
+ */
+export async function listarPreguntasPropias(
+  userId: number,
+  asignatura?: string,
+  filtros?: FiltrosPreguntas,
+  pagina = 1,
+  porPagina = POR_PAGINA_PREGUNTAS,
+): Promise<PaginaPreguntas> {
+  const where = and(...condicionesPreguntas(userId, asignatura, filtros))
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(preguntas)
+    .where(where)
+  const items = await db
     .select()
     .from(preguntas)
-    .where(and(...conds))
+    .where(where)
     .orderBy(desc(preguntas.id))
+    .limit(porPagina)
+    .offset(Math.max(0, (pagina - 1) * porPagina))
+  return { items, total: Number(n) }
 }
 
 export interface OpcionesFiltros {

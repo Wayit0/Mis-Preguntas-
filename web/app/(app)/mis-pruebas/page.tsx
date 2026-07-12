@@ -2,19 +2,56 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
 import { resolverAsignatura } from '@/lib/asignatura'
-import { listarPruebasPropias } from '@/lib/queries/pruebas'
+import { listarPruebasPropias, POR_PAGINA_PRUEBAS } from '@/lib/queries/pruebas'
+import {
+  listarCarpetas,
+  rutaCarpeta,
+  subcarpetas,
+  contarItemsEnCarpetas,
+} from '@/lib/queries/carpetas'
 import { buttonVariants } from '@/components/ui/button'
 import { TarjetaPrueba } from '@/components/pruebas/tarjeta-prueba'
+import { NavegadorCarpetas } from '@/components/carpetas/navegador-carpetas'
+import { Paginador } from '@/components/carpetas/paginador'
+import { BuscadorLista } from '@/components/carpetas/buscador-lista'
 
-export default async function MisPruebasPage() {
+export default async function MisPruebasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ busqueda?: string; carpeta?: string; pagina?: string }>
+}) {
+  const { busqueda, carpeta, pagina: paginaParam } = await searchParams
+
   const session = await getSession()
   if (!session) redirect('/login')
   const userId = Number(session.user.id)
 
-  // La asignatura es contexto global (cookie), no viene de la URL.
   const asignatura = await resolverAsignatura(userId)
 
-  const pruebas = await listarPruebasPropias(userId, asignatura)
+  const buscando = Boolean(busqueda?.trim())
+  const carpetaActual =
+    carpeta && Number.isFinite(Number(carpeta)) ? Number(carpeta) : null
+  const pagina = Math.max(1, Number(paginaParam) || 1)
+
+  const filtros = { busqueda, carpetaId: buscando ? undefined : carpetaActual }
+
+  const [pag, ruta, subs, carpetas] = await Promise.all([
+    listarPruebasPropias(userId, asignatura, filtros, pagina),
+    buscando ? Promise.resolve([]) : rutaCarpeta(userId, carpetaActual),
+    buscando ? Promise.resolve([]) : subcarpetas(userId, carpetaActual),
+    listarCarpetas(userId),
+  ])
+
+  if (!buscando && carpetaActual != null && ruta.length === 0) {
+    redirect('/mis-pruebas')
+  }
+
+  const conteoCarpetas = await contarItemsEnCarpetas(
+    userId,
+    'pruebas',
+    subs.map((s) => s.id),
+  )
+  const subConConteo = subs.map((s) => ({ ...s, n: conteoCarpetas.get(s.id) ?? 0 }))
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
@@ -30,40 +67,56 @@ export default async function MisPruebasPage() {
             ) : null}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Guarda tus pruebas, edítalas y descarga su PDF cuando quieras.
+            {pag.total === 1 ? '1 prueba' : `${pag.total} pruebas`}
+            {buscando ? ' · resultados en todas las carpetas' : ''}
           </p>
         </div>
-        <Link
-          href="/prueba"
-          className={buttonVariants()}
-        >
+        <Link href="/prueba" className={buttonVariants()}>
           ➕ Nueva prueba
         </Link>
       </div>
 
-      {pruebas.length === 0 ? (
+      {buscando ? null : (
+        <NavegadorCarpetas
+          basePath="/mis-pruebas"
+          carpetaActual={carpetaActual}
+          ruta={ruta}
+          subcarpetas={subConConteo}
+        />
+      )}
+
+      <BuscadorLista basePath="/mis-pruebas" valorInicial={busqueda ?? ''} />
+
+      {pag.items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <p className="text-base font-medium text-foreground">
-            Aún no tienes pruebas guardadas
+            {buscando
+              ? 'Sin resultados'
+              : carpetaActual != null
+                ? 'Esta carpeta está vacía'
+                : 'Aún no tienes pruebas guardadas'}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Crea una prueba, guárdala y aparecerá aquí para editarla o descargar
-            su PDF.
+            {buscando
+              ? 'Ninguna prueba coincide con tu búsqueda.'
+              : 'Crea una prueba o mueve pruebas existentes a esta carpeta.'}
           </p>
-          <Link
-            href="/prueba"
-            className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
-          >
-            ➕ Crear una prueba
-          </Link>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {pruebas.map((p) => (
-            <TarjetaPrueba key={p.id} prueba={p} />
+          {pag.items.map((p) => (
+            <TarjetaPrueba key={p.id} prueba={p} carpetas={carpetas} />
           ))}
         </div>
       )}
+
+      <Paginador
+        total={pag.total}
+        pagina={pagina}
+        porPagina={POR_PAGINA_PRUEBAS}
+        basePath="/mis-pruebas"
+        params={{ busqueda, carpeta }}
+      />
     </div>
   )
 }

@@ -5,11 +5,20 @@ import { resolverAsignatura } from '@/lib/asignatura'
 import {
   listarPreguntasPropias,
   opcionesDeFiltros,
+  POR_PAGINA_PREGUNTAS,
   type EstadoCompartida,
 } from '@/lib/queries/preguntas'
+import {
+  listarCarpetas,
+  rutaCarpeta,
+  subcarpetas,
+  contarItemsEnCarpetas,
+} from '@/lib/queries/carpetas'
 import { buttonVariants } from '@/components/ui/button'
 import { FiltrosPreguntas } from '@/components/preguntas/filtros-preguntas'
 import { TarjetaPregunta } from '@/components/preguntas/tarjeta-pregunta'
+import { NavegadorCarpetas } from '@/components/carpetas/navegador-carpetas'
+import { Paginador } from '@/components/carpetas/paginador'
 
 const ESTADOS_VALIDOS: EstadoCompartida[] = ['todas', 'compartida', 'privada']
 
@@ -33,30 +42,53 @@ export default async function PreguntasPage({
     nivel?: string
     estado?: string
     busqueda?: string
+    carpeta?: string
+    pagina?: string
   }>
 }) {
-  const { materia, nivel, estado, busqueda } = await searchParams
+  const { materia, nivel, estado, busqueda, carpeta, pagina: paginaParam } =
+    await searchParams
 
-  // Guard explícito (además del layout) para no ejecutar queries con un userId
-  // inválido si la página se renderiza junto al redirect del layout.
   const session = await getSession()
   if (!session) redirect('/login')
   const userId = Number(session.user.id)
 
-  // La asignatura es contexto global (cookie), no viene de la URL.
   const asignatura = await resolverAsignatura(userId)
 
+  const buscando = Boolean(busqueda?.trim())
+  const carpetaActual =
+    carpeta && Number.isFinite(Number(carpeta)) ? Number(carpeta) : null
+  const pagina = Math.max(1, Number(paginaParam) || 1)
+
+  // En modo búsqueda ignoramos la carpeta (resultados globales); en navegación,
+  // acotamos a la carpeta actual (`null` = raíz / sin carpeta).
   const filtros = {
     materia,
     nivel,
     estado: normalizarEstado(estado),
     busqueda,
+    carpetaId: buscando ? undefined : carpetaActual,
   }
 
-  const [lista, opciones] = await Promise.all([
-    listarPreguntasPropias(userId, asignatura, filtros),
+  const [pag, opciones, ruta, subs, carpetas] = await Promise.all([
+    listarPreguntasPropias(userId, asignatura, filtros, pagina),
     opcionesDeFiltros(userId, asignatura),
+    buscando ? Promise.resolve([]) : rutaCarpeta(userId, carpetaActual),
+    buscando ? Promise.resolve([]) : subcarpetas(userId, carpetaActual),
+    listarCarpetas(userId),
   ])
+
+  // Carpeta inexistente o ajena → volvemos a la raíz.
+  if (!buscando && carpetaActual != null && ruta.length === 0) {
+    redirect('/preguntas')
+  }
+
+  const conteos = await contarItemsEnCarpetas(
+    userId,
+    'preguntas',
+    subs.map((s) => s.id),
+  )
+  const subConConteo = subs.map((s) => ({ ...s, n: conteos.get(s.id) ?? 0 }))
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
@@ -72,10 +104,8 @@ export default async function PreguntasPage({
             ) : null}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {lista.length === 1
-              ? '1 pregunta'
-              : `${lista.length} preguntas`}{' '}
-            · filtra por materia, nivel o estado
+            {pag.total === 1 ? '1 pregunta' : `${pag.total} preguntas`}
+            {buscando ? ' · resultados en todas las carpetas' : ''}
           </p>
         </div>
         <Link
@@ -86,35 +116,47 @@ export default async function PreguntasPage({
         </Link>
       </div>
 
-      <FiltrosPreguntas
-        materias={opciones.materias}
-        niveles={opciones.niveles}
-      />
+      {buscando ? null : (
+        <NavegadorCarpetas
+          basePath="/preguntas"
+          carpetaActual={carpetaActual}
+          ruta={ruta}
+          subcarpetas={subConConteo}
+        />
+      )}
 
-      {lista.length === 0 ? (
+      <FiltrosPreguntas materias={opciones.materias} niveles={opciones.niveles} />
+
+      {pag.items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <p className="text-base font-medium text-foreground">
-            Aún no tienes preguntas aquí
+            {buscando
+              ? 'Sin resultados'
+              : carpetaActual != null
+                ? 'Esta carpeta está vacía'
+                : 'Aún no tienes preguntas aquí'}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {materia || nivel || (estado && estado !== 'todas')
-              ? 'Ninguna pregunta coincide con los filtros. Prueba a quitarlos.'
-              : 'Crea tu primera pregunta para empezar tu banco.'}
+            {busqueda || materia || nivel || (estado && estado !== 'todas')
+              ? 'Ninguna pregunta coincide. Prueba a quitar filtros o búsqueda.'
+              : 'Crea una pregunta o mueve preguntas existentes a esta carpeta.'}
           </p>
-          <Link
-            href={conAsignatura('/preguntas/nueva', asignatura)}
-            className={buttonVariants({ className: 'mt-4' })}
-          >
-            ➕ Agregar pregunta
-          </Link>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {lista.map((p) => (
-            <TarjetaPregunta key={p.id} p={p} />
+          {pag.items.map((p) => (
+            <TarjetaPregunta key={p.id} p={p} carpetas={carpetas} />
           ))}
         </div>
       )}
+
+      <Paginador
+        total={pag.total}
+        pagina={pagina}
+        porPagina={POR_PAGINA_PREGUNTAS}
+        basePath="/preguntas"
+        params={{ materia, nivel, estado, busqueda, carpeta }}
+      />
     </div>
   )
 }

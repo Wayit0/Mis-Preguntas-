@@ -1,4 +1,14 @@
-import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  type SQL,
+} from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { preguntas, textos } from '@/lib/db/schema'
 
@@ -8,23 +18,51 @@ export type Texto = typeof textos.$inferSelect
 /** Una fila de la tabla `preguntas` (subconjunto compartido con queries/preguntas). */
 export type PreguntaDeTexto = typeof preguntas.$inferSelect
 
+export const POR_PAGINA_TEXTOS = 24
+
+export interface FiltrosTextos {
+  /** Búsqueda por título. */
+  busqueda?: string
+  /** `undefined` = todas; `null` = sin carpeta; `number` = esa carpeta. */
+  carpetaId?: number | null
+}
+
+export interface PaginaTextos {
+  items: Texto[]
+  total: number
+}
+
 /**
- * Textos creados por el usuario, opcionalmente acotados a una asignatura. Orden
- * descendente por fecha de creación (los más recientes primero); el id resuelve
- * empates cuando `created_at` coincide (paridad práctica con app.py).
+ * Textos del usuario acotados por asignatura, búsqueda (título) y carpeta,
+ * PAGINADOS. Orden descendente por fecha (id como desempate).
  */
 export async function cargarTextosPropios(
   userId: number,
   asignatura?: string,
-): Promise<Texto[]> {
+  filtros?: FiltrosTextos,
+  pagina = 1,
+  porPagina = POR_PAGINA_TEXTOS,
+): Promise<PaginaTextos> {
   const conds: SQL[] = [eq(textos.userId, userId)]
   if (asignatura) conds.push(eq(textos.asignatura, asignatura))
+  if (filtros?.carpetaId === null) conds.push(isNull(textos.carpetaId))
+  else if (typeof filtros?.carpetaId === 'number') {
+    conds.push(eq(textos.carpetaId, filtros.carpetaId))
+  }
+  if (filtros?.busqueda?.trim()) {
+    conds.push(ilike(textos.titulo, `%${filtros.busqueda.trim()}%`))
+  }
+  const where = and(...conds)
 
-  return db
+  const [{ n }] = await db.select({ n: count() }).from(textos).where(where)
+  const items = await db
     .select()
     .from(textos)
-    .where(and(...conds))
+    .where(where)
     .orderBy(desc(textos.createdAt), desc(textos.id))
+    .limit(porPagina)
+    .offset(Math.max(0, (pagina - 1) * porPagina))
+  return { items, total: Number(n) }
 }
 
 /**

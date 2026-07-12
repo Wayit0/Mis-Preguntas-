@@ -5,6 +5,8 @@ import { buttonVariants } from '@/components/ui/button'
 import { eliminarTexto } from '@/lib/actions/textos'
 import { VISIBILIDAD_TEXTO } from '@/lib/validation/texto'
 import type { Texto } from '@/lib/queries/textos'
+import type { Carpeta } from '@/lib/queries/carpetas'
+import { MoverACarpeta } from '@/components/carpetas/mover-a-carpeta'
 
 /** Texto recortado para la vista previa de la tarjeta. */
 function preview(contenido: string, max = 220): string {
@@ -22,10 +24,13 @@ function etiquetaVisibilidad(compartida: number | null): string {
 export function TarjetaTexto({
   texto,
   nPreguntas,
+  carpetas,
 }: {
   texto: Texto
   /** Nº de preguntas asociadas a este texto. */
   nPreguntas: number
+  /** Lista plana de carpetas; si se pasa, muestra el selector "Mover a". */
+  carpetas?: Carpeta[]
 }) {
   return (
     <Card>
@@ -74,6 +79,14 @@ export function TarjetaTexto({
               🗑 Eliminar texto
             </button>
           </form>
+          {carpetas ? (
+            <MoverACarpeta
+              tipo="textos"
+              id={texto.id}
+              carpetaActual={texto.carpetaId ?? null}
+              carpetas={carpetas}
+            />
+          ) : null}
         </div>
       </CardContent>
     </Card>

@@ -104,7 +104,7 @@ describe('Mis Textos (CRUD + desasociar preguntas al borrar)', () => {
       .returning()
 
     // Verlo: aparece en la lista de la asignatura y trae la pregunta asociada.
-    const lista = await cargarTextosPropios(u.id, 'Lenguaje')
+    const { items: lista } = await cargarTextosPropios(u.id, 'Lenguaje')
     expect(lista.some((t) => t.id === textoId)).toBe(true)
 
     const pregs = await cargarPreguntasDeTexto(textoId)
@@ -136,7 +136,7 @@ describe('Mis Textos (CRUD + desasociar preguntas al borrar)', () => {
     await eliminarTexto(textoId)
 
     // El texto ya no existe.
-    const lista = await cargarTextosPropios(u.id, 'Historia')
+    const { items: lista } = await cargarTextosPropios(u.id, 'Historia')
     expect(lista.some((t) => t.id === textoId)).toBe(false)
 
     // La pregunta NO se borró y quedó desasociada (texto_id NULL).
@@ -179,7 +179,7 @@ describe('Mis Textos (CRUD + desasociar preguntas al borrar)', () => {
     currentUserId = intruso.id
     await eliminarTexto(textoId)
 
-    const lista = await cargarTextosPropios(dueno.id, 'Biología')
+    const { items: lista } = await cargarTextosPropios(dueno.id, 'Biología')
     expect(lista.some((t) => t.id === textoId)).toBe(true)
 
     const [pregDespues] = await db

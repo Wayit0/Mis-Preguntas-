@@ -5,9 +5,19 @@ import { resolverAsignatura } from '@/lib/asignatura'
 import {
   cargarTextosPropios,
   contarPreguntasPorTexto,
+  POR_PAGINA_TEXTOS,
 } from '@/lib/queries/textos'
+import {
+  listarCarpetas,
+  rutaCarpeta,
+  subcarpetas,
+  contarItemsEnCarpetas,
+} from '@/lib/queries/carpetas'
 import { buttonVariants } from '@/components/ui/button'
 import { TarjetaTexto } from '@/components/textos/tarjeta-texto'
+import { NavegadorCarpetas } from '@/components/carpetas/navegador-carpetas'
+import { Paginador } from '@/components/carpetas/paginador'
+import { BuscadorLista } from '@/components/carpetas/buscador-lista'
 
 function conAsignatura(base: string, asignatura?: string): string {
   return asignatura
@@ -15,18 +25,45 @@ function conAsignatura(base: string, asignatura?: string): string {
     : base
 }
 
-export default async function TextosPage() {
-  // Guard explícito (además del layout) para no ejecutar queries con un userId
-  // inválido si la página se renderiza junto al redirect del layout.
+export default async function TextosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ busqueda?: string; carpeta?: string; pagina?: string }>
+}) {
+  const { busqueda, carpeta, pagina: paginaParam } = await searchParams
+
   const session = await getSession()
   if (!session) redirect('/login')
   const userId = Number(session.user.id)
 
-  // La asignatura es contexto global (cookie), no viene de la URL.
   const asignatura = await resolverAsignatura(userId)
 
-  const textosPropios = await cargarTextosPropios(userId, asignatura)
-  const conteos = await contarPreguntasPorTexto(textosPropios.map((t) => t.id))
+  const buscando = Boolean(busqueda?.trim())
+  const carpetaActual =
+    carpeta && Number.isFinite(Number(carpeta)) ? Number(carpeta) : null
+  const pagina = Math.max(1, Number(paginaParam) || 1)
+
+  const filtros = {
+    busqueda,
+    carpetaId: buscando ? undefined : carpetaActual,
+  }
+
+  const [pag, ruta, subs, carpetas] = await Promise.all([
+    cargarTextosPropios(userId, asignatura, filtros, pagina),
+    buscando ? Promise.resolve([]) : rutaCarpeta(userId, carpetaActual),
+    buscando ? Promise.resolve([]) : subcarpetas(userId, carpetaActual),
+    listarCarpetas(userId),
+  ])
+
+  if (!buscando && carpetaActual != null && ruta.length === 0) {
+    redirect('/textos')
+  }
+
+  const [conteoPreguntas, conteoCarpetas] = await Promise.all([
+    contarPreguntasPorTexto(pag.items.map((t) => t.id)),
+    contarItemsEnCarpetas(userId, 'textos', subs.map((s) => s.id)),
+  ])
+  const subConConteo = subs.map((s) => ({ ...s, n: conteoCarpetas.get(s.id) ?? 0 }))
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
@@ -42,7 +79,8 @@ export default async function TextosPage() {
             ) : null}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Textos de comprensión lectora a los que puedes asociar preguntas.
+            {pag.total === 1 ? '1 texto' : `${pag.total} textos`}
+            {buscando ? ' · resultados en todas las carpetas' : ''}
           </p>
         </div>
         <Link
@@ -53,32 +91,52 @@ export default async function TextosPage() {
         </Link>
       </div>
 
-      {textosPropios.length === 0 ? (
+      {buscando ? null : (
+        <NavegadorCarpetas
+          basePath="/textos"
+          carpetaActual={carpetaActual}
+          ruta={ruta}
+          subcarpetas={subConConteo}
+        />
+      )}
+
+      <BuscadorLista basePath="/textos" valorInicial={busqueda ?? ''} />
+
+      {pag.items.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center">
           <p className="text-base font-medium text-foreground">
-            Aún no tienes textos aquí
+            {buscando
+              ? 'Sin resultados'
+              : carpetaActual != null
+                ? 'Esta carpeta está vacía'
+                : 'Aún no tienes textos aquí'}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Crea tu primer texto de comprensión para empezar.
+            {buscando
+              ? 'Ningún texto coincide con tu búsqueda.'
+              : 'Crea un texto o mueve textos existentes a esta carpeta.'}
           </p>
-          <Link
-            href={conAsignatura('/textos/nueva', asignatura)}
-            className={buttonVariants({ className: 'mt-4' })}
-          >
-            ➕ Agregar texto
-          </Link>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {textosPropios.map((t) => (
+          {pag.items.map((t) => (
             <TarjetaTexto
               key={t.id}
               texto={t}
-              nPreguntas={conteos.get(t.id) ?? 0}
+              nPreguntas={conteoPreguntas.get(t.id) ?? 0}
+              carpetas={carpetas}
             />
           ))}
         </div>
       )}
+
+      <Paginador
+        total={pag.total}
+        pagina={pagina}
+        porPagina={POR_PAGINA_TEXTOS}
+        basePath="/textos"
+        params={{ busqueda, carpeta }}
+      />
     </div>
   )
 }

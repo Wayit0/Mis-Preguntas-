@@ -8,6 +8,8 @@ import { imageUrl } from '@/lib/storage/blob'
 import { eliminarPregunta, toggleCompartida } from '@/lib/actions/preguntas'
 import { ETIQUETA_TIPO, LETRAS, type TipoPregunta } from '@/lib/validation/pregunta'
 import type { Pregunta } from '@/lib/queries/preguntas'
+import type { Carpeta } from '@/lib/queries/carpetas'
+import { MoverACarpeta } from '@/components/carpetas/mover-a-carpeta'
 import { LatexText } from './latex-text'
 
 function alternativaTexto(p: Pregunta, letra: string): string | null {
@@ -29,6 +31,7 @@ export function TarjetaPregunta({
   autor,
   soloLectura = false,
   propia = false,
+  carpetas,
 }: {
   p: Pregunta
   /** Nombre del autor; se muestra en el modo solo lectura (Banco Compartido). */
@@ -37,6 +40,8 @@ export function TarjetaPregunta({
   soloLectura?: boolean
   /** Marca la tarjeta como "Tuya" (tus propias preguntas dentro del Banco Compartido). */
   propia?: boolean
+  /** Lista plana de carpetas del usuario; si se pasa, muestra el selector "Mover a". */
+  carpetas?: Carpeta[]
 }) {
   const compartida = (p.compartida ?? 0) > 0
   const tipo = (p.tipo ?? 'seleccion_multiple') as TipoPregunta
@@ -172,6 +177,15 @@ export function TarjetaPregunta({
                 🗑 Eliminar
               </button>
             </form>
+
+            {carpetas ? (
+              <MoverACarpeta
+                tipo="preguntas"
+                id={p.id}
+                carpetaActual={p.carpetaId ?? null}
+                carpetas={carpetas}
+              />
+            ) : null}
           </div>
         )}
       </CardContent>

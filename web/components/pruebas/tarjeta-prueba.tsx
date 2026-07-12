@@ -5,6 +5,8 @@ import { buttonVariants } from '@/components/ui/button'
 import { eliminarPrueba } from '@/lib/actions/pruebas'
 import { BotonGenerarPdf } from '@/components/pruebas/boton-generar-pdf'
 import type { Prueba } from '@/lib/queries/pruebas'
+import type { Carpeta } from '@/lib/queries/carpetas'
+import { MoverACarpeta } from '@/components/carpetas/mover-a-carpeta'
 
 /** Formatea una fecha en español (día mes año); vacío si es null. */
 function formatoFecha(d: Date | null): string {
@@ -19,7 +21,14 @@ function formatoFecha(d: Date | null): string {
 // Clases compartidas de las acciones (misma altura táctil que "Mis Textos").
 const ACCION = 'h-9 px-3 sm:h-7 sm:px-2.5'
 
-export function TarjetaPrueba({ prueba }: { prueba: Prueba }) {
+export function TarjetaPrueba({
+  prueba,
+  carpetas,
+}: {
+  prueba: Prueba
+  /** Lista plana de carpetas; si se pasa, muestra el selector "Mover a". */
+  carpetas?: Carpeta[]
+}) {
   const nPreguntas = prueba.preguntasIds?.length ?? 0
   const nTextos = prueba.textosIds?.length ?? 0
   const tienePdf = !!prueba.pdfKey
@@ -105,6 +114,15 @@ export function TarjetaPrueba({ prueba }: { prueba: Prueba }) {
               🗑 Eliminar
             </button>
           </form>
+
+          {carpetas ? (
+            <MoverACarpeta
+              tipo="pruebas"
+              id={prueba.id}
+              carpetaActual={prueba.carpetaId ?? null}
+              carpetas={carpetas}
+            />
+          ) : null}
         </div>
       </CardContent>
     </Card>
