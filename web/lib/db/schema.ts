@@ -83,6 +83,22 @@ export const invitacionesColegio = pgTable('invitaciones_colegio', {
   createdAt: timestamp('created_at').defaultNow(),
 })
 
+// ---------------------------------------------------------------------------
+// Carpetas para organizar el contenido PERSONAL del profesor (preguntas, pruebas
+// y textos). Jerárquicas (parentId auto-referencia, null = raíz). `userId` y
+// `parentId` son integer sin FK formal, igual que el resto del dominio; la
+// integridad (propiedad, reubicación al borrar) se garantiza en las actions.
+// Un mismo árbol sirve a los tres tipos; cada ítem apunta a lo más una carpeta
+// vía su `carpetaId` (null = "Sin carpeta").
+// ---------------------------------------------------------------------------
+export const carpetas = pgTable('carpetas', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  nombre: text('nombre').notNull(),
+  parentId: integer('parent_id'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
 export const preguntas = pgTable('preguntas', {
   id: serial('id').primaryKey(),
   userId: integer('user_id').notNull(),
@@ -90,6 +106,9 @@ export const preguntas = pgTable('preguntas', {
   // Se estampa al crear con el colegio del autor y ANCLA el contenido al
   // colegio: permanece en el banco aunque el autor sea suspendido/eliminado.
   colegioId: integer('colegio_id'),
+  // Carpeta personal del autor (nullable = sin carpeta). Organización propia; no
+  // afecta la visibilidad ni el banco compartido.
+  carpetaId: integer('carpeta_id'),
   asignatura: text('asignatura').notNull(),
   materia: text('materia'),
   contenido: text('contenido'),
@@ -122,6 +141,8 @@ export const textos = pgTable('textos', {
   userId: integer('user_id').notNull(),
   // Colegio dueño del contenido (nullable). Ver nota en `preguntas.colegioId`.
   colegioId: integer('colegio_id'),
+  // Carpeta personal del autor (nullable = sin carpeta).
+  carpetaId: integer('carpeta_id'),
   asignatura: text('asignatura').notNull(),
   titulo: text('titulo').notNull(),
   contenido: text('contenido').notNull(),
@@ -143,6 +164,8 @@ export const pruebas = pgTable('pruebas', {
   userId: integer('user_id').notNull(),
   // Colegio dueño de la prueba (nullable). Ver nota en `preguntas.colegioId`.
   colegioId: integer('colegio_id'),
+  // Carpeta personal del autor (nullable = sin carpeta).
+  carpetaId: integer('carpeta_id'),
   asignatura: text('asignatura').notNull(),
   titulo: text('titulo'),
   colegio: text('colegio'),
