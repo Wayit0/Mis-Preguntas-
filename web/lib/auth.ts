@@ -261,6 +261,16 @@ export const auth = betterAuth({
         }
       : {}),
   },
+  // Enlace de cuentas: permite que un login con Google/Microsoft se una a una
+  // cuenta EXISTENTE con el mismo correo (email/contraseña u otro proveedor). Sin
+  // esto better-auth devuelve `account_not_linked` y rebota al login. Es seguro
+  // porque Google y Microsoft verifican la propiedad del correo.
+  account: {
+    accountLinking: {
+      enabled: true,
+      trustedProviders: ['google', 'microsoft'],
+    },
+  },
   // Verificación de correo. NO exigimos verificar para iniciar sesión
   // (requireEmailVerification queda en false por defecto): así los usuarios
   // migrados/antiguos siguen entrando y cualquiera puede usar la app de
