@@ -183,10 +183,35 @@
   animation: entrar-izq 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* Revelado al hacer scroll (landing). Estado inicial visible sin JS; el
+   componente Revelar añade .revelar y luego .revelar-visible al intersectar. */
+.revelar {
+  opacity: 0;
+  transform: translateY(16px);
+  transition:
+    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.revelar-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animar-subir,
   .animar-form-der,
   .animar-form-izq {
     animation: none;
+  }
+  .revelar {
+    opacity: 1;
+    transform: none;
+    transition: none;
   }
 }
