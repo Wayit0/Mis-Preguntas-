@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getSession } from "@/lib/get-session";
 import { buttonVariants } from "@/components/ui/button";
+import { Logo } from "@/components/brand/logo";
 
 // Portada pública. Si hay sesión, el CTA principal lleva al panel en vez de a login.
 export default async function Home() {
@@ -12,9 +13,7 @@ export default async function Home() {
       {/* ── Barra superior ─────────────────────────────────────────── */}
       <header className="sticky top-0 z-20 border-b border-border/70 bg-background/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-5 py-3.5">
-          <span className="flex shrink-0 items-center gap-2 whitespace-nowrap font-heading text-lg font-semibold tracking-tight">
-            <span aria-hidden>📚</span> EduBox
-          </span>
+          <Logo />
           <nav className="flex items-center gap-2">
             {autenticado ? (
               <Link
@@ -53,7 +52,11 @@ export default async function Home() {
           />
           <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-5 py-16 sm:py-24 lg:grid-cols-[1.05fr_0.95fr]">
             <div className="animar-subir flex flex-col gap-6">
-              <span className="w-fit rounded-full border border-border bg-card px-3 py-1 font-mono text-xs uppercase tracking-[0.18em] text-muted-foreground">
+              <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium tracking-wide text-primary">
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 rounded-full bg-accent-amber"
+                />
                 Para profesores
               </span>
               <h1 className="font-heading text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-5xl lg:text-6xl">
@@ -251,9 +254,7 @@ export default async function Home() {
 
       <footer className="border-t border-border">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-2 px-5 py-6 text-sm text-muted-foreground sm:flex-row">
-          <span className="font-heading font-semibold text-foreground">
-            📚 EduBox
-          </span>
+          <Logo isoClassName="h-5" className="[&_span]:text-base" />
           <span>Banco de preguntas y pruebas para docentes</span>
         </div>
       </footer>

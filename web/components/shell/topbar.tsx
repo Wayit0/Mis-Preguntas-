@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ChevronDown, KeyRound, LogOut, Menu } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
+import { Logo } from '@/components/brand/logo'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
@@ -44,14 +45,8 @@ export function Topbar({ user }: TopbarProps) {
         >
           <Menu className="size-5" />
         </button>
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2 font-bold text-primary"
-        >
-          <span aria-hidden className="text-lg leading-none">
-            📚
-          </span>
-          <span className="hidden sm:inline">EduBox</span>
+        <Link href="/dashboard" className="flex items-center">
+          <Logo isoClassName="h-5" className="[&_span]:text-base" />
         </Link>
       </div>
 

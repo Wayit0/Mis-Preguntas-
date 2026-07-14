@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Logo } from '@/components/brand/logo'
 
 export default function AuthLayout({
   children,
@@ -13,11 +14,8 @@ export default function AuthLayout({
           aria-hidden
           className="pointer-events-none absolute -bottom-24 -left-16 h-96 w-96 rounded-full bg-primary/20 blur-3xl"
         />
-        <Link
-          href="/"
-          className="relative z-10 flex w-fit items-center gap-2 font-heading text-lg font-semibold text-white"
-        >
-          <span aria-hidden>📚</span> EduBox
+        <Link href="/" className="relative z-10 w-fit">
+          <Logo enOscuro />
         </Link>
 
         <div className="relative z-10 max-w-md">
@@ -51,9 +49,9 @@ export default function AuthLayout({
           {/* Marca compacta visible en móvil (el panel se oculta) */}
           <Link
             href="/"
-            className="mb-6 flex items-center justify-center gap-2 font-heading text-xl font-semibold tracking-tight text-foreground lg:hidden"
+            className="mb-6 flex items-center justify-center lg:hidden"
           >
-            <span aria-hidden>📚</span> EduBox
+            <Logo />
           </Link>
           {children}
         </div>

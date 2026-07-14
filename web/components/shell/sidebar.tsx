@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Logo } from '@/components/brand/logo'
 import { useMobileNav } from './mobile-nav'
 import { SubjectSwitcher } from './subject-switcher'
 
@@ -183,9 +184,7 @@ export function Sidebar({
           />
           <aside className="absolute inset-y-0 left-0 flex w-64 flex-col bg-sidebar text-sidebar-foreground shadow-xl">
             <div className="flex items-center justify-between border-b border-sidebar-border px-4 py-3">
-              <span className="font-bold text-sidebar-foreground">
-                📚 EduBox
-              </span>
+              <Logo enOscuro />
               <button
                 type="button"
                 aria-label="Cerrar menú"

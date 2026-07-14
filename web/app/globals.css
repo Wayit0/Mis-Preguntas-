@@ -7,11 +7,11 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* Cuerpo/UI: IBM Plex Sans · Display: Fraunces · Mono: IBM Plex Mono.
-     (Antes --font-sans se referenciaba a sí misma y Geist nunca se conectaba.) */
+  /* Cuerpo/UI: IBM Plex Sans · Titulares/marca: Lora · Mono: IBM Plex Mono.
+     (Identidad EduBox: Lora Bold para h1/h2 y wordmark.) */
   --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-plex-mono), ui-monospace, monospace;
-  --font-heading: var(--font-fraunces), ui-serif, Georgia, serif;
+  --font-heading: var(--font-lora), ui-serif, Georgia, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -31,6 +31,8 @@
   --color-destructive: var(--destructive);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+  --color-accent-amber: var(--accent-amber);
+  --color-accent-amber-foreground: var(--accent-amber-foreground);
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
   --color-secondary-foreground: var(--secondary-foreground);
@@ -50,76 +52,80 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Tema "Esmeralda & grafito"
-   primary #059669 · primary-dark #047857 · accent #34D399
-   grafito #14241D · background #F4F8F6 · sidebar #14241D */
+/* Identidad "Verde bosque" EduBox (handoff de marca 2026)
+   primary #1F7A4D · hover/acento #2E9E63 · brote ámbar #F4C542
+   tinta #17211B · paper #F7F9F6 · sidebar tinta #17211B */
 :root {
-  --background: oklch(0.9755 0.005 165.01); /* #F4F8F6 */
-  --foreground: oklch(0.2434 0.0256 165.1); /* #14241D grafito */
-  --card: oklch(1 0 0); /* blanco */
-  --card-foreground: oklch(0.2434 0.0256 165.1);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2434 0.0256 165.1);
-  --primary: oklch(0.596 0.1274 163.23); /* #059669 */
-  --primary-foreground: oklch(1 0 0); /* blanco */
-  --secondary: oklch(0.945 0.01 164.86); /* #E7EFEB */
-  --secondary-foreground: oklch(0.2434 0.0256 165.1);
-  --muted: oklch(0.945 0.01 164.86);
-  --muted-foreground: oklch(0.4517 0.0228 167.01); /* #4A5A53 */
-  --accent: oklch(0.7729 0.1535 163.22); /* #34D399 */
-  --accent-foreground: oklch(0.2434 0.0256 165.1); /* grafito sobre verde */
-  --destructive: oklch(0.5771 0.2152 27.33); /* #DC2626 */
-  --border: oklch(0.9114 0.0145 169.21); /* #D9E5E0 */
-  --input: oklch(0.9114 0.0145 169.21);
-  --ring: oklch(0.596 0.1274 163.23); /* esmeralda */
-  --chart-1: oklch(0.7729 0.1535 163.22);
-  --chart-2: oklch(0.596 0.1274 163.23);
-  --chart-3: oklch(0.5081 0.1049 165.61);
-  --chart-4: oklch(0.4 0.08 165);
-  --chart-5: oklch(0.3 0.05 165);
+  --background: #f7f9f6; /* paper */
+  --foreground: #17211b; /* tinta */
+  --card: #ffffff; /* surface */
+  --card-foreground: #17211b;
+  --popover: #ffffff;
+  --popover-foreground: #17211b;
+  --primary: #1f7a4d; /* verde bosque */
+  --primary-foreground: #f7f9f6; /* paper sobre primary */
+  --secondary: #edf1ec; /* bg-muted */
+  --secondary-foreground: #17211b;
+  --muted: #edf1ec;
+  --muted-foreground: #5c6b60; /* text-muted */
+  --accent: #edf6f0; /* primary-tint: fondo sutil de hover/focus */
+  --accent-foreground: #1f7a4d; /* verde sobre el tint */
+  --accent-amber: #f4c542; /* brote / destaque puntual (con moderación) */
+  --accent-amber-foreground: #17211b;
+  --destructive: #d64541; /* rojo */
+  --border: #dce4dc;
+  --input: #dce4dc;
+  --ring: #1f7a4d;
+  --chart-1: #1f7a4d;
+  --chart-2: #2e9e63;
+  --chart-3: #9fd4b6;
+  --chart-4: #f4c542;
+  --chart-5: #5c6b60;
   --radius: 0.625rem;
-  --sidebar: oklch(0.2434 0.0256 165.1); /* #14241D grafito */
-  --sidebar-foreground: oklch(0.92 0.01 165);
-  --sidebar-primary: oklch(0.596 0.1274 163.23); /* esmeralda activa */
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.3 0.025 165); /* hover grafito claro */
-  --sidebar-accent-foreground: oklch(0.95 0.01 165);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.596 0.1274 163.23);
+  --sidebar: #17211b; /* tinta */
+  --sidebar-foreground: #e7eee8;
+  --sidebar-primary: #6ed9a0; /* verde sobre oscuro (item activo) */
+  --sidebar-primary-foreground: #17211b;
+  --sidebar-accent: #25332b; /* hover en el sidebar */
+  --sidebar-accent-foreground: #f7f9f6;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #6ed9a0;
 }
 
 .dark {
-  --background: oklch(0.2 0.02 165); /* grafito profundo */
-  --foreground: oklch(0.95 0.01 165);
-  --card: oklch(0.2434 0.0256 165.1); /* #14241D */
-  --card-foreground: oklch(0.95 0.01 165);
-  --popover: oklch(0.2434 0.0256 165.1);
-  --popover-foreground: oklch(0.95 0.01 165);
-  --primary: oklch(0.7 0.14 163); /* esmeralda más brillante en oscuro */
-  --primary-foreground: oklch(0.2 0.02 165);
-  --secondary: oklch(0.3 0.025 165);
-  --secondary-foreground: oklch(0.95 0.01 165);
-  --muted: oklch(0.3 0.025 165);
-  --muted-foreground: oklch(0.72 0.02 165);
-  --accent: oklch(0.7729 0.1535 163.22); /* #34D399 */
-  --accent-foreground: oklch(0.2 0.02 165);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.7 0.14 163);
-  --chart-1: oklch(0.7729 0.1535 163.22);
-  --chart-2: oklch(0.7 0.14 163);
-  --chart-3: oklch(0.596 0.1274 163.23);
-  --chart-4: oklch(0.5081 0.1049 165.61);
-  --chart-5: oklch(0.4 0.08 165);
-  --sidebar: oklch(0.17 0.02 165); /* grafito aún más profundo */
-  --sidebar-foreground: oklch(0.92 0.01 165);
-  --sidebar-primary: oklch(0.7 0.14 163);
-  --sidebar-primary-foreground: oklch(0.2 0.02 165);
-  --sidebar-accent: oklch(0.3 0.025 165);
-  --sidebar-accent-foreground: oklch(0.95 0.01 165);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.7 0.14 163);
+  --background: #131b16; /* tinta profunda */
+  --foreground: #f7f9f6; /* paper */
+  --card: #1b261f;
+  --card-foreground: #f7f9f6;
+  --popover: #1b261f;
+  --popover-foreground: #f7f9f6;
+  --primary: #35b074; /* verde vivo, legible en oscuro */
+  --primary-foreground: #0e1712;
+  --secondary: #253028;
+  --secondary-foreground: #f7f9f6;
+  --muted: #253028;
+  --muted-foreground: #a6b4a9;
+  --accent: #23332a; /* fondo sutil de hover/focus en oscuro */
+  --accent-foreground: #6ed9a0; /* verde claro sobre oscuro */
+  --accent-amber: #f4c542;
+  --accent-amber-foreground: #17211b;
+  --destructive: #f2685c;
+  --border: rgba(255, 255, 255, 0.1);
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: #35b074;
+  --chart-1: #6ed9a0;
+  --chart-2: #35b074;
+  --chart-3: #2e9e63;
+  --chart-4: #f4c542;
+  --chart-5: #a6b4a9;
+  --sidebar: #0f1611; /* tinta aún más profunda */
+  --sidebar-foreground: #e7eee8;
+  --sidebar-primary: #6ed9a0;
+  --sidebar-primary-foreground: #17211b;
+  --sidebar-accent: #1e2a22;
+  --sidebar-accent-foreground: #f7f9f6;
+  --sidebar-border: rgba(255, 255, 255, 0.1);
+  --sidebar-ring: #6ed9a0;
 }
 
 @layer base {

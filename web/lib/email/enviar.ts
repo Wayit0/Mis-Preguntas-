@@ -91,12 +91,12 @@ export async function enviarVerificacionCorreo(
             </p>
           </td></tr>
           <tr><td style="padding:4px 32px 24px;">
-            <a href="${esc(url)}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 24px;border-radius:8px;">Verificar mi correo</a>
+            <a href="${esc(url)}" style="display:inline-block;background:#1F7A4D;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 24px;border-radius:8px;">Verificar mi correo</a>
           </td></tr>
           <tr><td style="padding:0 32px 28px;">
             <p style="margin:0;font-size:12px;line-height:1.5;color:#71717a;">
               Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
-              <a href="${esc(url)}" style="color:#4f46e5;word-break:break-all;">${esc(url)}</a>
+              <a href="${esc(url)}" style="color:#1F7A4D;word-break:break-all;">${esc(url)}</a>
             </p>
             <p style="margin:16px 0 0;font-size:12px;line-height:1.5;color:#a1a1aa;">
               Si no creaste una cuenta en EduBox, puedes ignorar este correo.
@@ -138,12 +138,12 @@ export async function enviarResetPassword(
             </p>
           </td></tr>
           <tr><td style="padding:4px 32px 24px;">
-            <a href="${esc(url)}" style="display:inline-block;background:#4f46e5;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 24px;border-radius:8px;">Restablecer mi contraseña</a>
+            <a href="${esc(url)}" style="display:inline-block;background:#1F7A4D;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 24px;border-radius:8px;">Restablecer mi contraseña</a>
           </td></tr>
           <tr><td style="padding:0 32px 28px;">
             <p style="margin:0;font-size:12px;line-height:1.5;color:#71717a;">
               Si el botón no funciona, copia y pega este enlace en tu navegador:<br>
-              <a href="${esc(url)}" style="color:#4f46e5;word-break:break-all;">${esc(url)}</a>
+              <a href="${esc(url)}" style="color:#1F7A4D;word-break:break-all;">${esc(url)}</a>
             </p>
             <p style="margin:16px 0 0;font-size:12px;line-height:1.5;color:#a1a1aa;">
               Si no solicitaste cambiar tu contraseña, puedes ignorar este correo:

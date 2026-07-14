@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { Fraunces, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Lora, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
-// Display: Fraunces (serif cálido, académico) — solo titulares.
-const fraunces = Fraunces({
-  variable: "--font-fraunces",
+// Titulares y marca: Lora (serif con contraste, identidad EduBox). Bold para
+// h1/h2 y el wordmark.
+const lora = Lora({
+  variable: "--font-lora",
   subsets: ["latin"],
+  weight: ["500", "600", "700"],
   display: "swap",
 });
 
@@ -39,7 +41,7 @@ export default function RootLayout({
   return (
     <html
       lang="es-CL"
-      className={`${plexSans.variable} ${fraunces.variable} ${plexMono.variable} h-full antialiased`}
+      className={`${plexSans.variable} ${lora.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

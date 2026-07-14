@@ -74,7 +74,7 @@ export function TarjetaPregunta({
               <span
                 className={cn(
                   'text-xs font-medium',
-                  compartida ? 'text-accent' : 'text-muted-foreground',
+                  compartida ? 'text-primary' : 'text-muted-foreground',
                 )}
               >
                 {compartida ? '● Compartida' : 'Privada'}
