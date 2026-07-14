@@ -255,7 +255,15 @@ export default async function Home() {
       <footer className="border-t border-border">
         <div className="mx-auto flex w-full max-w-6xl flex-col items-center justify-between gap-2 px-5 py-6 text-sm text-muted-foreground sm:flex-row">
           <Logo isoClassName="h-5" className="[&_span]:text-base" />
-          <span>Banco de preguntas y pruebas para docentes</span>
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <span>Banco de preguntas y pruebas para docentes</span>
+            <Link href="/privacidad" className="hover:text-foreground">
+              Privacidad
+            </Link>
+            <Link href="/terminos" className="hover:text-foreground">
+              Términos
+            </Link>
+          </div>
         </div>
       </footer>
     </div>
