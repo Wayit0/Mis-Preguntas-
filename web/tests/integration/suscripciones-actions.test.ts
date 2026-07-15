@@ -87,6 +87,30 @@ describe('iniciarSuscripcion', () => {
     expect('error' in r).toBe(true)
     expect(mpCrearPreapproval).not.toHaveBeenCalled()
   })
+
+  it('permite re-suscribirse cuando la fila existente está cancelada (cambio de periodicidad)', async () => {
+    const u = await crearUsuario('act-resub')
+    currentUserId = u.id
+    const preapprovalViejo = `pre-x-${Date.now()}`
+    await db.insert(suscripciones).values({
+      userId: u.id, origen: 'mercadopago', estado: 'cancelada',
+      periodoHasta: new Date(Date.now() + 10 * 86_400_000),
+      mpPreapprovalId: preapprovalViejo,
+    })
+    const preapprovalNuevo = `pre-y-${Date.now()}`
+    mpCrearPreapproval.mockResolvedValue({
+      id: preapprovalNuevo, status: 'pending', init_point: 'https://mp/resub',
+    })
+
+    const r = await iniciarSuscripcion('mensual')
+    expect(r).toEqual({ initPoint: 'https://mp/resub' })
+    expect(mpCrearPreapproval).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: u.id, periodicidad: 'mensual' }),
+    )
+    const [s] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
+    expect(s.estado).toBe('pendiente')
+    expect(s.mpPreapprovalId).toBe(preapprovalNuevo)
+  })
 })
 
 describe('cancelarMiSuscripcion', () => {

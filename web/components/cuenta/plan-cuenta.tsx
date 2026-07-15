@@ -82,6 +82,8 @@ export function PlanCuenta({ datos }: { datos: DatosPlan }) {
         {datos.estado === 'cancelada' && datos.plan === 'pro' && (
           <p className="text-sm text-muted-foreground">
             Suscripción cancelada: conservas Pro hasta el {fecha(datos.periodoHasta)}.
+            Si te suscribes de nuevo, el nuevo plan reemplaza al actual de
+            inmediato (sin nueva prueba gratis).
           </p>
         )}
 
@@ -89,7 +91,7 @@ export function PlanCuenta({ datos }: { datos: DatosPlan }) {
           Importaciones con IA este mes: {datos.cuota.usadas} de {datos.cuota.limite}.
         </p>
 
-        {datos.plan === 'free' && (
+        {(datos.plan === 'free' || datos.estado === 'cancelada') && (
           <div className="flex flex-col gap-2">
             <Button onClick={() => suscribir('mensual')} disabled={pendiente || !datos.pagosHabilitados}>
               Pro mensual — $3.490/mes
@@ -113,8 +115,8 @@ export function PlanCuenta({ datos }: { datos: DatosPlan }) {
             </Button>
             <p className="text-xs text-muted-foreground">
               ¿Quieres cambiar entre mensual y anual? Cancela y vuelve a
-              suscribirte con la otra periodicidad (sin trial; conservas Pro
-              hasta el fin del período ya pagado).
+              suscribirte de inmediato con la otra periodicidad: el nuevo plan
+              reemplaza al actual al instante (sin trial).
             </p>
           </div>
         )}

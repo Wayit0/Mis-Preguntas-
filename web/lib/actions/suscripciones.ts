@@ -39,7 +39,7 @@ export async function iniciarSuscripcion(
   }
 
   const existente = await suscripcionDeUsuario(userId)
-  if (existente && esProSuscripcion(existente)) {
+  if (existente && existente.estado !== 'cancelada' && esProSuscripcion(existente)) {
     return { error: 'Ya tienes EduBox Pro activo.' }
   }
 

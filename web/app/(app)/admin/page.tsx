@@ -56,7 +56,7 @@ export default async function AdminPage({
   const { tab, pagos } = await searchParams
   const tabActual = normalizarTab(tab)
   const pagosDeRaw = pagos ? Number(pagos) : NaN
-  const pagosDe = Number.isFinite(pagosDeRaw) ? pagosDeRaw : undefined
+  const pagosDe = Number.isInteger(pagosDeRaw) && pagosDeRaw > 0 ? pagosDeRaw : undefined
 
   const tabs: { id: Tab; etiqueta: string }[] = [
     { id: 'colegios', etiqueta: 'Colegios' },
