@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/get-session'
 import { analizarArchivo, type ResultadoAnalisis } from '@/lib/import/analizar'
+import { cuotaImportaciones } from '@/lib/suscripciones/entitlements'
 
 export const runtime = 'nodejs'
 
@@ -19,6 +20,19 @@ export async function POST(request: Request) {
   const session = await getSession()
   if (!session) return new Response('No autorizado', { status: 401 })
   const userId = Number(session.user.id)
+
+  // Cuota de importaciones IA del plan (free 3/mes, pro 100/mes). Se corta
+  // ANTES de gastar tokens. La respuesta usa la misma forma {resultado} que el
+  // stream para que el cliente la procese sin caso especial.
+  const cuota = await cuotaImportaciones(userId)
+  if (cuota.restantes <= 0) {
+    const resultado: ResultadoAnalisis = {
+      ok: false,
+      sinCupo: true,
+      error: `Alcanzaste tus ${cuota.limite} importaciones con IA de este mes.`,
+    }
+    return Response.json({ resultado })
+  }
 
   const form = await request.formData()
   const archivo = form.get('archivo')

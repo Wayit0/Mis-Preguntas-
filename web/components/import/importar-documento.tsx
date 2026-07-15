@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { CheckCircle2, FileText, Loader2 } from 'lucide-react'
 
 import { guardarPreguntasImportadas } from '@/lib/actions/import'
@@ -292,10 +293,32 @@ function ProgresoAnalisis({ nombreArchivo }: { nombreArchivo: string }) {
   )
 }
 
+/** Tarjeta de upsell cuando se agotó la cuota de importaciones con IA del mes. */
+function AvisoCuotaAgotada({ mensaje }: { mensaje?: string }) {
+  return (
+    <Card className="border border-accent-amber">
+      <CardContent className="flex flex-col gap-2">
+        <p role="alert" className="text-sm font-medium text-foreground">
+          {mensaje ?? 'Alcanzaste tus importaciones con IA de este mes.'}
+        </p>
+        <Link
+          href="/precios"
+          className="w-fit text-sm font-medium text-primary hover:underline"
+        >
+          Conoce EduBox Pro — 100 importaciones al mes
+        </Link>
+      </CardContent>
+    </Card>
+  )
+}
+
 export function ImportarDocumento({
   asignaturaInicial,
+  cuota,
 }: {
   asignaturaInicial?: string
+  /** Cuota mensual de importaciones con IA del plan del usuario. */
+  cuota: { limite: number; restantes: number }
 }) {
   const router = useRouter()
 
@@ -304,15 +327,21 @@ export function ImportarDocumento({
   )
   const [fase, setFase] = useState<Fase>('subir')
   const [error, setError] = useState<string | null>(null)
+  // La ruta puede rechazar la petición por falta de cupo (carrera con otra
+  // pestaña, o la cuota mostrada al cargar la página quedó desactualizada).
+  // Se distingue del error genérico para mostrar el mismo CTA a Pro.
+  const [sinCupoError, setSinCupoError] = useState(false)
   const [aviso, setAviso] = useState<string | null>(null)
   const [preguntas, setPreguntas] = useState<PreguntaEditable[]>([])
   const [nombreArchivo, setNombreArchivo] = useState('')
 
   const seleccionadas = preguntas.filter((p) => p.incluir).length
+  const sinCupo = cuota.restantes === 0 || sinCupoError
 
   async function onAnalizar(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError(null)
+    setSinCupoError(false)
     setAviso(null)
 
     const formData = new FormData(e.currentTarget)
@@ -329,6 +358,7 @@ export function ImportarDocumento({
       const resultado = await analizarEnStreaming(formData)
       if (!resultado.ok) {
         setError(resultado.error)
+        setSinCupoError(Boolean(resultado.sinCupo))
         setFase('subir')
         return
       }
@@ -403,6 +433,7 @@ export function ImportarDocumento({
   function reiniciar() {
     setPreguntas([])
     setError(null)
+    setSinCupoError(false)
     setAviso(null)
     setFase('subir')
   }
@@ -673,6 +704,15 @@ export function ImportarDocumento({
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       {encabezado}
 
+      {sinCupo ? (
+        <AvisoCuotaAgotada mensaje={sinCupoError ? (error ?? undefined) : undefined} />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Te quedan {cuota.restantes} de {cuota.limite} importaciones con IA
+          este mes.
+        </p>
+      )}
+
       {fase === 'analizando' ? (
         <ProgresoAnalisis nombreArchivo={nombreArchivo} />
       ) : null}
@@ -723,7 +763,7 @@ export function ImportarDocumento({
               </p>
             ) : null}
 
-            {error ? (
+            {error && !sinCupoError ? (
               <p role="alert" className="text-sm text-destructive">
                 {error}
               </p>
@@ -732,7 +772,7 @@ export function ImportarDocumento({
             <div>
               <Button
                 type="submit"
-                disabled={fase === 'analizando'}
+                disabled={fase === 'analizando' || sinCupo}
                 className="w-full sm:w-auto"
               >
                 {fase === 'analizando'

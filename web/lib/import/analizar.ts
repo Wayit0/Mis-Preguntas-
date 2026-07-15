@@ -25,7 +25,7 @@ import { MAX_PAGINAS_PDF, type PreguntaDetectada } from '@/lib/validation/import
 /** Resultado del análisis de un documento. */
 export type ResultadoAnalisis =
   | { ok: true; preguntas: PreguntaDetectada[]; imagenes: ImagenExtraida[] }
-  | { ok: false; error: string }
+  | { ok: false; error: string; sinCupo?: boolean }
 
 /**
  * Valida el archivo, lo convierte a content blocks y detecta las preguntas con
