@@ -134,6 +134,12 @@ export default async function Home() {
                   {l.texto}
                 </a>
               ))}
+              <Link
+                href="/precios"
+                className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Precios
+              </Link>
             </div>
             {autenticado ? (
               <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
@@ -694,6 +700,9 @@ export default async function Home() {
           <Logo isoClassName="h-5" className="[&_span]:text-base" />
           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             <span>Banco de preguntas y pruebas para docentes</span>
+            <Link href="/precios" className="hover:text-foreground">
+              Precios
+            </Link>
             <Link href="/privacidad" className="hover:text-foreground">
               Privacidad
             </Link>
