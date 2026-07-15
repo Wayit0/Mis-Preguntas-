@@ -8,6 +8,12 @@ import {
   cuotaImportaciones,
   DIAS_GRACIA_MOROSA,
 } from '@/lib/suscripciones/entitlements'
+import {
+  estadoDesdeMp,
+  sincronizarPreapproval,
+  registrarPagoAutorizado,
+} from '@/lib/suscripciones/sync'
+import type { MpPreapproval } from '@/lib/suscripciones/mercadopago'
 
 async function crearUsuario(prefijo: string) {
   const email = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2)}@x.cl`
@@ -160,5 +166,77 @@ describe('entitlements', () => {
     const cuotaPro = await cuotaImportaciones(u.id)
     expect(cuotaPro.limite).toBe(100)
     expect(cuotaPro.restantes).toBe(98)
+  })
+})
+
+describe('sincronización con MercadoPago', () => {
+  it('estadoDesdeMp mapea los estados de MP', () => {
+    const futuro = enDias(10)
+    const pasado = enDias(-1)
+    expect(estadoDesdeMp('pending', null)).toBe('pendiente')
+    expect(estadoDesdeMp('authorized', futuro)).toBe('trial')
+    expect(estadoDesdeMp('authorized', pasado)).toBe('activa')
+    expect(estadoDesdeMp('authorized', null)).toBe('activa')
+    expect(estadoDesdeMp('paused', null)).toBe('morosa')
+    expect(estadoDesdeMp('cancelled', null)).toBe('cancelada')
+  })
+
+  it('sincronizarPreapproval crea la fila vía external_reference y marca el trial', async () => {
+    const u = await crearUsuario('sync-alta')
+    const pre: MpPreapproval = {
+      id: `pre-${Date.now()}`,
+      status: 'authorized',
+      external_reference: String(u.id),
+      next_payment_date: enDias(15).toISOString(),
+      auto_recurring: {
+        frequency: 1, frequency_type: 'months', transaction_amount: 3490,
+        currency_id: 'CLP', start_date: enDias(15).toISOString(),
+      },
+    }
+    await sincronizarPreapproval(pre)
+
+    const [s] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
+    expect(s.estado).toBe('trial')
+    expect(s.origen).toBe('mercadopago')
+    expect(s.periodicidad).toBe('mensual')
+    expect(s.mpPreapprovalId).toBe(pre.id)
+    expect(s.periodoHasta).toBeInstanceOf(Date)
+
+    const [u2] = await db.select().from(usuarios).where(eq(usuarios.id, u.id))
+    expect(u2.trialUsadoEl).toBeInstanceOf(Date)
+
+    // Reentrega del webhook con cancelación: actualiza la MISMA fila.
+    await sincronizarPreapproval({ ...pre, status: 'cancelled' })
+    const [s2] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
+    expect(s2.id).toBe(s.id)
+    expect(s2.estado).toBe('cancelada')
+  })
+
+  it('registrarPagoAutorizado inserta idempotente y ajusta el estado', async () => {
+    const u = await crearUsuario('sync-pago')
+    const preId = `pre-pago-${Date.now()}`
+    await db.insert(suscripciones).values({
+      userId: u.id, origen: 'mercadopago', estado: 'activa', mpPreapprovalId: preId,
+    })
+    const pago = {
+      id: `ap-${Date.now()}`, preapproval_id: preId, status: 'rejected',
+      transaction_amount: 3490, payment: { status_detail: 'cc_rejected_insufficient_amount' },
+    }
+    await registrarPagoAutorizado(pago)
+    await registrarPagoAutorizado(pago) // reentrega del webhook
+
+    const filas = await db
+      .select()
+      .from(pagosSuscripcion)
+      .where(eq(pagosSuscripcion.mpPaymentId, String(pago.id)))
+    expect(filas.length).toBe(1)
+    expect(filas[0].montoClp).toBe(3490)
+
+    const [s] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
+    expect(s.estado).toBe('morosa')
+
+    await registrarPagoAutorizado({ ...pago, id: `ap2-${Date.now()}`, status: 'approved' })
+    const [s2] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
+    expect(s2.estado).toBe('activa')
   })
 })
