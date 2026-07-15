@@ -14,6 +14,7 @@ import {
   registrarPagoAutorizado,
 } from '@/lib/suscripciones/sync'
 import type { MpPreapproval } from '@/lib/suscripciones/mercadopago'
+import { procesarEventoMp } from '@/lib/suscripciones/webhook'
 
 async function crearUsuario(prefijo: string) {
   const email = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2)}@x.cl`
@@ -238,5 +239,21 @@ describe('sincronización con MercadoPago', () => {
     await registrarPagoAutorizado({ ...pago, id: `ap2-${Date.now()}`, status: 'approved' })
     const [s2] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
     expect(s2.estado).toBe('activa')
+  })
+})
+
+describe('procesarEventoMp', () => {
+  it('subscription_preapproval consulta MP y sincroniza', async () => {
+    const u = await crearUsuario('wh-pre')
+    const pre: MpPreapproval = {
+      id: `wh-${Date.now()}`, status: 'authorized', external_reference: String(u.id),
+      next_payment_date: enDias(30).toISOString(),
+    }
+    await procesarEventoMp('subscription_preapproval', pre.id, {
+      obtenerPreapproval: async () => pre,
+      obtenerPagoAutorizado: async () => { throw new Error('no debe llamarse') },
+    })
+    const [s] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
+    expect(s.estado).toBe('activa')
   })
 })
