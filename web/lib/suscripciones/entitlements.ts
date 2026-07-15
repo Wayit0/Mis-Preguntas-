@@ -26,8 +26,13 @@ const masDias = (fecha: Date, dias: number) =>
 /** Regla pura: ¿esta suscripción otorga Pro en `ahora`? */
 export function esProSuscripcion(s: Suscripcion, ahora = new Date()): boolean {
   switch (s.estado) {
-    case 'trial':
-      return true
+    case 'trial': {
+      // Si el webhook que cierra el trial se pierde, un trial vencido converge
+      // a free tras la misma gracia que la morosidad (nada de Pro eterno por
+      // cache desactualizado). Sin fecha conocida se asume vigente.
+      if (!s.trialTerminaEl) return true
+      return ahora < masDias(s.trialTerminaEl, DIAS_GRACIA_MOROSA)
+    }
     case 'activa':
       // Las cortesías siempre tienen vencimiento; MP 'activa' es Pro sin más
       // (el vencimiento real lo gobierna MercadoPago con sus cobros).

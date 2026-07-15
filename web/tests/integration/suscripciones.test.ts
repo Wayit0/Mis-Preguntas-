@@ -78,6 +78,18 @@ describe('entitlements', () => {
     }
     expect(esProSuscripcion({ ...base, estado: 'pendiente' } as never)).toBe(false)
     expect(esProSuscripcion({ ...base, estado: 'trial' } as never)).toBe(true)
+    // trial con fecha: vigente, vencido dentro de la gracia, vencido más allá
+    expect(
+      esProSuscripcion({ ...base, estado: 'trial', trialTerminaEl: enDias(10) } as never),
+    ).toBe(true)
+    expect(
+      esProSuscripcion({ ...base, estado: 'trial', trialTerminaEl: enDias(-3) } as never),
+    ).toBe(true)
+    expect(
+      esProSuscripcion({
+        ...base, estado: 'trial', trialTerminaEl: enDias(-(DIAS_GRACIA_MOROSA + 1)),
+      } as never),
+    ).toBe(false)
     expect(esProSuscripcion({ ...base, estado: 'activa' } as never)).toBe(true)
     // morosa: gracia de 7 días desde periodoHasta
     expect(
