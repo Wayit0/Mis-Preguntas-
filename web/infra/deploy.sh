@@ -47,12 +47,13 @@ if [[ -n "${CLIENT_IP}" ]]; then
   params+=("clientIp=${CLIENT_IP}")
 fi
 
-# Opcionales (login social + correo). Sólo se pasan si están definidos; vacíos =
-# el Bicep no crea el secreto ni el app setting. También se pueden gestionar por
-# `az keyvault secret set` / `az webapp config appsettings set` sin redeploy
-# (ver web/docs/oauth-y-correo.md).
+# Opcionales (login social + correo + MercadoPago). Sólo se pasan si están
+# definidos; vacíos = el Bicep no crea el secreto ni el app setting. También se
+# pueden gestionar por `az keyvault secret set` / `az webapp config appsettings
+# set` sin redeploy (ver web/docs/oauth-y-correo.md y web/docs/mercadopago.md).
 for var in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET MICROSOFT_CLIENT_ID \
-           MICROSOFT_CLIENT_SECRET RESEND_API_KEY EMAIL_FROM; do
+           MICROSOFT_CLIENT_SECRET RESEND_API_KEY EMAIL_FROM \
+           MP_ACCESS_TOKEN MP_WEBHOOK_SECRET; do
   val="${!var:-}"
   if [[ -n "${val}" ]]; then
     # Nombre de param en camelCase (googleClientId, resendApiKey, emailFrom, ...).
@@ -63,6 +64,8 @@ for var in GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET MICROSOFT_CLIENT_ID \
       MICROSOFT_CLIENT_SECRET) params+=("microsoftClientSecret=${val}") ;;
       RESEND_API_KEY) params+=("resendApiKey=${val}") ;;
       EMAIL_FROM) params+=("emailFrom=${val}") ;;
+      MP_ACCESS_TOKEN) params+=("mpAccessToken=${val}") ;;
+      MP_WEBHOOK_SECRET) params+=("mpWebhookSecret=${val}") ;;
     esac
   fi
 done

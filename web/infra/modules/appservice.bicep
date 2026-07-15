@@ -48,6 +48,8 @@ var gSecret = optionalSecretUris.?googleClientSecret ?? ''
 var mId = optionalSecretUris.?microsoftClientId ?? ''
 var mSecret = optionalSecretUris.?microsoftClientSecret ?? ''
 var resendUri = optionalSecretUris.?resendApiKey ?? ''
+var mpAccessTokenUri = optionalSecretUris.?mpAccessToken ?? ''
+var mpWebhookSecretUri = optionalSecretUris.?mpWebhookSecret ?? ''
 
 var optionalAppSettings = concat(
   gId != '' ? [ { name: 'GOOGLE_CLIENT_ID', value: '@Microsoft.KeyVault(SecretUri=${gId})' } ] : [],
@@ -55,7 +57,9 @@ var optionalAppSettings = concat(
   mId != '' ? [ { name: 'MICROSOFT_CLIENT_ID', value: '@Microsoft.KeyVault(SecretUri=${mId})' } ] : [],
   mSecret != '' ? [ { name: 'MICROSOFT_CLIENT_SECRET', value: '@Microsoft.KeyVault(SecretUri=${mSecret})' } ] : [],
   resendUri != '' ? [ { name: 'RESEND_API_KEY', value: '@Microsoft.KeyVault(SecretUri=${resendUri})' } ] : [],
-  emailFrom != '' ? [ { name: 'EMAIL_FROM', value: emailFrom } ] : []
+  emailFrom != '' ? [ { name: 'EMAIL_FROM', value: emailFrom } ] : [],
+  mpAccessTokenUri != '' ? [ { name: 'MP_ACCESS_TOKEN', value: '@Microsoft.KeyVault(SecretUri=${mpAccessTokenUri})' } ] : [],
+  mpWebhookSecretUri != '' ? [ { name: 'MP_WEBHOOK_SECRET', value: '@Microsoft.KeyVault(SecretUri=${mpWebhookSecretUri})' } ] : []
 )
 
 resource plan 'Microsoft.Web/serverfarms@2024-04-01' = {

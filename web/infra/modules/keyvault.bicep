@@ -54,6 +54,16 @@ param microsoftClientSecret string = ''
 @description('API key de Resend (correo transaccional).')
 param resendApiKey string = ''
 
+// --- Secretos opcionales (MercadoPago, suscripciones EduBox Pro). Mismo
+// patrón: vacío = no se crea el secreto. ---
+@secure()
+@description('Access token de MercadoPago (credenciales de producción o de prueba).')
+param mpAccessToken string = ''
+
+@secure()
+@description('Secret del webhook de MercadoPago (valida x-signature).')
+param mpWebhookSecret string = ''
+
 // Rol integrado "Key Vault Secrets User".
 var keyVaultSecretsUserRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
 
@@ -150,6 +160,22 @@ resource secretResend 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (resen
   name: 'resend-api-key'
   properties: {
     value: resendApiKey
+  }
+}
+
+resource secretMpAccessToken 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (mpAccessToken != '') {
+  parent: keyVault
+  name: 'mp-access-token'
+  properties: {
+    value: mpAccessToken
+  }
+}
+
+resource secretMpWebhookSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (mpWebhookSecret != '') {
+  parent: keyVault
+  name: 'mp-webhook-secret'
+  properties: {
+    value: mpWebhookSecret
   }
 }
 

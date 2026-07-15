@@ -74,6 +74,16 @@ param resendApiKey string = ''
 @description('Remitente de correo (EMAIL_FROM). Vacío = default del código.')
 param emailFrom string = ''
 
+// --- MercadoPago (suscripciones EduBox Pro, opcional). Vacío = no se crea el
+// secreto ni el app setting; ver web/docs/mercadopago.md. ---
+@secure()
+@description('Access token de MercadoPago (producción o prueba).')
+param mpAccessToken string = ''
+
+@secure()
+@description('Secret del webhook de MercadoPago (valida x-signature).')
+param mpWebhookSecret string = ''
+
 @description('IP pública del cliente para una regla de firewall temporal de migración. Vacío = no se crea.')
 param clientIp string = ''
 
@@ -106,6 +116,8 @@ var optionalSecretUris = {
   microsoftClientId: microsoftClientId != '' ? 'https://${keyVaultName}${keyVaultDns}/secrets/microsoft-client-id' : ''
   microsoftClientSecret: microsoftClientSecret != '' ? 'https://${keyVaultName}${keyVaultDns}/secrets/microsoft-client-secret' : ''
   resendApiKey: resendApiKey != '' ? 'https://${keyVaultName}${keyVaultDns}/secrets/resend-api-key' : ''
+  mpAccessToken: mpAccessToken != '' ? 'https://${keyVaultName}${keyVaultDns}/secrets/mp-access-token' : ''
+  mpWebhookSecret: mpWebhookSecret != '' ? 'https://${keyVaultName}${keyVaultDns}/secrets/mp-webhook-secret' : ''
 }
 
 // --- Resource Group --------------------------------------------------------
@@ -176,6 +188,8 @@ module keyvault 'modules/keyvault.bicep' = {
     microsoftClientId: microsoftClientId
     microsoftClientSecret: microsoftClientSecret
     resendApiKey: resendApiKey
+    mpAccessToken: mpAccessToken
+    mpWebhookSecret: mpWebhookSecret
   }
 }
 
