@@ -48,6 +48,9 @@ export const usuarios = pgTable('usuarios', {
   // guardar una prueba con instrucciones y pre-rellenan el generador de la
   // siguiente (reutilizables "igual que el logo" del colegio).
   instruccionesDefault: text('instrucciones_default'),
+  // Candado de un-trial-por-vida: se marca cuando MercadoPago AUTORIZA la
+  // primera suscripción con trial (no al abrir el checkout). Nullable.
+  trialUsadoEl: timestamp('trial_usado_el'),
 })
 
 // ---------------------------------------------------------------------------
@@ -67,6 +70,11 @@ export const colegios = pgTable('colegios', {
   // automáticamente al colegio. Único entre colegios (nullable: los colegios sin
   // dominio conviven, ya que Postgres permite múltiples NULL en una UNIQUE).
   dominio: text('dominio').unique(),
+  // Licencia B2B activada a mano desde el admin global. Vigente si
+  // licenciaHasta > now(); NULL = sin licencia. La nota guarda n° de factura
+  // o contacto comercial.
+  licenciaHasta: timestamp('licencia_hasta'),
+  licenciaNota: text('licencia_nota'),
   createdAt: timestamp('created_at').defaultNow(),
 })
 
@@ -297,4 +305,46 @@ export const verifications = pgTable('verifications', {
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow(),
   updatedAt: timestamp('updated_at').defaultNow(),
+})
+
+// ---------------------------------------------------------------------------
+// Suscripciones (plan Pro individual). UNA fila por usuario (unique user_id):
+// la fila refleja el estado actual — es un CACHE del estado en MercadoPago
+// (origen 'mercadopago') o una concesión manual del admin (origen 'cortesia').
+// Estados: 'pendiente' (checkout iniciado) | 'trial' | 'activa' | 'morosa' |
+// 'cancelada'. Ser "Pro" NUNCA se guarda en usuarios: se deriva en
+// lib/suscripciones/entitlements.ts.
+// ---------------------------------------------------------------------------
+
+export const suscripciones = pgTable('suscripciones', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id')
+    .notNull()
+    .unique()
+    .references(() => usuarios.id),
+  origen: text('origen').notNull(), // 'mercadopago' | 'cortesia'
+  periodicidad: text('periodicidad'), // 'mensual' | 'anual' (NULL en cortesías)
+  estado: text('estado').notNull(),
+  mpPreapprovalId: text('mp_preapproval_id').unique(),
+  trialTerminaEl: timestamp('trial_termina_el'),
+  // Fin del período pagado/concedido. Para MP se sincroniza con
+  // next_payment_date; para cortesías es el vencimiento fijado por el admin.
+  periodoHasta: timestamp('periodo_hasta'),
+  nota: text('nota'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+// Historial de cobros de MP (webhook subscription_authorized_payment).
+// Idempotente por mp_payment_id. Sirve al admin para responder reclamos sin
+// entrar a MercadoPago.
+export const pagosSuscripcion = pgTable('pagos_suscripcion', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull(),
+  suscripcionId: integer('suscripcion_id').notNull(),
+  mpPaymentId: text('mp_payment_id').notNull().unique(),
+  montoClp: integer('monto_clp').notNull().default(0),
+  estado: text('estado').notNull(), // 'approved' | 'rejected' | ... (status de MP)
+  detalle: jsonb('detalle').$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
 })
