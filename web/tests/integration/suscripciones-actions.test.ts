@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import { eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { suscripciones, usuarios } from '@/lib/db/schema'
 
@@ -21,9 +21,8 @@ vi.mock('@/lib/suscripciones/mercadopago', async (importOriginal) => ({
   mpObtenerPreapproval: (...a: unknown[]) => mpObtenerPreapproval(...a),
 }))
 
-const { iniciarSuscripcion, cancelarMiSuscripcion } = await import(
-  '@/lib/actions/suscripciones'
-)
+const { iniciarSuscripcion, cancelarMiSuscripcion, reconciliarMiSuscripcion } =
+  await import('@/lib/actions/suscripciones')
 
 async function crearUsuario(prefijo: string) {
   const email = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2)}@x.cl`
@@ -33,6 +32,14 @@ async function crearUsuario(prefijo: string) {
     .returning()
   return u
 }
+
+beforeAll(async () => {
+  // Los ids de preapproval de este archivo son fijos; limpia restos de corridas
+  // anteriores para no chocar con el unique de mp_preapproval_id.
+  await db.delete(suscripciones).where(
+    inArray(suscripciones.mpPreapprovalId, ['pre-nuevo', 'pre-2', 'pre-cancel', 'pre-reconciliar']),
+  )
+})
 
 beforeEach(() => {
   mpCrearPreapproval.mockReset()
@@ -106,5 +113,19 @@ describe('cancelarMiSuscripcion', () => {
     currentUserId = u.id
     const r = await cancelarMiSuscripcion()
     expect('error' in r).toBe(true)
+  })
+})
+
+describe('reconciliarMiSuscripcion', () => {
+  it('nunca lanza aunque MP falle', async () => {
+    const u = await crearUsuario('act-reconciliar')
+    currentUserId = u.id
+    await db.insert(suscripciones).values({
+      userId: u.id, origen: 'mercadopago', estado: 'activa',
+      mpPreapprovalId: 'pre-reconciliar',
+    })
+    mpObtenerPreapproval.mockRejectedValue(new Error('mp caído'))
+    await expect(reconciliarMiSuscripcion()).resolves.toBeUndefined()
+    expect(mpObtenerPreapproval).toHaveBeenCalledWith('pre-reconciliar')
   })
 })

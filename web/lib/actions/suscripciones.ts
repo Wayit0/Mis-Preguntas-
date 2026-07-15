@@ -103,11 +103,11 @@ export async function cancelarMiSuscripcion(): Promise<ResultadoCancelar> {
  * se perdió). Se llama al cargar /cuenta cuando la fila lo amerita. Nunca lanza.
  */
 export async function reconciliarMiSuscripcion(): Promise<void> {
-  const userId = await usuarioActual()
-  if (!userId) return
-  const s = await suscripcionDeUsuario(userId)
-  if (!s || s.origen !== 'mercadopago' || !s.mpPreapprovalId || !mpHabilitado()) return
   try {
+    const userId = await usuarioActual()
+    if (!userId) return
+    const s = await suscripcionDeUsuario(userId)
+    if (!s || s.origen !== 'mercadopago' || !s.mpPreapprovalId || !mpHabilitado()) return
     const pre = await mpObtenerPreapproval(s.mpPreapprovalId)
     await sincronizarPreapproval({ ...pre, external_reference: String(userId) })
   } catch (err) {
