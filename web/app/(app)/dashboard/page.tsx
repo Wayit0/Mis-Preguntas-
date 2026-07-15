@@ -4,6 +4,7 @@ import { getSession } from '@/lib/get-session'
 import { getActor } from '@/lib/authz'
 import { resolverAsignatura } from '@/lib/asignatura'
 import { getDashboardStats } from '@/lib/queries/dashboard'
+import { AvisoLicencia } from '@/components/colegio/aviso-licencia'
 import { ElegirAsignatura } from '@/components/shell/elegir-asignatura'
 import { buttonVariants } from '@/components/ui/button'
 import {
@@ -75,6 +76,10 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      {actor?.role === 'school_admin' && actor.colegioId != null ? (
+        <AvisoLicencia colegioId={actor.colegioId} />
+      ) : null}
+
       <div className="flex flex-col gap-1">
         <h1 className="font-heading text-2xl font-bold tracking-tight text-foreground">
           Hola, {nombre}
