@@ -46,15 +46,28 @@ export async function sincronizarPreapproval(pre: MpPreapproval): Promise<void> 
     fila?.trialTerminaEl ??
     (pre.auto_recurring?.start_date ? new Date(pre.auto_recurring.start_date) : null)
   const estado = estadoDesdeMp(pre.status, trialTerminaEl, ahora)
+  const periodoHasta = pre.next_payment_date
+    ? new Date(pre.next_payment_date)
+    : (fila?.periodoHasta ?? null)
+
+  // Una fila morosa NO vuelve a 'activa' solo porque el preapproval siga
+  // 'authorized' (MP queda authorized mientras reintenta el cobro): solo la
+  // saca de morosa un pago aprobado (registrarPagoAutorizado) o un
+  // next_payment_date que avanzó más allá del período que falló.
+  const estadoFinal =
+    fila?.estado === 'morosa' &&
+    estado === 'activa' &&
+    !(periodoHasta && fila.periodoHasta && periodoHasta > fila.periodoHasta)
+      ? 'morosa'
+      : estado
+
   const valores = {
     origen: 'mercadopago' as const,
-    estado,
+    estado: estadoFinal,
     periodicidad: pre.auto_recurring?.frequency === 12 ? 'anual' : 'mensual',
     mpPreapprovalId: pre.id,
     trialTerminaEl,
-    periodoHasta: pre.next_payment_date
-      ? new Date(pre.next_payment_date)
-      : (fila?.periodoHasta ?? null),
+    periodoHasta,
     updatedAt: ahora,
   }
 
@@ -70,7 +83,7 @@ export async function sincronizarPreapproval(pre: MpPreapproval): Promise<void> 
   }
 
   // Candado un-trial-por-vida: se quema cuando MP autoriza un trial.
-  if (estado === 'trial') {
+  if (estadoFinal === 'trial') {
     await db
       .update(usuarios)
       .set({ trialUsadoEl: ahora })
@@ -89,6 +102,11 @@ export async function registrarPagoAutorizado(pago: MpPagoAutorizado): Promise<v
     return
   }
 
+  // El resultado del cobro viene en payment.status ('approved'/'rejected');
+  // el status de nivel superior describe el ciclo de scheduling de MP
+  // ('scheduled'/'processed'/'recycling'). Se prefiere el anidado.
+  const resultado = pago.payment?.status ?? pago.status
+
   await db
     .insert(pagosSuscripcion)
     .values({
@@ -96,18 +114,18 @@ export async function registrarPagoAutorizado(pago: MpPagoAutorizado): Promise<v
       suscripcionId: s.id,
       mpPaymentId: String(pago.id),
       montoClp: Math.round(pago.transaction_amount ?? 0),
-      estado: pago.status ?? 'desconocido',
+      estado: resultado ?? 'desconocido',
       detalle: { status_detail: pago.payment?.status_detail ?? null },
     })
     .onConflictDoNothing({ target: pagosSuscripcion.mpPaymentId })
 
   const ahora = new Date()
-  if (pago.status === 'rejected' && (s.estado === 'activa' || s.estado === 'trial')) {
+  if (resultado === 'rejected' && (s.estado === 'activa' || s.estado === 'trial')) {
     await db
       .update(suscripciones)
       .set({ estado: 'morosa', updatedAt: ahora })
       .where(eq(suscripciones.id, s.id))
-  } else if (pago.status === 'approved' && s.estado !== 'cancelada') {
+  } else if (resultado === 'approved' && s.estado !== 'cancelada') {
     await db
       .update(suscripciones)
       .set({ estado: 'activa', updatedAt: ahora })

@@ -213,32 +213,94 @@ describe('sincronización con MercadoPago', () => {
     expect(s2.estado).toBe('cancelada')
   })
 
-  it('registrarPagoAutorizado inserta idempotente y ajusta el estado', async () => {
+  it('registrarPagoAutorizado inserta idempotente y ajusta el estado (forma real de MP: payment.status anidado)', async () => {
     const u = await crearUsuario('sync-pago')
     const preId = `pre-pago-${Date.now()}`
     await db.insert(suscripciones).values({
       userId: u.id, origen: 'mercadopago', estado: 'activa', mpPreapprovalId: preId,
     })
-    const pago = {
-      id: `ap-${Date.now()}`, preapproval_id: preId, status: 'rejected',
-      transaction_amount: 3490, payment: { status_detail: 'cc_rejected_insufficient_amount' },
+    // El status de nivel superior describe el scheduling de MP ('processed'),
+    // NO el resultado del cobro: eso vive en payment.status.
+    const pagoRechazado = {
+      id: `ap-${Date.now()}`, preapproval_id: preId, status: 'processed',
+      transaction_amount: 3490,
+      payment: { status: 'rejected', status_detail: 'cc_rejected_insufficient_amount' },
     }
-    await registrarPagoAutorizado(pago)
-    await registrarPagoAutorizado(pago) // reentrega del webhook
+    await registrarPagoAutorizado(pagoRechazado)
+    await registrarPagoAutorizado(pagoRechazado) // reentrega del webhook
 
     const filas = await db
       .select()
       .from(pagosSuscripcion)
-      .where(eq(pagosSuscripcion.mpPaymentId, String(pago.id)))
+      .where(eq(pagosSuscripcion.mpPaymentId, String(pagoRechazado.id)))
     expect(filas.length).toBe(1)
     expect(filas[0].montoClp).toBe(3490)
+    expect(filas[0].estado).toBe('rejected')
 
     const [s] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
     expect(s.estado).toBe('morosa')
 
-    await registrarPagoAutorizado({ ...pago, id: `ap2-${Date.now()}`, status: 'approved' })
+    const pagoAprobado = {
+      ...pagoRechazado, id: `ap2-${Date.now()}`, status: 'processed',
+      payment: { status: 'approved' },
+    }
+    await registrarPagoAutorizado(pagoAprobado)
     const [s2] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
     expect(s2.estado).toBe('activa')
+    const [filaAprobada] = await db
+      .select()
+      .from(pagosSuscripcion)
+      .where(eq(pagosSuscripcion.mpPaymentId, String(pagoAprobado.id)))
+    expect(filaAprobada.estado).toBe('approved')
+  })
+
+  it('registrarPagoAutorizado cae al status de nivel superior si no hay payment anidado', async () => {
+    const u = await crearUsuario('sync-pago-fallback')
+    const preId = `pre-pago-fb-${Date.now()}`
+    await db.insert(suscripciones).values({
+      userId: u.id, origen: 'mercadopago', estado: 'activa', mpPreapprovalId: preId,
+    })
+    const pago = {
+      id: `ap-fb-${Date.now()}`, preapproval_id: preId, status: 'rejected',
+      transaction_amount: 3490,
+    }
+    await registrarPagoAutorizado(pago)
+
+    const [s] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
+    expect(s.estado).toBe('morosa')
+    const [fila] = await db
+      .select()
+      .from(pagosSuscripcion)
+      .where(eq(pagosSuscripcion.mpPaymentId, String(pago.id)))
+    expect(fila.estado).toBe('rejected')
+  })
+
+  it('sincronizarPreapproval no baja una fila morosa a activa mientras MP reintenta el cobro', async () => {
+    const u = await crearUsuario('sync-morosa')
+    const preId = `pre-morosa-${Date.now()}`
+    const periodoHastaInicial = enDias(-2)
+    await db.insert(suscripciones).values({
+      userId: u.id, origen: 'mercadopago', estado: 'morosa',
+      mpPreapprovalId: preId, periodoHasta: periodoHastaInicial,
+    })
+
+    const pre: MpPreapproval = {
+      id: preId, status: 'authorized', external_reference: String(u.id),
+      next_payment_date: periodoHastaInicial.toISOString(),
+    }
+    // MP sigue "authorized" mientras reintenta el cobro fallido: el
+    // next_payment_date no avanzó, así que la fila debe seguir 'morosa'.
+    await sincronizarPreapproval(pre)
+    let [s] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
+    expect(s.estado).toBe('morosa')
+
+    // El próximo ciclo de cobro avanzó de verdad: ahora sí sale de morosa.
+    await sincronizarPreapproval({
+      ...pre,
+      next_payment_date: new Date(periodoHastaInicial.getTime() + 30 * DIA).toISOString(),
+    })
+    ;[s] = await db.select().from(suscripciones).where(eq(suscripciones.userId, u.id))
+    expect(s.estado).toBe('activa')
   })
 })
 
