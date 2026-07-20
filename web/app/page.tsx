@@ -3,6 +3,7 @@ import { getSession } from "@/lib/get-session";
 import { buttonVariants } from "@/components/ui/button";
 import { Logo, Isotipo } from "@/components/brand/logo";
 import { Revelar } from "@/components/marketing/revelar";
+import { lanzamientoGratis } from "@/lib/suscripciones/lanzamiento";
 
 // ---------------------------------------------------------------------------
 // Portada pública. Estructura: hero (tesis: de la pregunta al PDF) → cómo
@@ -110,6 +111,7 @@ export default async function Home() {
   const autenticado = session !== null;
   const ctaPrincipalHref = autenticado ? "/dashboard" : "/registro";
   const ctaPrincipalTexto = autenticado ? "Ir al panel" : "Crear cuenta gratis";
+  const gratisPorLanzamiento = lanzamientoGratis();
 
   return (
     <div className="flex min-h-full flex-col bg-background text-foreground">
@@ -209,6 +211,18 @@ export default async function Home() {
                   Ver cómo funciona
                 </a>
               </div>
+              {gratisPorLanzamiento && (
+                <p className="text-sm text-muted-foreground">
+                  Estamos en versión de lanzamiento:{" "}
+                  <Link
+                    href="/precios"
+                    className="font-medium text-primary underline-offset-4 hover:underline"
+                  >
+                    las funciones Pro son gratis para todos
+                  </Link>
+                  , sin tarjeta.
+                </p>
+              )}
               <p className="font-mono text-xs text-muted-foreground">
                 Física · Química · Biología · Matemáticas · Filosofía ·
                 Lenguaje · y más

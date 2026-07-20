@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { suscripciones, pagosSuscripcion, usuarios, colegios, usosIa } from '@/lib/db/schema'
@@ -167,6 +167,38 @@ describe('entitlements', () => {
     const cuotaPro = await cuotaImportaciones(u.id)
     expect(cuotaPro.limite).toBe(100)
     expect(cuotaPro.restantes).toBe(98)
+  })
+})
+
+describe('lanzamiento gratis', () => {
+  const previo = process.env.LANZAMIENTO_GRATIS
+  beforeEach(() => {
+    delete process.env.LANZAMIENTO_GRATIS // encendido por defecto
+  })
+  afterEach(() => {
+    process.env.LANZAMIENTO_GRATIS = previo
+  })
+
+  it('libera Pro y sus 100 importaciones a una cuenta sin suscripción', async () => {
+    const u = await crearUsuario('lanz-libre')
+    const plan = await planEfectivo(u.id)
+    expect(plan.plan).toBe('pro')
+    expect(plan.origen).toBe('lanzamiento')
+    expect((await cuotaImportaciones(u.id)).limite).toBe(100)
+  })
+
+  it('no tapa el origen real de quien ya tiene Pro', async () => {
+    const u = await crearUsuario('lanz-cortesia')
+    await db.insert(suscripciones).values({
+      userId: u.id, origen: 'cortesia', estado: 'activa', periodoHasta: enDias(30),
+    })
+    expect((await planEfectivo(u.id)).origen).toBe('cortesia')
+  })
+
+  it('apagado, la misma cuenta vuelve a free', async () => {
+    process.env.LANZAMIENTO_GRATIS = 'false'
+    const u = await crearUsuario('lanz-off')
+    expect((await planEfectivo(u.id)).plan).toBe('free')
   })
 })
 

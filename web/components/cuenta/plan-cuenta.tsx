@@ -10,7 +10,7 @@ import { iniciarSuscripcion, cancelarMiSuscripcion } from '@/lib/actions/suscrip
 
 export interface DatosPlan {
   plan: 'free' | 'pro'
-  origen: 'suscripcion' | 'cortesia' | 'colegio' | null
+  origen: 'suscripcion' | 'cortesia' | 'colegio' | 'lanzamiento' | null
   estado: string | null
   periodicidad: string | null
   periodoHasta: string | null
@@ -47,6 +47,8 @@ export function PlanCuenta({ datos }: { datos: DatosPlan }) {
     })
 
   const esProPropio = datos.plan === 'pro' && datos.origen === 'suscripcion'
+  // Mientras dure el lanzamiento nadie paga: no se ofrece checkout.
+  const enLanzamiento = datos.origen === 'lanzamiento'
 
   return (
     <Card>
@@ -58,6 +60,13 @@ export function PlanCuenta({ datos }: { datos: DatosPlan }) {
           </Badge>
         </div>
 
+        {enLanzamiento && (
+          <p className="rounded-lg bg-primary/10 p-3 text-sm">
+            EduBox está en versión de lanzamiento: tienes todas las funciones
+            Pro liberadas, gratis y sin tarjeta. Te avisaremos por correo con
+            anticipación antes de que empiece a cobrarse.
+          </p>
+        )}
         {datos.origen === 'colegio' && (
           <p className="text-sm text-muted-foreground">
             Tienes Pro por la licencia de tu colegio.
@@ -91,7 +100,7 @@ export function PlanCuenta({ datos }: { datos: DatosPlan }) {
           Importaciones con IA este mes: {datos.cuota.usadas} de {datos.cuota.limite}.
         </p>
 
-        {(datos.plan === 'free' || datos.estado === 'cancelada') && (
+        {!enLanzamiento && (datos.plan === 'free' || datos.estado === 'cancelada') && (
           <div className="flex flex-col gap-2">
             <Button onClick={() => suscribir('mensual')} disabled={pendiente || !datos.pagosHabilitados}>
               Pro mensual — $3.490/mes

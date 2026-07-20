@@ -1,6 +1,7 @@
 import { and, count, eq, gte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { colegios, suscripciones, usosIa, usuarios } from '@/lib/db/schema'
+import { lanzamientoGratis } from '@/lib/suscripciones/lanzamiento'
 
 // ---------------------------------------------------------------------------
 // Derivación de entitlements. Ser "Pro" NUNCA es una columna: se calcula aquí
@@ -12,7 +13,7 @@ export const LIMITE_IMPORTACIONES = { free: 3, pro: 100 } as const
 export const DIAS_GRACIA_MOROSA = 7
 
 export type Suscripcion = typeof suscripciones.$inferSelect
-export type OrigenPro = 'suscripcion' | 'cortesia' | 'colegio'
+export type OrigenPro = 'suscripcion' | 'cortesia' | 'colegio' | 'lanzamiento'
 
 export interface PlanEfectivo {
   plan: 'free' | 'pro'
@@ -73,6 +74,12 @@ export async function planEfectivo(userId: number): Promise<PlanEfectivo> {
     .limit(1)
   if (fila?.licenciaHasta && fila.licenciaHasta > new Date()) {
     return { plan: 'pro', origen: 'colegio', suscripcion: s ?? null }
+  }
+  // Último recurso antes de free: durante el lanzamiento nadie paga y todos
+  // tienen los límites Pro. Va al final para que quien SÍ tiene suscripción,
+  // cortesía o licencia siga viendo su origen real en /cuenta y en el admin.
+  if (lanzamientoGratis()) {
+    return { plan: 'pro', origen: 'lanzamiento', suscripcion: s ?? null }
   }
   return { plan: 'free', origen: null, suscripcion: s ?? null }
 }

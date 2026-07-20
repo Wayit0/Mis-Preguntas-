@@ -2,6 +2,12 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Logo } from "@/components/brand/logo";
 import { buttonVariants } from "@/components/ui/button";
+import { lanzamientoGratis } from "@/lib/suscripciones/lanzamiento";
+
+// El aviso de lanzamiento se lee de LANZAMIENTO_GRATIS en cada request: si se
+// prerenderizara, apagar el lanzamiento en el App Service dejaría esta página
+// prometiendo Pro gratis hasta el siguiente build.
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Precios — EduBox",
@@ -9,7 +15,10 @@ export const metadata: Metadata = {
     "Planes de EduBox: Gratis para partir, Pro para importar sin límites y licencias para colegios.",
 };
 
-const PLANES = [
+// El plan Pro se muestra distinto mientras dure el lanzamiento: no se cobra a
+// nadie (ver lib/suscripciones/lanzamiento.ts), así que la tarjeta anuncia el
+// precio futuro en vez de pedirlo hoy.
+const planes = (gratis: boolean) => [
   {
     nombre: "Gratis",
     precio: "$0",
@@ -21,19 +30,25 @@ const PLANES = [
       "Pruebas en PDF ilimitadas",
       "Textos de comprensión y carpetas",
       "Banco compartido del colegio",
-      "3 importaciones con IA al mes",
+      gratis
+        ? "100 importaciones con IA al mes durante el lanzamiento"
+        : "3 importaciones con IA al mes",
     ],
   },
   {
     nombre: "Pro",
-    precio: "$3.490",
-    detalle: "/mes · o $35.880/año (equivale a $2.990/mes)",
-    cta: { href: "/cuenta", texto: "Probar gratis 15 días" },
+    precio: gratis ? "Gratis" : "$3.490",
+    detalle: gratis
+      ? "durante el lanzamiento · después $3.490/mes"
+      : "/mes · o $35.880/año (equivale a $2.990/mes)",
+    cta: gratis
+      ? { href: "/registro", texto: "Crear cuenta gratis" }
+      : { href: "/cuenta", texto: "Probar gratis 15 días" },
     destacado: true,
     incluye: [
       "Todo lo del plan Gratis",
       "100 importaciones con IA al mes",
-      "Prueba gratis de 15 días",
+      gratis ? "Sin tarjeta mientras dure el lanzamiento" : "Prueba gratis de 15 días",
       "Acceso anticipado a nuevas funciones (formas A/B, exportar a Word)",
     ],
   },
@@ -56,6 +71,9 @@ const PLANES = [
 ];
 
 export default function PreciosPage() {
+  const gratis = lanzamientoGratis();
+  const PLANES = planes(gratis);
+
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-10 px-4 py-12">
       <header className="flex items-center justify-between">
@@ -78,6 +96,20 @@ export default function PreciosPage() {
           Parte gratis. Paga solo si la IA te ahorra horas todos los meses.
         </p>
       </div>
+
+      {gratis && (
+        <div className="rounded-2xl border-2 border-primary bg-primary/5 p-5 text-center">
+          <p className="font-heading text-lg font-semibold text-primary">
+            EduBox está en versión de lanzamiento: Pro es gratis para todos
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Por ahora no cobramos nada. Todas las cuentas tienen las funciones
+            Pro liberadas —incluidas las 100 importaciones con IA al mes— sin
+            tarjeta. Te avisaremos por correo con anticipación antes de empezar
+            a cobrar.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-5 md:grid-cols-3">
         {PLANES.map((p) => (
@@ -123,8 +155,9 @@ export default function PreciosPage() {
       </div>
 
       <p className="text-center text-xs text-muted-foreground">
-        Precios en pesos chilenos, IVA incluido. Cancela cuando quieras:
-        conservas todo tu contenido y vuelves al plan Gratis.
+        Precios en pesos chilenos, IVA incluido
+        {gratis ? ", referenciales mientras dure el lanzamiento" : ""}. Cancela
+        cuando quieras: conservas todo tu contenido y vuelves al plan Gratis.
       </p>
     </main>
   );

@@ -13,6 +13,7 @@ import {
   mpObtenerPreapproval,
   type Periodicidad,
 } from '@/lib/suscripciones/mercadopago'
+import { lanzamientoGratis } from '@/lib/suscripciones/lanzamiento'
 import { sincronizarPreapproval } from '@/lib/suscripciones/sync'
 import { suscripcionDeUsuario } from '@/lib/queries/suscripciones'
 
@@ -33,6 +34,9 @@ export async function iniciarSuscripcion(
   if (!userId) return { error: 'Debes iniciar sesión.' }
   if (periodicidad !== 'mensual' && periodicidad !== 'anual') {
     return { error: 'Periodicidad no válida.' }
+  }
+  if (lanzamientoGratis()) {
+    return { error: 'Durante el lanzamiento EduBox Pro es gratis: no necesitas suscribirte.' }
   }
   if (!mpHabilitado()) {
     return { error: 'Los pagos aún no están habilitados. Escríbenos a contacto@edubox.cl.' }

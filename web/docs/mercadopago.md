@@ -22,6 +22,34 @@ webhook ignora eventos.
 > aplica a **cualquier** App Service en modo producción, incluida QA — no
 > sólo a `edubox.cl`. No despliegues sin este secreto configurado.
 
+## Lanzamiento abierto: hoy nadie paga (`LANZAMIENTO_GRATIS`)
+
+Mientras EduBox esté en **versión de lanzamiento**, las funciones Pro están
+liberadas para todas las cuentas y el cobro está apagado. Lo gobierna un solo
+interruptor, `lib/suscripciones/lanzamiento.ts`, **encendido por defecto**:
+
+- `planEfectivo()` devuelve `plan: 'pro'` con `origen: 'lanzamiento'` a quien no
+  tenga suscripción, cortesía ni licencia de colegio → **100 importaciones IA al
+  mes para todos**. Quien sí tiene una fuente real de Pro conserva su origen.
+- `iniciarSuscripcion()` rechaza el checkout ("durante el lanzamiento EduBox Pro
+  es gratis"), y `/cuenta` no muestra los botones de pago.
+- `/precios` (render dinámico) y la portada anuncian que Pro es gratis durante
+  el lanzamiento, con el precio futuro a la vista.
+
+**Para empezar a cobrar** (después de cargar las credenciales de MP y validar el
+sandbox en QA):
+
+```bash
+az webapp config appsettings set -g rg-mispreguntas-prod \
+  -n app-mispreguntas-ecupwarmwaeb6 \
+  --settings LANZAMIENTO_GRATIS=false
+```
+
+Sólo el valor exacto `false` lo apaga (vacío o ausente = encendido). Al
+apagarlo, las cuentas sin suscripción vuelven al plan Gratis y sus 3
+importaciones al mes: **avisar por correo antes**, junto con el anuncio del
+checklist de más abajo.
+
 ## Recursos Azure (reales)
 
 | Entorno | Web App | URL pública |
@@ -125,6 +153,7 @@ para poder probar contra un túnel (ngrok/similar) sin configurar el secreto.
 - [ ] `MP_WEBHOOK_SECRET` de **producción** cargado — **obligatorio**: sin él, `https://edubox.cl/api/webhooks/mercadopago` responde 503 a toda notificación (fail-closed, commit `0c829b0`).
 - [ ] Webhook de producción registrado en el panel de MP (modo Producción) apuntando a `https://edubox.cl/api/webhooks/mercadopago`, eventos `subscription_preapproval` y `subscription_authorized_payment`.
 - [ ] Ciclo completo verificado en QA con credenciales de prueba (Paso 4) antes de promover a `main`.
+- [ ] `LANZAMIENTO_GRATIS=false` en ambas Web Apps — mientras siga encendido nadie puede suscribirse (el checkout se rechaza a propósito).
 - [ ] **Correo de anuncio a los usuarios existentes**: al lanzar, todos los usuarios actuales pasan al plan **Gratis** (3 importaciones IA/mes) — enviar a mano vía Resend un correo explicando el cambio e invitando al **trial de 15 días de EduBox Pro**. No hay automatización de este envío; usar la lista de usuarios de **Admin → Usuarios** para armar los destinatarios.
 - [ ] **Boletas SII**: mientras no se automatice la emisión, generarlas **a mano** a partir del reporte de **Admin → Suscripciones** (tarjeta "Ingreso del mes" + "Ver pagos" por usuario, con monto en CLP y fecha de cada cobro aprobado).
 

@@ -88,6 +88,20 @@ describe('iniciarSuscripcion', () => {
     expect(mpCrearPreapproval).not.toHaveBeenCalled()
   })
 
+  it('no cobra durante el lanzamiento: rechaza sin llamar a MercadoPago', async () => {
+    const u = await crearUsuario('act-lanzamiento')
+    currentUserId = u.id
+    const previo = process.env.LANZAMIENTO_GRATIS
+    delete process.env.LANZAMIENTO_GRATIS // encendido por defecto
+    try {
+      const r = await iniciarSuscripcion('mensual')
+      expect(r).toEqual({ error: expect.stringContaining('lanzamiento') })
+      expect(mpCrearPreapproval).not.toHaveBeenCalled()
+    } finally {
+      process.env.LANZAMIENTO_GRATIS = previo
+    }
+  })
+
   it('permite re-suscribirse cuando la fila existente está cancelada (cambio de periodicidad)', async () => {
     const u = await crearUsuario('act-resub')
     currentUserId = u.id
