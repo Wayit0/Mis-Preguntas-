@@ -29,6 +29,21 @@ export function mensajeErrorAuth(
     case 'INVALID_TOKEN':
     case 'TOKEN_EXPIRED':
       return 'El enlace de recuperación no es válido o expiró. Solicítalo de nuevo.'
+    // Códigos del login social: no llegan como respuesta de la API sino en la
+    // URL de retorno (?error=...), en minúsculas y con guiones bajos.
+    case 'account_not_linked':
+      return 'Ya existe una cuenta con ese correo. Inicia sesión con tu contraseña y luego podrás entrar con Google.'
+    case 'account_already_linked_to_different_user':
+    case 'unable_to_link_account':
+      return 'No pudimos vincular esa cuenta con tu correo. Escríbenos a contacto@edubox.cl.'
+    case 'email_not_found':
+      return 'El proveedor no entregó un correo electrónico. Inicia sesión con tu correo y contraseña.'
+    case 'invalid_code':
+    case 'no_code':
+    case 'invalid_callback_request':
+    case 'state_not_found':
+    case 'please_restart_the_process':
+      return 'No se completó el inicio de sesión con el proveedor. Intenta de nuevo.'
     default:
       return fallback
   }

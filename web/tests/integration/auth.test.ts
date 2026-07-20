@@ -74,4 +74,25 @@ describe('auth (better-auth contra Postgres)', () => {
     const signIn2 = await auth.api.signInEmail({ body: { email, password } })
     expect(signIn2.token).toBeTruthy()
   })
+
+  // Regresión: con `requireLocalEmailVerified` en su default (true), better-auth
+  // rechaza con `account_not_linked` el login social de cualquier cuenta local
+  // sin correo verificado — es decir, casi todas, porque no exigimos verificar
+  // para entrar. Falla en silencio y sólo en producción, así que se fija aquí.
+  it('el enlace de cuentas no exige que el correo local ya esté verificado', () => {
+    const linking = auth.options.account?.accountLinking
+    expect(linking?.enabled).toBe(true)
+    expect(linking?.trustedProviders).toEqual(['google', 'microsoft'])
+    expect(linking?.requireLocalEmailVerified).toBe(false)
+  })
+
+  it('un usuario recién registrado por correo nace sin verificar', async () => {
+    // Premisa del test anterior: si esto cambiara (verificación obligatoria),
+    // el candado de better-auth dejaría de estorbar y podría reconsiderarse.
+    const email = `sinverificar${Date.now()}@x.cl`
+    const signUp = await auth.api.signUpEmail({
+      body: { name: 'Sin Verificar', email, password: 'Sup3rClave!' },
+    })
+    expect(signUp.user.emailVerified).toBe(false)
+  })
 })
