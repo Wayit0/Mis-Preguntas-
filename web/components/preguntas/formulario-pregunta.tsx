@@ -219,7 +219,7 @@ export function FormularioPregunta({
           </span>
         </h1>
         <p className="text-sm text-muted-foreground">
-          Puedes usar LaTeX entre signos $…$ para fórmulas (p. ej. $E=mc^2$).
+          Usa el botón «Ecuación» para insertar fórmulas con el editor visual.
         </p>
       </div>
 
