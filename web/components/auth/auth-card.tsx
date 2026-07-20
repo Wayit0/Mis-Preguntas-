@@ -21,9 +21,12 @@ const emailSchema = z.string().email()
 export function AuthCard({
   modoInicial = 'login',
   proveedores = [],
+  errorInicial = null,
 }: {
   modoInicial?: Modo
   proveedores?: ProveedorSocial[]
+  /** Mensaje ya traducido con el que abre la tarjeta (p. ej. ?error= del login social). */
+  errorInicial?: string | null
 }) {
   const router = useRouter()
   const [modo, setModo] = useState<Modo>(modoInicial)
@@ -31,7 +34,7 @@ export function AuthCard({
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(errorInicial)
   const [cargando, setCargando] = useState(false)
 
   function cambiarModo(nuevo: Modo) {

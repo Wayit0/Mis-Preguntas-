@@ -71,6 +71,10 @@ export function BotonesSociales({
     const { error } = await authClient.signIn.social({
       provider: p,
       callbackURL: '/dashboard',
+      // Si el proveedor o el enlace fallan, better-auth redirige el navegador a
+      // esta URL con ?error=<código>. Sin esto aterrizaba en la portada, que no
+      // lee ese parámetro: el usuario veía la home sin explicación alguna.
+      errorCallbackURL: '/login',
     })
     // En éxito el navegador ya se redirige al proveedor; sólo manejamos el error.
     if (error) {

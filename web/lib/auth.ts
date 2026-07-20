@@ -59,20 +59,26 @@ export const roles = {
 }
 
 /**
- * Auto-asociación al colegio por DOMINIO de correo. Se ejecuta SÓLO cuando el
- * correo ya está VERIFICADO (desde `afterEmailVerification`): así el dominio del
- * correo prueba pertenencia al colegio y nadie puede colarse registrándose con
- * un correo de un dominio ajeno que no controla. Si el usuario ya tiene colegio,
+ * Auto-asociación al colegio por DOMINIO de correo. Sólo asocia si el correo
+ * está VERIFICADO: así el dominio prueba pertenencia al colegio y nadie se cuela
+ * registrándose con un dominio ajeno que no controla. La verificación se
+ * comprueba AQUÍ (no en cada llamador) porque hay tres caminos que llegan hasta
+ * acá: verificar el correo por enlace, registrarse con un proveedor social, y
+ * enlazar un proveedor a una cuenta existente. Si el usuario ya tiene colegio,
  * no hace nada.
  */
 async function asociarColegioPorDominio(userId: number): Promise<void> {
   if (!Number.isFinite(userId)) return
   const [u] = await db
-    .select({ email: usuarios.email, colegioId: usuarios.colegioId })
+    .select({
+      email: usuarios.email,
+      colegioId: usuarios.colegioId,
+      emailVerified: usuarios.emailVerified,
+    })
     .from(usuarios)
     .where(eq(usuarios.id, userId))
     .limit(1)
-  if (!u || u.colegioId != null) return
+  if (!u || u.colegioId != null || u.emailVerified !== true) return
 
   const dominio = u.email.toLowerCase().split('@')[1]
   if (!dominio) return
@@ -265,10 +271,19 @@ export const auth = betterAuth({
   // cuenta EXISTENTE con el mismo correo (email/contraseña u otro proveedor). Sin
   // esto better-auth devuelve `account_not_linked` y rebota al login. Es seguro
   // porque Google y Microsoft verifican la propiedad del correo.
+  //
+  // `requireLocalEmailVerified: false` es IMPRESCINDIBLE aquí: por defecto
+  // better-auth exige además que la cuenta local ya tenga el correo verificado
+  // (ver la condición en node_modules/better-auth/dist/oauth2/link-account.mjs).
+  // Como NO exigimos verificar para iniciar sesión, casi todas las cuentas
+  // tienen emailVerified=false y el enlace se rechazaba siempre. Tras enlazar,
+  // better-auth marca emailVerified=true con la afirmación del proveedor (mismo
+  // archivo), así que la cuenta queda verificada de verdad.
   account: {
     accountLinking: {
       enabled: true,
       trustedProviders: ['google', 'microsoft'],
+      requireLocalEmailVerified: false,
     },
   },
   // Verificación de correo. NO exigimos verificar para iniciar sesión
@@ -327,6 +342,22 @@ export const auth = betterAuth({
       // Bitácora de accesos (éxito y fallo, email y social). Va primero porque
       // debe registrar también los fallos, que salen temprano abajo.
       await registrarAccesoDesdeContexto(ctx)
+
+      // Login social: asocia al colegio por dominio. Cubre el caso que
+      // `databaseHooks.user.create.after` no ve — cuando el proveedor se ENLAZA
+      // a una cuenta que ya existía: better-auth marca ahí emailVerified=true
+      // con la afirmación del proveedor, pero sin pasar por
+      // `afterEmailVerification`, que es donde vive la asociación del flujo por
+      // correo. Es idempotente (no hace nada si ya tiene colegio).
+      if (ctx.path === '/callback/google' || ctx.path === '/callback/microsoft') {
+        const sesion = ctx.context.newSession as
+          | { user?: { id?: string | number } }
+          | null
+          | undefined
+        if (sesion?.user?.id != null) {
+          await asociarColegioPorDominio(Number(sesion.user.id))
+        }
+      }
 
       const returned = ctx.context.returned as
         | { token?: string; user?: { id?: string | number } }
