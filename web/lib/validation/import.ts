@@ -10,7 +10,8 @@ import { TIPOS_PREGUNTA } from '@/lib/validation/pregunta'
 // Validación de la importación de documentos con IA (Fase 7.2).
 //
 // `PreguntasDetectadasSchema` es la forma estructurada que le pedimos al modelo
-// (vía `zodOutputFormat`): un objeto con un arreglo `preguntas`. Cada pregunta
+// (como `input_schema` de la herramienta `entregar_preguntas`, ver
+// `lib/ai/import.ts`): un objeto con un arreglo `preguntas`. Cada pregunta
 // reproduce los campos del MVP (pregunta, A–E, correcta, explicación, materia,
 // nivel) más un `tipo` para distinguir selección múltiple de desarrollo.
 //
