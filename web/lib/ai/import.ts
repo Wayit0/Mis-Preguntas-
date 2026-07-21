@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
+import { z } from 'zod/v4'
 
 import type { BloqueContenido } from '@/lib/docparse/extract'
 import {
@@ -12,16 +12,36 @@ import {
 // Detección de preguntas con Anthropic (Fase 7.2).
 //
 // Toma los *content blocks* del documento (de `docparse/extract`) y le pide al
-// modelo que extraiga las preguntas en forma estructurada (salida JSON validada
-// contra `PreguntasDetectadasSchema` vía `zodOutputFormat`). Equivalente al
-// `detectar_preguntas_con_claude` del MVP, ampliado a preguntas de desarrollo.
+// modelo que extraiga las preguntas llamando a UNA herramienta cuyo esquema de
+// entrada es `PreguntasDetectadasSchema`. La salida (el `input` del tool_use)
+// pasa por la misma criba con Zod que antes.
 //
-// Referencia de la API: SDK oficial de Anthropic, `client.messages.parse` con
-// `output_config.format`. Modelo: `claude-opus-4-8` (sin sufijo de fecha).
+// POR QUÉ TOOL USE Y NO STRUCTURED OUTPUTS: hasta 2026-07 se usaba
+// `messages.parse` con `output_config.format` (structured outputs beta). En
+// producción empezó a fallar el 100% de las importaciones con
+// `400 invalid_request_error: "Grammar compilation timed out."` — la API no
+// alcanza a compilar la gramática de decodificación restringida para este
+// esquema (un arreglo de objetos con ~13 campos), ni siquiera reintentando. El
+// código de la extracción no había cambiado: fue una degradación del lado de la
+// API. Tool use es GA, no compila esa gramática y produce el JSON igual de bien;
+// la laxitud eventual la absorbe la criba. Modelo: `claude-opus-4-8`.
 // ---------------------------------------------------------------------------
 
 /** Modelo de extracción (id exacto, sin sufijo de fecha). */
 const MODELO = 'claude-opus-4-8'
+
+/** Nombre de la herramienta con la que el modelo entrega las preguntas. */
+const HERRAMIENTA = 'entregar_preguntas'
+
+/**
+ * Esquema de entrada de la herramienta, derivado del MISMO zod que valida la
+ * salida (una sola fuente de verdad). Es una guía para el modelo, no un
+ * contrato estricto (no activamos `strict`, justamente para no volver a la
+ * compilación de gramática que se agotaba).
+ */
+const ESQUEMA_HERRAMIENTA = z.toJSONSchema(
+  PreguntasDetectadasSchema,
+) as Anthropic.Tool.InputSchema
 
 /** Uso de tokens de una detección (para el registro de costos del admin). */
 export interface UsoDeteccion {
@@ -146,7 +166,7 @@ const FIXTURE_FAKE: readonly unknown[] = [
  * Extrae las preguntas presentes en un documento ya convertido a content blocks.
  *
  * Devuelve sólo las preguntas válidas (con enunciado no vacío). Si el modelo no
- * produce salida estructurada (`parsed_output` nulo) o rechaza la petición
+ * llama a la herramienta (no hay bloque `tool_use`) o rechaza la petición
  * (`stop_reason === 'refusal'`), devuelve un arreglo vacío en lugar de fallar.
  */
 export async function detectarPreguntas(
@@ -161,33 +181,28 @@ export async function detectarPreguntas(
   const client = new Anthropic() // lee ANTHROPIC_API_KEY del entorno
 
   const instruccion =
-    `Extrae todas las preguntas del documento adjunto. ` +
-    `La asignatura es "${asignatura}".`
+    `Extrae todas las preguntas del documento adjunto y entrégalas llamando a ` +
+    `la herramienta ${HERRAMIENTA}. La asignatura es "${asignatura}".`
 
-  const llamar = () =>
-    client.messages.parse({
-      model: MODELO,
-      max_tokens: 16000,
-      system: SISTEMA,
-      messages: [
-        { role: 'user', content: [...contentBlocks, { type: 'text', text: instruccion }] },
-      ],
-      output_config: { format: zodOutputFormat(PreguntasDetectadasSchema) },
-    })
-
-  // "Grammar compilation timed out" (400) es un fallo de compilación de la
-  // gramática del structured output en frío; la API la cachea una vez
-  // compilada, así que un único reintento suele bastar. Cualquier otro error
-  // se propaga (el SDK ya reintenta solo los 429/5xx).
-  let res: Awaited<ReturnType<typeof llamar>>
-  try {
-    res = await llamar()
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : ''
-    if (!msg.includes('Grammar compilation timed out')) throw err
-    console.warn('[importar] grammar timeout; reintentando una vez…')
-    res = await llamar()
-  }
+  const res = await client.messages.create({
+    model: MODELO,
+    max_tokens: 16000,
+    system: SISTEMA,
+    messages: [
+      { role: 'user', content: [...contentBlocks, { type: 'text', text: instruccion }] },
+    ],
+    tools: [
+      {
+        name: HERRAMIENTA,
+        description:
+          'Registra todas las preguntas extraídas del documento. Llámala una ' +
+          'sola vez con el arreglo completo de preguntas.',
+        input_schema: ESQUEMA_HERRAMIENTA,
+      },
+    ],
+    // Fuerza al modelo a responder con la herramienta (no texto libre).
+    tool_choice: { type: 'tool', name: HERRAMIENTA },
+  })
 
   // Uso real reportado por la API (para el panel de costos del admin).
   const uso: UsoDeteccion = {
@@ -200,8 +215,14 @@ export async function detectarPreguntas(
 
   if (res.stop_reason === 'refusal') return { preguntas: [], uso }
 
-  const data = res.parsed_output
-  if (!data) return { preguntas: [], uso }
-
-  return { preguntas: cribarPreguntas(data.preguntas), uso }
+  // La salida vive en el `input` del bloque tool_use. Tomamos su arreglo
+  // `preguntas` tal cual y lo cribamos ítem por ítem (la criba descarta lo
+  // inválido sin tumbar el resto).
+  const bloque = res.content.find((b) => b.type === 'tool_use')
+  const preguntas =
+    bloque?.type === 'tool_use'
+      ? (bloque.input as { preguntas?: unknown[] } | null)?.preguntas
+      : undefined
+  const items = Array.isArray(preguntas) ? preguntas : []
+  return { preguntas: cribarPreguntas(items), uso }
 }
