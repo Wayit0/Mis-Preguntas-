@@ -476,8 +476,10 @@ export function ImportarDocumento({
           // La limpieza perezosa lo recogerá.
         }
       }
+      // Sin router.refresh(): crearPregunta ya revalida /preguntas server-side,
+      // y un refresh() justo tras push() corre una carrera que puede abortar
+      // el redirect (visto en e2e: ERR_ABORTED del RSC de la navegación).
       router.push(`/preguntas?asignatura=${encodeURIComponent(asignatura)}`)
-      router.refresh()
     } catch {
       setError('Ocurrió un error al guardar las preguntas. Inténtalo de nuevo.')
       setFase('revisar')
