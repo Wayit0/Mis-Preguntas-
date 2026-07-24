@@ -228,6 +228,32 @@ export const usosIa = pgTable('usos_ia', {
 })
 
 // ---------------------------------------------------------------------------
+// Borradores de "Importar Documento con IA": cada análisis exitoso se guarda
+// como borrador retomable, para que cerrar la página a mitad de la revisión
+// (o un deploy que invalide las server actions del bundle abierto) no pierda
+// el trabajo ni obligue a gastar otra importación de la cuota. Diseño en
+// docs/superpowers/specs/2026-07-24-borradores-importacion-design.md.
+// ---------------------------------------------------------------------------
+
+export const borradoresImportacion = pgTable('borradores_importacion', {
+  id: serial('id').primaryKey(),
+  // Dueño del borrador (convención del repo: sin FK).
+  userId: integer('user_id').notNull(),
+  asignatura: text('asignatura').notNull(),
+  nombreArchivo: text('nombre_archivo').notNull(),
+  // El ResultadoAnalisis ok crudo ({preguntas, imagenes}, imágenes en base64).
+  // Lo escribe SOLO el servidor al terminar el análisis; inmutable después.
+  resultado: jsonb('resultado').$type<Record<string, unknown>>().notNull(),
+  // Estado editable del cliente (PreguntaEditable[]), sobrescrito completo por
+  // cada auto-guardado. NULL = nunca se editó (retomar deriva de `resultado`).
+  edicion: jsonb('edicion').$type<unknown[]>(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  // Se toca en cada auto-guardado: es la base del tope por usuario (se elimina
+  // el más antiguo) y de la limpieza perezosa a 30 días.
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+// ---------------------------------------------------------------------------
 // Registro de accesos (para el panel de administración global). Cada intento de
 // inicio de sesión —por email/contraseña o por proveedor social— inserta una
 // fila con el resultado (éxito/fallo), el método, la IP y el navegador. Es
