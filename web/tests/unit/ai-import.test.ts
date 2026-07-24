@@ -83,7 +83,7 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
     expect(preguntas[0].pregunta).toBe('¿Cuánto es 2 + 2?')
     expect(preguntas[0].correcta).toBe('B')
     expect(preguntas[0].tipo).toBe('seleccion_multiple')
-    expect(uso?.modelo).toBe('claude-opus-4-8')
+    expect(uso?.modelo).toBe('claude-sonnet-5')
     expect(mocks.create).toHaveBeenCalledTimes(1)
   })
 
@@ -113,9 +113,11 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
     await detectarPreguntas(bloques, 'Biología')
 
     const args = mocks.create.mock.calls[0][0]
-    expect(args.model).toBe('claude-opus-4-8')
+    expect(args.model).toBe('claude-sonnet-5')
     // Tool use forzado (no structured outputs / no output_config).
     expect(args.output_config).toBeUndefined()
+    // Thinking OFF explícito: en Sonnet 5 omitirlo activaría adaptive thinking.
+    expect(args.thinking).toEqual({ type: 'disabled' })
     expect(args.tool_choice).toEqual({ type: 'tool', name: 'entregar_preguntas' })
     expect(args.tools[0].name).toBe('entregar_preguntas')
     // El input_schema se derivó del zod y es un objeto JSON-Schema con `preguntas`.
