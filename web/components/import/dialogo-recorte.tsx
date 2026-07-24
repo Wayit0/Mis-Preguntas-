@@ -107,11 +107,12 @@ export function DialogoRecorte({
             {error}
           </p>
         ) : null}
+        {/* Deshabilitar mientras aplicando para evitar que Restaurar/Cancelar pisen el onAplicar en vuelo */}
         <div className="flex flex-wrap justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onRestaurar}>
+          <Button type="button" variant="outline" onClick={onRestaurar} disabled={aplicando}>
             Restaurar original
           </Button>
-          <DialogClose render={<Button type="button" variant="outline" />}>
+          <DialogClose render={<Button type="button" variant="outline" disabled={aplicando} />}>
             Cancelar
           </DialogClose>
           <Button type="button" onClick={aplicar} disabled={aplicando}>
