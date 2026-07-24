@@ -6,6 +6,12 @@ import Link from 'next/link'
 import { CheckCircle2, FileText, Loader2 } from 'lucide-react'
 
 import { guardarPreguntasImportadas } from '@/lib/actions/import'
+import {
+  descartarBorradorImportacion,
+  obtenerBorradorImportacion,
+  actualizarBorradorImportacion,
+} from '@/lib/actions/borradores-importacion'
+import type { BorradorResumen } from '@/lib/import/borradores'
 import type { ResultadoAnalisis } from '@/lib/import/analizar'
 import {
   TIPOS_PREGUNTA,
@@ -18,6 +24,7 @@ import {
   parsearImagenesAlternativas,
   type ImagenParaGuardar,
   type PreguntaAnalizada,
+  type PreguntaEditableBorrador,
 } from '@/lib/validation/import'
 import type { ImagenExtraida } from '@/lib/docparse/extract'
 import { ASIGNATURAS } from '@/components/shell/subjects'
@@ -38,34 +45,12 @@ import { LatexText } from '@/components/preguntas/latex-text'
 
 /* eslint-disable @next/next/no-img-element */
 
-/** Una pregunta detectada, ya en forma editable (sin nulls) + selección. */
-interface PreguntaEditable {
-  id: string
-  incluir: boolean
-  pregunta: string
-  A: string
-  B: string
-  C: string
-  D: string
-  E: string
-  correcta: string
-  explicacion: string
-  materia: string
-  nivel: string
-  tipo: TipoPregunta
-  imagenPregunta: ImagenParaGuardar | null
-  imagenA: ImagenParaGuardar | null
-  imagenB: ImagenParaGuardar | null
-  imagenC: ImagenParaGuardar | null
-  imagenD: ImagenParaGuardar | null
-  imagenE: ImagenParaGuardar | null
-  imagenPreguntaOriginal: ImagenParaGuardar | null
-  imagenAOriginal: ImagenParaGuardar | null
-  imagenBOriginal: ImagenParaGuardar | null
-  imagenCOriginal: ImagenParaGuardar | null
-  imagenDOriginal: ImagenParaGuardar | null
-  imagenEOriginal: ImagenParaGuardar | null
-}
+/**
+ * Una pregunta detectada, ya en forma editable (sin nulls) + selección.
+ * La forma es el schema compartido `preguntaEditableBorradorSchema`: es lo
+ * que el auto-guardado persiste y lo que retomar restaura.
+ */
+type PreguntaEditable = PreguntaEditableBorrador
 
 /** Columna de imagen editable de una alternativa (`imagenA`…`imagenE`). */
 type CampoImagenAlternativa = `imagen${(typeof LETRAS)[number]}`
@@ -350,10 +335,13 @@ function AvisoCuotaAgotada({ mensaje }: { mensaje?: string }) {
 export function ImportarDocumento({
   asignaturaInicial,
   cuota,
+  borradores,
 }: {
   asignaturaInicial?: string
   /** Cuota mensual de importaciones con IA del plan del usuario. */
   cuota: { limite: number; restantes: number }
+  /** Borradores retomables del usuario (para «Importaciones en curso»). */
+  borradores: BorradorResumen[]
 }) {
   const router = useRouter()
 
@@ -376,6 +364,11 @@ export function ImportarDocumento({
     id: string
     campo: CampoImagen
   } | null>(null)
+  // Borrador activo de esta revisión (para el auto-guardado y el borrado al
+  // completar). Null si el análisis no alcanzó a crear uno (best-effort).
+  const [borradorId, setBorradorId] = useState<number | null>(null)
+  // Copia local de la lista para reflejar retomas/descartes sin recargar.
+  const [listaBorradores, setListaBorradores] = useState(borradores)
 
   const seleccionadas = preguntas.filter((p) => p.incluir).length
   const sinCupo = cuota.restantes === 0 || sinCupoError
@@ -414,6 +407,7 @@ export function ImportarDocumento({
       setPreguntas(
         resultado.preguntas.map((p) => aEditable(p, resultado.imagenes)),
       )
+      setBorradorId(resultado.borradorId ?? null)
       setFase('revisar')
     } catch {
       setError('Ocurrió un error al analizar el documento. Inténtalo de nuevo.')
@@ -426,6 +420,16 @@ export function ImportarDocumento({
       prev.map((p) => (p.id === id ? { ...p, ...cambios } : p)),
     )
   }
+
+  // Auto-guardado del borrador: 3 s después del último cambio en revisión.
+  // Best-effort: un fallo se ignora (se reintenta con el próximo cambio).
+  useEffect(() => {
+    if (fase !== 'revisar' || borradorId == null) return
+    const timer = setTimeout(() => {
+      actualizarBorradorImportacion(borradorId, preguntas).catch(() => {})
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [preguntas, fase, borradorId])
 
   async function onGuardar() {
     setError(null)
@@ -464,6 +468,14 @@ export function ImportarDocumento({
         setFase('revisar')
         return
       }
+      // El borrador ya cumplió su función; eliminarlo es best-effort.
+      if (borradorId != null) {
+        try {
+          await descartarBorradorImportacion(borradorId)
+        } catch {
+          // La limpieza perezosa lo recogerá.
+        }
+      }
       router.push(`/preguntas?asignatura=${encodeURIComponent(asignatura)}`)
       router.refresh()
     } catch {
@@ -479,6 +491,37 @@ export function ImportarDocumento({
     setAviso(null)
     setRecortando(null)
     setFase('subir')
+    setBorradorId(null)
+    // La lista del server component puede estar desactualizada (p. ej. el
+    // análisis recién hecho creó un borrador): recargar props.
+    router.refresh()
+  }
+
+  async function onRetomar(id: number) {
+    setError(null)
+    const res = await obtenerBorradorImportacion(id)
+    if (!res.ok) {
+      setError(res.error)
+      setListaBorradores((prev) => prev.filter((b) => b.id !== id))
+      return
+    }
+    const { borrador } = res
+    setAsignatura(borrador.asignatura)
+    setNombreArchivo(borrador.nombreArchivo)
+    setPreguntas(
+      borrador.edicion ??
+        borrador.resultado.preguntas.map((p) =>
+          aEditable(p, borrador.resultado.imagenes),
+        ),
+    )
+    setBorradorId(borrador.id)
+    setFase('revisar')
+  }
+
+  async function onDescartar(id: number) {
+    if (!window.confirm('¿Eliminar este borrador? No se puede deshacer.')) return
+    await descartarBorradorImportacion(id).catch(() => {})
+    setListaBorradores((prev) => prev.filter((b) => b.id !== id))
   }
 
   // ───────────────────────────── Encabezado ──────────────────────────────
@@ -856,6 +899,62 @@ export function ImportarDocumento({
           </form>
         </CardContent>
       </Card>
+
+      {fase !== 'analizando' && listaBorradores.length > 0 ? (
+        <Card>
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex flex-col gap-0.5">
+              <h2 className="text-sm font-semibold text-foreground">
+                Importaciones en curso
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Análisis ya hechos que puedes retomar sin gastar otra
+                importación. Se guardan por 30 días.
+              </p>
+            </div>
+            <ul className="flex flex-col gap-2">
+              {listaBorradores.map((b) => (
+                <li
+                  key={b.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
+                >
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {b.nombreArchivo}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {b.asignatura} ·{' '}
+                      {b.numPreguntas === 1
+                        ? '1 pregunta'
+                        : `${b.numPreguntas} preguntas`}{' '}
+                      ·{' '}
+                      {new Date(b.actualizadoEn).toLocaleString('es-CL', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button type="button" size="sm" onClick={() => onRetomar(b.id)}>
+                      Retomar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onDescartar(b.id)}
+                    >
+                      Descartar
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }
