@@ -18,6 +18,12 @@ const {
   MAX_BORRADORES_POR_USUARIO,
 } = await import('@/lib/import/borradores')
 
+const {
+  obtenerBorradorImportacion,
+  actualizarBorradorImportacion,
+  descartarBorradorImportacion,
+} = await import('@/lib/actions/borradores-importacion')
+
 async function crearUsuario(prefijo: string) {
   const email = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2)}@x.cl`
   const [u] = await db
@@ -35,6 +41,28 @@ function resultadoMinimo(n = 1) {
       tipo: 'seleccion_multiple' as const,
     })),
     imagenes: [],
+  }
+}
+
+/** Una PreguntaEditableBorrador válida mínima. */
+function preguntaEditable(texto: string) {
+  const sinImagen = null
+  return {
+    id: 'det-0',
+    incluir: true,
+    pregunta: texto,
+    A: 'a', B: 'b', C: 'c', D: 'd', E: '',
+    correcta: 'A',
+    explicacion: '',
+    materia: '',
+    nivel: '',
+    tipo: 'seleccion_multiple' as const,
+    imagenPregunta: sinImagen, imagenPreguntaOriginal: sinImagen,
+    imagenA: sinImagen, imagenAOriginal: sinImagen,
+    imagenB: sinImagen, imagenBOriginal: sinImagen,
+    imagenC: sinImagen, imagenCOriginal: sinImagen,
+    imagenD: sinImagen, imagenDOriginal: sinImagen,
+    imagenE: sinImagen, imagenEOriginal: sinImagen,
   }
 }
 
@@ -122,5 +150,85 @@ describe('lib/import/borradores (crear, listar, retención)', () => {
       resultado: resultadoMinimo(),
     })
     expect(await listarBorradores(b.id)).toHaveLength(0)
+  })
+})
+
+describe('actions/borradores-importacion (sesión + pertenencia)', () => {
+  it('actualiza la edición y obtener la devuelve; numPreguntas cuenta la edición', async () => {
+    const u = await crearUsuario('borr-act')
+    currentUserId = u.id
+    const id = await crearBorrador(u.id, {
+      asignatura: 'Física',
+      nombreArchivo: 'doc.docx',
+      resultado: resultadoMinimo(3),
+    })
+
+    const upd = await actualizarBorradorImportacion(id, [
+      preguntaEditable('editada 1'),
+      preguntaEditable('editada 2'),
+    ])
+    expect(upd.ok).toBe(true)
+
+    const res = await obtenerBorradorImportacion(id)
+    if (!res.ok) throw new Error(res.error)
+    expect(res.borrador.edicion).toHaveLength(2)
+    expect(res.borrador.edicion?.[0].pregunta).toBe('editada 1')
+    expect(res.borrador.resultado.preguntas).toHaveLength(3)
+
+    const lista = await listarBorradores(u.id)
+    expect(lista[0].numPreguntas).toBe(2)
+  })
+
+  it('rechaza una edición malformada sin guardar nada', async () => {
+    const u = await crearUsuario('borr-mal')
+    currentUserId = u.id
+    const id = await crearBorrador(u.id, {
+      asignatura: 'Física',
+      nombreArchivo: 'doc.docx',
+      resultado: resultadoMinimo(),
+    })
+
+    const upd = await actualizarBorradorImportacion(id, [{ pregunta: 'sin campos' }])
+    expect(upd.ok).toBe(false)
+
+    const res = await obtenerBorradorImportacion(id)
+    if (!res.ok) throw new Error(res.error)
+    expect(res.borrador.edicion).toBeNull()
+  })
+
+  it('un usuario no puede obtener/actualizar/descartar borradores ajenos', async () => {
+    const a = await crearUsuario('borr-own-a')
+    const b = await crearUsuario('borr-own-b')
+    const id = await crearBorrador(a.id, {
+      asignatura: 'Física',
+      nombreArchivo: 'de-a.docx',
+      resultado: resultadoMinimo(),
+    })
+
+    currentUserId = b.id
+    expect((await obtenerBorradorImportacion(id)).ok).toBe(false)
+    expect((await actualizarBorradorImportacion(id, [preguntaEditable('x')])).ok).toBe(false)
+    expect((await descartarBorradorImportacion(id)).ok).toBe(false)
+
+    // El de A sigue intacto.
+    currentUserId = a.id
+    expect((await obtenerBorradorImportacion(id)).ok).toBe(true)
+  })
+
+  it('descartar elimina el borrador; sin sesión todo falla', async () => {
+    const u = await crearUsuario('borr-del')
+    currentUserId = u.id
+    const id = await crearBorrador(u.id, {
+      asignatura: 'Física',
+      nombreArchivo: 'doc.docx',
+      resultado: resultadoMinimo(),
+    })
+    expect((await descartarBorradorImportacion(id)).ok).toBe(true)
+    expect((await obtenerBorradorImportacion(id)).ok).toBe(false)
+
+    currentUserId = 0
+    expect((await obtenerBorradorImportacion(id)).ok).toBe(false)
+    expect((await actualizarBorradorImportacion(id, [])).ok).toBe(false)
+    expect((await descartarBorradorImportacion(id)).ok).toBe(false)
   })
 })
