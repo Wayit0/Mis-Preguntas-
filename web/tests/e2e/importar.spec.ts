@@ -179,3 +179,47 @@ test('importar: recortar imagen a mano en la revisión y restaurar', async ({
     .poll(async () => miniatura.getAttribute('src'))
     .toBe(srcOriginal)
 })
+
+test('importar: el borrador se retoma tras recargar y desaparece al guardar', async ({
+  page,
+}) => {
+  const sufijo = Date.now()
+  const password = 'clave-segura-123'
+
+  // 1. Registro y análisis (IA mockeada) con una imagen 1x1.
+  await page.goto('/registro')
+  await page.locator('#nombre').fill(`Borrador ${sufijo}`)
+  await page.locator('#email').fill(`borrador${sufijo}@x.cl`)
+  await page.locator('#password').fill(password)
+  await page.locator('#password2').fill(password)
+  await page.getByRole('button', { name: 'Crear cuenta' }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+
+  await page.goto('/importar?asignatura=F%C3%ADsica')
+  await page
+    .locator('input[name="archivo"]')
+    .setInputFiles({ name: 'prueba.png', mimeType: 'image/png', buffer: PNG_1x1 })
+  await page.getByRole('button', { name: 'Analizar documento' }).click()
+  await expect(page.getByText('2 preguntas detectadas')).toBeVisible()
+
+  // 2. Editar el primer enunciado y esperar el auto-guardado (debounce 3 s).
+  const enunciado = page.getByLabel('Enunciado').first()
+  await enunciado.fill('¿Cuál es la unidad de fuerza? [EDITADO]')
+  await page.waitForTimeout(4500)
+
+  // 3. Recargar: el trabajo en curso aparece como borrador retomable.
+  await page.reload()
+  await expect(page.getByText('Importaciones en curso')).toBeVisible()
+  await expect(page.getByText('prueba.png')).toBeVisible()
+
+  // 4. Retomar: la edición sigue tal cual.
+  await page.getByRole('button', { name: 'Retomar' }).click()
+  await expect(page.getByText('2 preguntas detectadas')).toBeVisible()
+  await expect(page.getByLabel('Enunciado').first()).toHaveValue(/\[EDITADO\]/)
+
+  // 5. Guardar: redirige a Mis Preguntas y el borrador desaparece de /importar.
+  await page.getByRole('button', { name: /Guardar 2 preguntas/ }).click()
+  await expect(page).toHaveURL(/\/preguntas(\?|$)/)
+  await page.goto('/importar')
+  await expect(page.getByText('Importaciones en curso')).not.toBeVisible()
+})
