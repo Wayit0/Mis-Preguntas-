@@ -1,0 +1,1 @@
+CREATE INDEX "borradores_importacion_user_id_idx" ON "borradores_importacion" USING btree ("user_id");

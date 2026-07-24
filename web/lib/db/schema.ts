@@ -7,6 +7,7 @@ import {
   boolean,
   jsonb,
   primaryKey,
+  index,
 } from 'drizzle-orm/pg-core'
 
 // ---------------------------------------------------------------------------
@@ -235,23 +236,27 @@ export const usosIa = pgTable('usos_ia', {
 // docs/superpowers/specs/2026-07-24-borradores-importacion-design.md.
 // ---------------------------------------------------------------------------
 
-export const borradoresImportacion = pgTable('borradores_importacion', {
-  id: serial('id').primaryKey(),
-  // Dueño del borrador (convención del repo: sin FK).
-  userId: integer('user_id').notNull(),
-  asignatura: text('asignatura').notNull(),
-  nombreArchivo: text('nombre_archivo').notNull(),
-  // El ResultadoAnalisis ok crudo ({preguntas, imagenes}, imágenes en base64).
-  // Lo escribe SOLO el servidor al terminar el análisis; inmutable después.
-  resultado: jsonb('resultado').$type<Record<string, unknown>>().notNull(),
-  // Estado editable del cliente (PreguntaEditable[]), sobrescrito completo por
-  // cada auto-guardado. NULL = nunca se editó (retomar deriva de `resultado`).
-  edicion: jsonb('edicion').$type<unknown[]>(),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  // Se toca en cada auto-guardado: es la base del tope por usuario (se elimina
-  // el más antiguo) y de la limpieza perezosa a 30 días.
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+export const borradoresImportacion = pgTable(
+  'borradores_importacion',
+  {
+    id: serial('id').primaryKey(),
+    // Dueño del borrador (convención del repo: sin FK).
+    userId: integer('user_id').notNull(),
+    asignatura: text('asignatura').notNull(),
+    nombreArchivo: text('nombre_archivo').notNull(),
+    // El ResultadoAnalisis ok crudo ({preguntas, imagenes}, imágenes en base64).
+    // Lo escribe SOLO el servidor al terminar el análisis; inmutable después.
+    resultado: jsonb('resultado').$type<Record<string, unknown>>().notNull(),
+    // Estado editable del cliente (PreguntaEditable[]), sobrescrito completo por
+    // cada auto-guardado. NULL = nunca se editó (retomar deriva de `resultado`).
+    edicion: jsonb('edicion').$type<unknown[]>(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    // Se toca en cada auto-guardado: es la base del tope por usuario (se elimina
+    // el más antiguo) y de la limpieza perezosa a 30 días.
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => [index('borradores_importacion_user_id_idx').on(t.userId)],
+)
 
 // ---------------------------------------------------------------------------
 // Registro de accesos (para el panel de administración global). Cada intento de

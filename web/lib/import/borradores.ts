@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, lt } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, lt, sql } from 'drizzle-orm'
 
 import { db } from '@/lib/db'
 import { borradoresImportacion } from '@/lib/db/schema'
@@ -67,8 +67,11 @@ export async function crearBorrador(
     .where(eq(borradoresImportacion.userId, userId))
     .orderBy(asc(borradoresImportacion.updatedAt))
   const sobran = existentes.length - (MAX_BORRADORES_POR_USUARIO - 1)
-  for (const b of existentes.slice(0, Math.max(0, sobran))) {
-    await db.delete(borradoresImportacion).where(eq(borradoresImportacion.id, b.id))
+  const idsAEliminar = existentes.slice(0, Math.max(0, sobran)).map((b) => b.id)
+  if (idsAEliminar.length > 0) {
+    await db
+      .delete(borradoresImportacion)
+      .where(inArray(borradoresImportacion.id, idsAEliminar))
   }
 
   const [fila] = await db
@@ -83,26 +86,35 @@ export async function crearBorrador(
   return fila.id
 }
 
-/** Lista los borradores del usuario, más reciente primero. Aplica limpieza. */
+/**
+ * Lista los borradores del usuario, más reciente primero. Aplica limpieza.
+ * No trae los jsonb completos (`resultado`/`edicion` pueden pesar varios MB
+ * por las imágenes en base64): sólo columnas escalares y el largo del arreglo
+ * de preguntas, calculado en SQL.
+ */
 export async function listarBorradores(userId: number): Promise<BorradorResumen[]> {
   await limpiarExpirados(userId)
   const filas = await db
-    .select()
+    .select({
+      id: borradoresImportacion.id,
+      nombreArchivo: borradoresImportacion.nombreArchivo,
+      asignatura: borradoresImportacion.asignatura,
+      updatedAt: borradoresImportacion.updatedAt,
+      // Largo de la edición (si existe) o de las preguntas del resultado, sin
+      // transferir los jsonb completos (imágenes en base64, varios MB).
+      numPreguntas: sql<number>`coalesce(
+        jsonb_array_length(${borradoresImportacion.edicion}),
+        jsonb_array_length(${borradoresImportacion.resultado}->'preguntas')
+      )`,
+    })
     .from(borradoresImportacion)
     .where(eq(borradoresImportacion.userId, userId))
     .orderBy(desc(borradoresImportacion.updatedAt))
-  return filas.map((f) => {
-    const resultado = f.resultado as unknown as ResultadoBorrador
-    const edicion = f.edicion as unknown[] | null
-    return {
-      id: f.id,
-      nombreArchivo: f.nombreArchivo,
-      asignatura: f.asignatura,
-      // Si hay edición, es la verdad más fresca (el usuario pudo... no: la
-      // edición no agrega ni quita preguntas hoy, pero contar de ahí es igual
-      // de correcto y refleja lo que verá al retomar).
-      numPreguntas: edicion?.length ?? resultado.preguntas.length,
-      actualizadoEn: f.updatedAt.toISOString(),
-    }
-  })
+  return filas.map((f) => ({
+    id: f.id,
+    nombreArchivo: f.nombreArchivo,
+    asignatura: f.asignatura,
+    numPreguntas: Number(f.numPreguntas ?? 0),
+    actualizadoEn: f.updatedAt.toISOString(),
+  }))
 }

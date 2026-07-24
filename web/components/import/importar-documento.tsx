@@ -369,6 +369,16 @@ export function ImportarDocumento({
   const [borradorId, setBorradorId] = useState<number | null>(null)
   // Copia local de la lista para reflejar retomas/descartes sin recargar.
   const [listaBorradores, setListaBorradores] = useState(borradores)
+  // router.refresh() re-renderiza el server component con props frescas
+  // (nueva referencia de array), pero useState conserva el snapshot del
+  // primer montaje: resincronizar durante el render (patrón recomendado por
+  // React para "ajustar estado cuando cambia una prop"; un useEffect aquí
+  // dispara un setState incondicional, prohibido por react-hooks/set-state-in-effect).
+  const [borradoresPrevios, setBorradoresPrevios] = useState(borradores)
+  if (borradores !== borradoresPrevios) {
+    setBorradoresPrevios(borradores)
+    setListaBorradores(borradores)
+  }
 
   const seleccionadas = preguntas.filter((p) => p.incluir).length
   const sinCupo = cuota.restantes === 0 || sinCupoError
@@ -475,6 +485,9 @@ export function ImportarDocumento({
         } catch {
           // La limpieza perezosa lo recogerá.
         }
+        // Evita que un autosave en vuelo (o el timer aún pendiente) escriba
+        // contra un borrador ya borrado si el redirect de abajo fallara.
+        setBorradorId(null)
       }
       // Sin router.refresh(): crearPregunta ya revalida /preguntas server-side,
       // y un refresh() justo tras push() corre una carrera que puede abortar
@@ -500,6 +513,9 @@ export function ImportarDocumento({
   }
 
   async function onRetomar(id: number) {
+    // La tarjeta de «Importaciones en curso» sólo se ve en fase 'subir', pero
+    // el guard protege si eso cambia (p. ej. se agrega otro punto de entrada).
+    if (fase !== 'subir') return
     setError(null)
     const res = await obtenerBorradorImportacion(id)
     if (!res.ok) {
@@ -935,6 +951,7 @@ export function ImportarDocumento({
                         month: 'short',
                         hour: '2-digit',
                         minute: '2-digit',
+                        timeZone: 'America/Santiago',
                       })}
                     </span>
                   </div>
