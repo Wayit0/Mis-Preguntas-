@@ -12,9 +12,13 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer", "sharp"],
   // Default de Server Actions es 1MB: muy poco para "Importar Documento" (DOCX/PDF
   // con fotos/diagramas incrustados, o la re-subida de esas imágenes al guardar).
+  // El auto-guardado de borradores de importación envía el estado editable completo
+  // (imágenes en base64, incluidas las originales pre-recorte); el tope amable es
+  // 25 MB (MAX_BYTES_EDICION en lib/actions/borradores-importacion.ts) y el límite
+  // de plataforma debe quedar POR ENCIMA para que ese error amable sea alcanzable.
   experimental: {
     serverActions: {
-      bodySizeLimit: "15mb",
+      bodySizeLimit: "30mb",
     },
   },
 };

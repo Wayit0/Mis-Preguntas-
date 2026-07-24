@@ -231,4 +231,12 @@ describe('actions/borradores-importacion (sesión + pertenencia)', () => {
     expect((await actualizarBorradorImportacion(id, [])).ok).toBe(false)
     expect((await descartarBorradorImportacion(id)).ok).toBe(false)
   })
+
+  it('id no finito (NaN) devuelve error amable, no excepción de BD', async () => {
+    const u = await crearUsuario('borr-nan')
+    currentUserId = u.id
+    expect((await obtenerBorradorImportacion(Number.NaN)).ok).toBe(false)
+    expect((await actualizarBorradorImportacion(Number.NaN, [])).ok).toBe(false)
+    expect((await descartarBorradorImportacion(Number.NaN)).ok).toBe(false)
+  })
 })

@@ -32,12 +32,14 @@ export interface BorradorParaRetomar {
   edicion: PreguntaEditableBorrador[] | null
 }
 
+/** Obtiene un borrador de importación existente del usuario. */
 export async function obtenerBorradorImportacion(
   id: number,
 ): Promise<{ ok: true; borrador: BorradorParaRetomar } | { ok: false; error: string }> {
   const session = await getSession()
   if (!session) return { ok: false, error: 'Debes iniciar sesión.' }
   const userId = Number(session.user.id)
+  if (!Number.isFinite(id)) return { ok: false, error: NO_ENCONTRADO }
 
   const [fila] = await db
     .select()
@@ -53,11 +55,12 @@ export async function obtenerBorradorImportacion(
       nombreArchivo: fila.nombreArchivo,
       resultado: fila.resultado as unknown as ResultadoBorrador,
       // La edición se validó al escribirse; al leer se confía en la BD.
-      edicion: (fila.edicion as PreguntaEditableBorrador[] | null) ?? null,
+      edicion: fila.edicion as PreguntaEditableBorrador[] | null,
     },
   }
 }
 
+/** Guarda la edición de un borrador de importación. */
 export async function actualizarBorradorImportacion(
   id: number,
   edicion: unknown,
@@ -65,6 +68,7 @@ export async function actualizarBorradorImportacion(
   const session = await getSession()
   if (!session) return { ok: false, error: 'Debes iniciar sesión.' }
   const userId = Number(session.user.id)
+  if (!Number.isFinite(id)) return { ok: false, error: NO_ENCONTRADO }
 
   // Tope de tamaño ANTES de validar forma (el stringify es más barato que un
   // parse de zod sobre un payload gigante malicioso).
@@ -85,12 +89,14 @@ export async function actualizarBorradorImportacion(
   return { ok: true }
 }
 
+/** Descarta un borrador de importación. */
 export async function descartarBorradorImportacion(
   id: number,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const session = await getSession()
   if (!session) return { ok: false, error: 'Debes iniciar sesión.' }
   const userId = Number(session.user.id)
+  if (!Number.isFinite(id)) return { ok: false, error: NO_ENCONTRADO }
 
   const eliminadas = await db
     .delete(borradoresImportacion)
