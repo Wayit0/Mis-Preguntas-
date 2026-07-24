@@ -89,6 +89,51 @@ export function parsearImagenesAlternativas(
   return pares
 }
 
+/**
+ * Recorte propuesto por la IA para la imagen del enunciado, como STRING
+ * compacto "x,y,ancho,alto" en PORCENTAJES ENTEROS (0-100) del ancho/alto de
+ * la imagen, con origen arriba a la izquierda. Null si la imagen ya muestra
+ * sólo la figura relevante. String plano por la misma razón que
+ * `imagenesAlternativas`: mantener mínima la complejidad del schema que viaja
+ * al modelo. El parseo/validación real lo hace {@link parsearRecorte}; una
+ * caja malformada simplemente se ignora (queda la imagen completa).
+ */
+const recortePropuestoSchema = z.string().nullish()
+
+/** Lado mínimo del recorte, en % de la imagen: filtra cajas degeneradas. */
+const LADO_MINIMO_RECORTE_PCT = 5
+
+/** Una caja de recorte ya parseada y validada (porcentajes enteros 0-100). */
+export interface CajaRecorte {
+  x: number
+  y: number
+  ancho: number
+  alto: number
+}
+
+/**
+ * Parsea el string compacto "x,y,ancho,alto" a una caja válida, o null si está
+ * malformado o es degenerado. Clampea ancho/alto para que la caja quede dentro
+ * de la imagen; exige al menos 5% por lado tras el clamp. Nunca lanza: un
+ * recorte inválido se ignora en silencio (la imagen queda completa).
+ */
+export function parsearRecorte(
+  valor: string | null | undefined,
+): CajaRecorte | null {
+  if (!valor) return null
+  const partes = valor.split(',').map((p) => p.trim())
+  if (partes.length !== 4) return null
+  if (!partes.every((p) => /^\d+$/.test(p))) return null
+  const [x, y, ancho, alto] = partes.map(Number)
+  if (x >= 100 || y >= 100) return null
+  const anchoClamp = Math.min(ancho, 100 - x)
+  const altoClamp = Math.min(alto, 100 - y)
+  if (anchoClamp < LADO_MINIMO_RECORTE_PCT || altoClamp < LADO_MINIMO_RECORTE_PCT) {
+    return null
+  }
+  return { x, y, ancho: anchoClamp, alto: altoClamp }
+}
+
 /** Una pregunta tal cual la entrega el modelo (forma laxa, pre-criba). */
 export const preguntaDetectadaSchema = z.object({
   pregunta: z.string(),
@@ -109,6 +154,9 @@ export const preguntaDetectadaSchema = z.object({
   // Imágenes de las alternativas (si alguna alternativa ES una imagen o
   // depende de una), como string compacto "A:0,B:1". Null si no aplica.
   imagenesAlternativas: imagenesAlternativasSchema,
+  // Recorte propuesto para la imagen del enunciado ("x,y,ancho,alto" en % de
+  // la imagen), cuando ésta contiene más contenido que la figura relevante.
+  imagenPreguntaRecorte: recortePropuestoSchema,
 })
 
 /** Forma estructurada que pedimos al modelo (raíz del structured output). */
@@ -129,6 +177,17 @@ export const preguntaDetectadaValidaSchema = preguntaDetectadaSchema.extend({
 
 /** Una pregunta detectada (forma laxa inferida del esquema). */
 export type PreguntaDetectada = z.infer<typeof preguntaDetectadaSchema>
+
+/**
+ * Una pregunta ya post-procesada por `aplicarRecortesIA` (lib/import/recorte):
+ * si el recorte propuesto se aplicó, `imagenPreguntaIndice` apunta a la imagen
+ * recortada (agregada al final del arreglo) e `imagenPreguntaOriginalIndice`
+ * conserva el índice de la original, para que el cliente pueda restaurar o
+ * re-recortar sin degradación.
+ */
+export type PreguntaAnalizada = PreguntaDetectada & {
+  imagenPreguntaOriginalIndice?: number | null
+}
 
 /** El objeto completo devuelto por el modelo. */
 export type PreguntasDetectadas = z.infer<typeof PreguntasDetectadasSchema>
