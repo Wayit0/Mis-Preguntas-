@@ -1,5 +1,6 @@
 import { getSession } from '@/lib/get-session'
 import { analizarArchivo, type ResultadoAnalisis } from '@/lib/import/analizar'
+import { crearBorrador } from '@/lib/import/borradores'
 import { cuotaImportaciones } from '@/lib/suscripciones/entitlements'
 
 export const runtime = 'nodejs'
@@ -60,6 +61,22 @@ export async function POST(request: Request) {
 
       try {
         const resultado = await analizarArchivo(archivo, asignatura, userId)
+        // Borrador retomable (best-effort): si el insert falla, la importación
+        // sigue igual — el profesor simplemente no podrá retomarla después.
+        if (resultado.ok) {
+          try {
+            resultado.borradorId = await crearBorrador(userId, {
+              asignatura,
+              nombreArchivo: archivo.name,
+              resultado: {
+                preguntas: resultado.preguntas,
+                imagenes: resultado.imagenes,
+              },
+            })
+          } catch (err) {
+            console.error('[importar] no se pudo crear el borrador:', err)
+          }
+        }
         enviar({ resultado })
       } catch (err) {
         console.error('[importar] error no controlado en la ruta:', err)

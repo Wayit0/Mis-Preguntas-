@@ -25,7 +25,17 @@ import { MAX_PAGINAS_PDF, type PreguntaAnalizada } from '@/lib/validation/import
 
 /** Resultado del análisis de un documento. */
 export type ResultadoAnalisis =
-  | { ok: true; preguntas: PreguntaAnalizada[]; imagenes: ImagenExtraida[] }
+  | {
+      ok: true
+      preguntas: PreguntaAnalizada[]
+      imagenes: ImagenExtraida[]
+      /**
+       * Id del borrador creado por el route handler tras el análisis (para el
+       * auto-guardado y retomar). Ausente si el insert falló: el borrador es
+       * best-effort y su fallo nunca rompe la importación.
+       */
+      borradorId?: number
+    }
   | { ok: false; error: string; sinCupo?: boolean }
 
 /**
