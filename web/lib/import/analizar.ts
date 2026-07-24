@@ -7,10 +7,11 @@ import {
   type ImagenExtraida,
 } from '@/lib/docparse/extract'
 import { detectarPreguntas, type UsoDeteccion } from '@/lib/ai/import'
+import { aplicarRecortesIA } from '@/lib/import/recorte'
 import { calcularCostoMicroUsd } from '@/lib/ai/costos'
 import { db } from '@/lib/db'
 import { usosIa } from '@/lib/db/schema'
-import { MAX_PAGINAS_PDF, type PreguntaDetectada } from '@/lib/validation/import'
+import { MAX_PAGINAS_PDF, type PreguntaAnalizada } from '@/lib/validation/import'
 
 // ---------------------------------------------------------------------------
 // Núcleo del análisis de "Importar Documento con IA".
@@ -24,7 +25,7 @@ import { MAX_PAGINAS_PDF, type PreguntaDetectada } from '@/lib/validation/import
 
 /** Resultado del análisis de un documento. */
 export type ResultadoAnalisis =
-  | { ok: true; preguntas: PreguntaDetectada[]; imagenes: ImagenExtraida[] }
+  | { ok: true; preguntas: PreguntaAnalizada[]; imagenes: ImagenExtraida[] }
   | { ok: false; error: string; sinCupo?: boolean }
 
 /**
@@ -119,9 +120,18 @@ export async function analizarArchivo(
 
   try {
     const { preguntas, uso } = await detectarPreguntas(documento.bloques, asignatura)
+
+    // Post-proceso: aplica los recortes que la IA haya propuesto para las
+    // imágenes de enunciado (ver lib/import/recorte). Nunca lanza.
+    const recortado = await aplicarRecortesIA(preguntas, documento.imagenes)
+    const recortes = recortado.preguntas.filter(
+      (p) => p.imagenPreguntaOriginalIndice != null,
+    ).length
+
     const duracionSegundos = Number(((Date.now() - inicio) / 1000).toFixed(1))
     console.log(
-      `[importar] fin OK: preguntas=${preguntas.length} en ${duracionSegundos}s`,
+      `[importar] fin OK: preguntas=${preguntas.length} ` +
+        `recortesIA=${recortes} en ${duracionSegundos}s`,
     )
     if (uso) {
       await registrarUsoIa(userId, 'importar_documento', uso, {
@@ -131,10 +141,11 @@ export async function analizarArchivo(
         asignatura,
         imagenes: documento.imagenes.length,
         preguntas: preguntas.length,
+        recortesIA: recortes,
         duracionSegundos,
       })
     }
-    return { ok: true, preguntas, imagenes: documento.imagenes }
+    return { ok: true, preguntas: recortado.preguntas, imagenes: recortado.imagenes }
   } catch (err) {
     // Log con detalle para poder diagnosticar en los logs del servidor (Azure App
     // Service / Application Insights) qué falló realmente: el mensaje que ve el
