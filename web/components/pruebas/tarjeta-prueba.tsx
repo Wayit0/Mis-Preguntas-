@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { eliminarPrueba } from '@/lib/actions/pruebas'
 import { BotonGenerarPdf } from '@/components/pruebas/boton-generar-pdf'
+import { BotonDescargarDocx } from '@/components/pruebas/boton-descargar-docx'
 import type { Prueba } from '@/lib/queries/pruebas'
 import type { Carpeta } from '@/lib/queries/carpetas'
 import { MoverACarpeta } from '@/components/carpetas/mover-a-carpeta'
@@ -101,6 +102,8 @@ export function TarjetaPrueba({
             asignatura={prueba.asignatura}
             tienePdf={tienePdf}
           />
+
+          <BotonDescargarDocx pruebaId={prueba.id} asignatura={prueba.asignatura} />
 
           <form action={eliminarPrueba.bind(null, prueba.id)}>
             <button
