@@ -352,36 +352,46 @@ function BloquePregunta({
 }) {
   const lineas = lineasDesarrollo(p.tipo)
   return (
-    <View style={est.preguntaBloque} wrap={false}>
-      {/* wrap={false}: mantiene enunciado + alternativas juntos en una sola
-          página (react-pdf empuja el bloque completo a la página siguiente
-          si no cabe entero, en vez de partirlo).
+    <View style={est.preguntaBloque}>
+      {/* Preferencia: la pregunta completa cabe en una sola página siempre
+          que haya espacio (react-pdf no rompe un bloque si no es necesario).
+          Pero en vez de un único wrap={false} para toda la pregunta —que
+          empujaba la pregunta entera a la página siguiente cuando no cabía
+          completa, sin poder partirla nunca—, cada unidad "atómica" (el
+          enunciado con su imagen, y cada alternativa con la suya) lleva su
+          propio wrap={false}. Así, si la pregunta no cabe entera, se
+          distribuye entre páginas cortando entre el enunciado y las
+          alternativas, o entre alternativas, pero nunca a mitad de un
+          enunciado/alternativa/imagen. No se modifica tamaño de fuente,
+          imagen ni interlineado.
           Ancla el ancho del contenedor antes de cualquier texto. Sin esto,
           yoga-layout calcula el ancho por contenido intrínseco (~350pt) en
           vez de estirarse al ancho de la página. Un hijo con ancho
           explícito como primer elemento fuerza el ancho correcto. */}
       <View style={{ width: fmt.areaUtil, height: 0 }} />
-      <View style={est.preguntaFila}>
-        <Text style={est.preguntaNumero}>{p.numero}.</Text>
-        {p.enunciadoSegmentos ? (
-          <TextoConFormulas
-            segmentos={p.enunciadoSegmentos}
-            estilo={est.palabraEnunciado}
-          />
-        ) : (
-          <Text style={est.preguntaEnunciado}>{p.enunciado}</Text>
-        )}
+      <View wrap={false}>
+        <View style={est.preguntaFila}>
+          <Text style={est.preguntaNumero}>{p.numero}.</Text>
+          {p.enunciadoSegmentos ? (
+            <TextoConFormulas
+              segmentos={p.enunciadoSegmentos}
+              estilo={est.palabraEnunciado}
+            />
+          ) : (
+            <Text style={est.preguntaEnunciado}>{p.enunciado}</Text>
+          )}
+        </View>
+        {p.imagenEnunciado ? (
+          <ImagenPdf img={p.imagenEnunciado} style={est.imagenPregunta} />
+        ) : null}
       </View>
-      {p.imagenEnunciado ? (
-        <ImagenPdf img={p.imagenEnunciado} style={est.imagenPregunta} />
-      ) : null}
       {lineas > 0 ? (
         Array.from({ length: lineas }).map((_, i) => (
           <View key={i} style={est.lineaRespuesta} />
         ))
       ) : (
         p.alternativas.map((alt) => (
-          <View key={alt.letra}>
+          <View key={alt.letra} wrap={false}>
             <View style={est.alternativaFila}>
               <Text style={est.alternativaLetra}>
                 {fmt.etiquetaAlternativa(alt.letra)}
