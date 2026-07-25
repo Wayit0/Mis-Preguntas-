@@ -108,12 +108,23 @@ export default async function PreguntasPage({
             {buscando ? ' · resultados en todas las carpetas' : ''}
           </p>
         </div>
-        <Link
-          href={conAsignatura('/preguntas/nueva', asignatura)}
-          className={buttonVariants({ className: 'w-full sm:w-auto' })}
-        >
-          ➕ Nueva pregunta
-        </Link>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Link
+            href={conAsignatura('/preguntas/duplicadas', asignatura)}
+            className={buttonVariants({
+              variant: 'outline',
+              className: 'w-full sm:w-auto',
+            })}
+          >
+            🔁 Detectar duplicadas
+          </Link>
+          <Link
+            href={conAsignatura('/preguntas/nueva', asignatura)}
+            className={buttonVariants({ className: 'w-full sm:w-auto' })}
+          >
+            ➕ Nueva pregunta
+          </Link>
+        </div>
       </div>
 
       {buscando ? null : (
