@@ -393,7 +393,7 @@ function crearEstilos(fmt: OpcionesFormato) {
     titulo: {
       fontFamily: fmt.fuenteNegrita,
       fontSize: 18,
-      marginBottom: 10,
+      marginBottom: 24,
       textAlign: 'center',
     },
     identifFila: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 14 },
@@ -549,8 +549,11 @@ function BloquePregunta({
 }) {
   const lineas = lineasDesarrollo(p.tipo)
   return (
-    <View style={est.preguntaBloque}>
-      {/* Ancla el ancho del contenedor antes de cualquier texto. Sin esto,
+    <View style={est.preguntaBloque} wrap={false}>
+      {/* wrap={false}: mantiene enunciado + alternativas juntos en una sola
+          página (react-pdf empuja el bloque completo a la página siguiente
+          si no cabe entero, en vez de partirlo).
+          Ancla el ancho del contenedor antes de cualquier texto. Sin esto,
           yoga-layout calcula el ancho por contenido intrínseco (~350pt) en
           vez de estirarse al ancho de la página. Un hijo con ancho
           explícito como primer elemento fuerza el ancho correcto. */}
