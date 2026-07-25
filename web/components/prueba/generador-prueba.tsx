@@ -476,6 +476,7 @@ export function GeneradorPrueba({
   // Vista previa: object URL del PDF generado (o null si el modal está cerrado).
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [cargandoPreview, setCargandoPreview] = useState(false)
+  const [descargandoDocx, setDescargandoDocx] = useState(false)
 
   // Con el modal abierto: cerrar con Escape y bloquear el scroll del fondo.
   useEffect(() => {
@@ -550,6 +551,41 @@ export function GeneradorPrueba({
       setError('Ocurrió un error al generar la vista previa.')
     } finally {
       setCargandoPreview(false)
+    }
+  }
+
+  // Genera el .docx de la selección actual y lo descarga directo (no hay
+  // vista previa embebida para Word, a diferencia del PDF).
+  async function descargarDocx() {
+    setError(null)
+    if (seleccion.length === 0 && textosSel.size === 0) {
+      setError('Selecciona al menos una pregunta o un texto.')
+      return
+    }
+    setDescargandoDocx(true)
+    try {
+      const res = await fetch('/api/prueba/docx', {
+        method: 'POST',
+        body: construirFormData(),
+      })
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '')
+        setError(msg || 'No se pudo generar el documento Word. Inténtalo de nuevo.')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `prueba_${asignatura || 'general'}.docx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('Ocurrió un error al generar el documento Word.')
+    } finally {
+      setDescargandoDocx(false)
     }
   }
 
@@ -1071,8 +1107,16 @@ export function GeneradorPrueba({
                   download={`prueba_${asignatura || 'general'}.pdf`}
                   className={buttonVariants({ size: 'sm' })}
                 >
-                  ⬇️ Descargar
+                  ⬇️ Descargar PDF
                 </a>
+                <button
+                  type="button"
+                  onClick={descargarDocx}
+                  disabled={descargandoDocx}
+                  className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                >
+                  {descargandoDocx ? 'Generando…' : '📝 Descargar Word'}
+                </button>
                 <button
                   type="button"
                   onClick={cerrarPreview}

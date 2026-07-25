@@ -6,6 +6,7 @@ import {
   type PreguntaPdf,
   type TextoPdf,
 } from '@/lib/pdf/prueba'
+import { generarPruebaDocx } from '@/lib/docx/prueba'
 
 /**
  * Error de "selección vacía": la prueba no contiene ninguna pregunta (ni suelta
@@ -198,13 +199,46 @@ export async function construirPruebaPdf(
   })
 }
 
-/** Nombre de archivo seguro para la descarga (sin acentos ni caracteres raros). */
-export function nombreArchivo(asignatura: string): string {
-  const base = asignatura
+/**
+ * Construye el .docx de una prueba a partir de la misma selección de
+ * preguntas/textos que el PDF. Ver `resolverContenidoPrueba` para las reglas
+ * de resolución.
+ */
+export async function construirPruebaDocx(
+  userId: number,
+  opts: OpcionesPrueba,
+): Promise<Buffer> {
+  const { textos, preguntas } = await resolverContenidoPrueba(userId, opts)
+
+  return generarPruebaDocx({
+    titulo: opts.titulo ?? '',
+    asignatura: opts.asignatura,
+    colegio: opts.colegio ?? '',
+    profesor: opts.profesor ?? '',
+    instrucciones: opts.instrucciones ?? '',
+    formato: opts.formato ?? 'estandar',
+    formulas: opts.formulas ?? [],
+    textos,
+    preguntas,
+  })
+}
+
+/** Slug del nombre de archivo (sin acentos ni caracteres raros), sin extensión. */
+function slugArchivo(asignatura: string): string {
+  return asignatura
     .toLowerCase()
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
-  return `prueba_${base || 'general'}.pdf`
+}
+
+/** Nombre de archivo seguro para la descarga del PDF. */
+export function nombreArchivo(asignatura: string): string {
+  return `prueba_${slugArchivo(asignatura) || 'general'}.pdf`
+}
+
+/** Nombre de archivo seguro para la descarga del DOCX. */
+export function nombreArchivoDocx(asignatura: string): string {
+  return `prueba_${slugArchivo(asignatura) || 'general'}.docx`
 }
