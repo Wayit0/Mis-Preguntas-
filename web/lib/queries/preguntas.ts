@@ -135,6 +135,57 @@ export async function opcionesDeFiltros(
   }
 }
 
+/** Normaliza un enunciado para comparar duplicados exactos: sin tildes,
+ * minúsculas y espacios colapsados. Dos enunciados que sólo difieren en
+ * mayúsculas, tildes o espacios cuentan como la misma pregunta. */
+function normalizarEnunciado(texto: string): string {
+  return texto
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Un grupo de preguntas propias con el mismo enunciado normalizado. */
+export interface GrupoDuplicadas {
+  clave: string
+  preguntas: Pregunta[]
+}
+
+/**
+ * Agrupa las preguntas propias (acotadas por asignatura si se indica) por
+ * enunciado normalizado, y devuelve sólo los grupos con más de una pregunta
+ * (duplicados exactos). Sólo detecta coincidencias literales — una pregunta
+ * reformulada con otras palabras no se agrupa.
+ */
+export async function preguntasDuplicadas(
+  userId: number,
+  asignatura?: string,
+): Promise<GrupoDuplicadas[]> {
+  const conds: SQL[] = [eq(preguntas.userId, userId)]
+  if (asignatura) conds.push(eq(preguntas.asignatura, asignatura))
+
+  const filas = await db
+    .select()
+    .from(preguntas)
+    .where(and(...conds))
+    .orderBy(desc(preguntas.id))
+
+  const grupos = new Map<string, Pregunta[]>()
+  for (const fila of filas) {
+    const clave = normalizarEnunciado(fila.pregunta)
+    if (!clave) continue
+    const arr = grupos.get(clave)
+    if (arr) arr.push(fila)
+    else grupos.set(clave, [fila])
+  }
+
+  return [...grupos.entries()]
+    .filter(([, arr]) => arr.length > 1)
+    .map(([clave, arr]) => ({ clave, preguntas: arr }))
+}
+
 /**
  * Carga una pregunta concreta del usuario (para editar). Devuelve `null` si no
  * existe o no le pertenece (guard de propiedad). Tolera ids no numéricos.

@@ -1,6 +1,6 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { preguntas } from '@/lib/db/schema'
@@ -106,6 +106,30 @@ export async function eliminarPregunta(id: number): Promise<void> {
     .where(and(eq(preguntas.id, id), eq(preguntas.userId, userId)))
 
   revalidatePath('/preguntas')
+}
+
+/**
+ * Elimina varias preguntas del usuario de una vez (guard de propiedad vía
+ * `inArray` + `userId`). Usada por la vista de "Preguntas duplicadas" para
+ * borrar las copias seleccionadas en un solo submit.
+ */
+export async function eliminarPreguntasEnLote(formData: FormData): Promise<void> {
+  const session = await getSession()
+  if (!session) return
+  const userId = Number(session.user.id)
+
+  const ids = formData
+    .getAll('id')
+    .map((v) => Number(v))
+    .filter((n) => Number.isInteger(n) && n > 0)
+  if (ids.length === 0) return
+
+  await db
+    .delete(preguntas)
+    .where(and(inArray(preguntas.id, ids), eq(preguntas.userId, userId)))
+
+  revalidatePath('/preguntas')
+  revalidatePath('/preguntas/duplicadas')
 }
 
 /** Cambia el estado de compartición de una pregunta del usuario. */
