@@ -96,6 +96,15 @@ Si el enunciado de una pregunta depende de una de esas imágenes (es decir, no \
 se entiende sin verla), indica su número n en "imagenPreguntaIndice"; si no \
 aplica ninguna imagen, deja el campo en null.
 
+Si la imagen asignada al enunciado contiene bastante más contenido que la \
+figura relevante (p. ej. además de la tabla o el diagrama se ve el texto de \
+la pregunta, de las alternativas o de otras preguntas), indica en \
+"imagenPreguntaRecorte" la zona a CONSERVAR como "x,y,ancho,alto" en \
+PORCENTAJES ENTEROS (0-100) del ancho y alto de la imagen, con origen en la \
+esquina superior izquierda. Ejemplo: "0,10,100,45" conserva una franja \
+horizontal que parte al 10% de la altura. Si la imagen ya muestra sólo la \
+figura relevante, deja "imagenPreguntaRecorte" en null.
+
 Si una ALTERNATIVA es una imagen o depende de una (p. ej. alternativas que son \
 gráficos o figuras), regístralo en "imagenesAlternativas" como un texto \
 compacto "LETRA:n" separado por comas, por ejemplo "A:0,B:1" (alternativa A \
@@ -146,6 +155,11 @@ const FIXTURE_FAKE: readonly unknown[] = [
     nivel: 'PAES',
     tipo: 'seleccion_multiple',
     imagenPreguntaIndice: 0,
+    // Recorte propuesto: con el fixture real (imagen de 4×4 px de
+    // sample-con-imagen.docx) el resultado quedaría bajo el mínimo de 32 px y
+    // el post-proceso lo ignora en silencio — exactamente el camino de
+    // fallback que queremos cubierto en e2e sin romper nada.
+    imagenPreguntaRecorte: '25,25,50,50',
   },
   {
     pregunta: 'Explica con tus palabras la primera ley de Newton. [demo-import]',

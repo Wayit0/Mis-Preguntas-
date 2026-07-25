@@ -17,10 +17,11 @@ import {
   MAX_PAGINAS_PDF,
   parsearImagenesAlternativas,
   type ImagenParaGuardar,
-  type PreguntaDetectada,
+  type PreguntaAnalizada,
 } from '@/lib/validation/import'
 import type { ImagenExtraida } from '@/lib/docparse/extract'
 import { ASIGNATURAS } from '@/components/shell/subjects'
+import { DialogoRecorte } from '@/components/import/dialogo-recorte'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -58,10 +59,21 @@ interface PreguntaEditable {
   imagenC: ImagenParaGuardar | null
   imagenD: ImagenParaGuardar | null
   imagenE: ImagenParaGuardar | null
+  imagenPreguntaOriginal: ImagenParaGuardar | null
+  imagenAOriginal: ImagenParaGuardar | null
+  imagenBOriginal: ImagenParaGuardar | null
+  imagenCOriginal: ImagenParaGuardar | null
+  imagenDOriginal: ImagenParaGuardar | null
+  imagenEOriginal: ImagenParaGuardar | null
 }
 
 /** Columna de imagen editable de una alternativa (`imagenA`…`imagenE`). */
 type CampoImagenAlternativa = `imagen${(typeof LETRAS)[number]}`
+
+/** Cualquier columna de imagen editable (enunciado o alternativa). */
+type CampoImagen = 'imagenPregunta' | CampoImagenAlternativa
+/** La columna que guarda la imagen original (pre-recorte) de un campo. */
+type CampoImagenOriginal = `${CampoImagen}Original`
 
 /** Resuelve un índice de imagen (el que puso la IA) al objeto correspondiente. */
 function resolverImagen(
@@ -75,7 +87,7 @@ function resolverImagen(
 
 let contador = 0
 function aEditable(
-  p: PreguntaDetectada,
+  p: PreguntaAnalizada,
   imagenesDisponibles: ImagenExtraida[],
 ): PreguntaEditable {
   const tipo = (TIPOS_PREGUNTA as readonly string[]).includes(p.tipo)
@@ -93,6 +105,12 @@ function aEditable(
       ia.indice,
     ]),
   )
+  const imagenPregunta = resolverImagen(p.imagenPreguntaIndice, imagenesDisponibles)
+  const imagenA = resolverImagen(porLetra.get('A'), imagenesDisponibles)
+  const imagenB = resolverImagen(porLetra.get('B'), imagenesDisponibles)
+  const imagenC = resolverImagen(porLetra.get('C'), imagenesDisponibles)
+  const imagenD = resolverImagen(porLetra.get('D'), imagenesDisponibles)
+  const imagenE = resolverImagen(porLetra.get('E'), imagenesDisponibles)
   return {
     id: `det-${contador++}`,
     incluir: true,
@@ -107,24 +125,36 @@ function aEditable(
     materia: p.materia ?? '',
     nivel: p.nivel ?? '',
     tipo,
-    imagenPregunta: resolverImagen(p.imagenPreguntaIndice, imagenesDisponibles),
-    imagenA: resolverImagen(porLetra.get('A'), imagenesDisponibles),
-    imagenB: resolverImagen(porLetra.get('B'), imagenesDisponibles),
-    imagenC: resolverImagen(porLetra.get('C'), imagenesDisponibles),
-    imagenD: resolverImagen(porLetra.get('D'), imagenesDisponibles),
-    imagenE: resolverImagen(porLetra.get('E'), imagenesDisponibles),
+    imagenPregunta,
+    // Si el servidor aplicó un recorte de la IA, la original vive en otro
+    // índice; si no, la original ES la imagen asignada.
+    imagenPreguntaOriginal:
+      resolverImagen(p.imagenPreguntaOriginalIndice, imagenesDisponibles) ??
+      imagenPregunta,
+    imagenA,
+    imagenAOriginal: imagenA,
+    imagenB,
+    imagenBOriginal: imagenB,
+    imagenC,
+    imagenCOriginal: imagenC,
+    imagenD,
+    imagenDOriginal: imagenD,
+    imagenE,
+    imagenEOriginal: imagenE,
   }
 }
 
-/** Miniatura de una imagen detectada, con botón para quitarla. */
+/** Miniatura de una imagen detectada, con botones para recortarla o quitarla. */
 function MiniaturaImagen({
   imagen,
   alt,
   onQuitar,
+  onRecortar,
 }: {
   imagen: ImagenParaGuardar
   alt: string
   onQuitar: () => void
+  onRecortar: () => void
 }) {
   return (
     <div className="flex items-center gap-2">
@@ -133,9 +163,14 @@ function MiniaturaImagen({
         alt={alt}
         className="max-h-24 w-fit rounded-md border border-border object-contain"
       />
-      <Button type="button" variant="outline" size="sm" onClick={onQuitar}>
-        Quitar imagen
-      </Button>
+      <div className="flex flex-col gap-1 sm:flex-row">
+        <Button type="button" variant="outline" size="sm" onClick={onRecortar}>
+          Recortar
+        </Button>
+        <Button type="button" variant="outline" size="sm" onClick={onQuitar}>
+          Quitar imagen
+        </Button>
+      </div>
     </div>
   )
 }
@@ -334,6 +369,13 @@ export function ImportarDocumento({
   const [aviso, setAviso] = useState<string | null>(null)
   const [preguntas, setPreguntas] = useState<PreguntaEditable[]>([])
   const [nombreArchivo, setNombreArchivo] = useState('')
+  // Imagen en recorte manual: qué pregunta y qué campo. El diálogo se monta
+  // una sola vez (fuera del map de tarjetas) y recorta SIEMPRE desde la
+  // imagen original guardada en el estado editable.
+  const [recortando, setRecortando] = useState<{
+    id: string
+    campo: CampoImagen
+  } | null>(null)
 
   const seleccionadas = preguntas.filter((p) => p.incluir).length
   const sinCupo = cuota.restantes === 0 || sinCupoError
@@ -435,6 +477,7 @@ export function ImportarDocumento({
     setError(null)
     setSinCupoError(false)
     setAviso(null)
+    setRecortando(null)
     setFase('subir')
   }
 
@@ -487,6 +530,30 @@ export function ImportarDocumento({
             Subir otro documento
           </Button>
         </div>
+
+        {(() => {
+          if (!recortando) return null
+          const pregunta = preguntas.find((q) => q.id === recortando.id)
+          if (!pregunta) return null
+          const original =
+            pregunta[`${recortando.campo}Original` as CampoImagenOriginal] ??
+            pregunta[recortando.campo]
+          if (!original) return null
+          return (
+            <DialogoRecorte
+              original={original}
+              onAplicar={(imagen) => {
+                actualizar(recortando.id, { [recortando.campo]: imagen })
+                setRecortando(null)
+              }}
+              onRestaurar={() => {
+                actualizar(recortando.id, { [recortando.campo]: original })
+                setRecortando(null)
+              }}
+              onCerrar={() => setRecortando(null)}
+            />
+          )
+        })()}
 
         <div className="flex flex-col gap-4">
           {preguntas.map((p, i) => {
@@ -556,6 +623,9 @@ export function ImportarDocumento({
                         imagen={p.imagenPregunta}
                         alt={`Imagen del enunciado ${i + 1}`}
                         onQuitar={() => actualizar(p.id, { imagenPregunta: null })}
+                        onRecortar={() =>
+                          setRecortando({ id: p.id, campo: 'imagenPregunta' })
+                        }
                       />
                     ) : null}
                   </div>
@@ -587,6 +657,9 @@ export function ImportarDocumento({
                                 alt={`Imagen de la alternativa ${letra}`}
                                 onQuitar={() =>
                                   actualizar(p.id, { [campoImagen]: null })
+                                }
+                                onRecortar={() =>
+                                  setRecortando({ id: p.id, campo: campoImagen })
                                 }
                               />
                             ) : null}

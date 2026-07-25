@@ -191,4 +191,20 @@ describe('ai/import detectarPreguntas (SDK mockeado)', () => {
     )
     expect(mocks.create).toHaveBeenCalledTimes(1)
   })
+
+  it('conserva imagenPreguntaRecorte tras la criba', async () => {
+    mocks.create.mockResolvedValue(
+      respuestaTool([
+        {
+          pregunta: '¿Qué muestra la tabla?',
+          tipo: 'seleccion_multiple',
+          imagenPreguntaIndice: 0,
+          imagenPreguntaRecorte: '0,10,100,45',
+        },
+      ]),
+    )
+    const { preguntas } = await detectarPreguntas(bloques, 'Física')
+    expect(preguntas).toHaveLength(1)
+    expect(preguntas[0].imagenPreguntaRecorte).toBe('0,10,100,45')
+  })
 })
