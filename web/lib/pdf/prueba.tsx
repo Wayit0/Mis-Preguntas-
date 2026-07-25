@@ -333,7 +333,6 @@ interface OpcionesFormato {
   areaUtil: number
   /** Rótulo de alternativa: "A)" en estándar, "A." en IB. */
   etiquetaAlternativa: (letra: string) => string
-  tituloCentrado: boolean
   instruccionesEnCaja: boolean
   tituloInstrucciones: string
   lineaPunteada: boolean
@@ -345,7 +344,6 @@ const FORMATO_ESTANDAR: OpcionesFormato = {
   fuenteNegrita: 'Helvetica-Bold',
   areaUtil: AREA_UTIL,
   etiquetaAlternativa: (l) => `${l})`,
-  tituloCentrado: false,
   instruccionesEnCaja: false,
   tituloInstrucciones: 'Instrucciones',
   lineaPunteada: false,
@@ -358,7 +356,6 @@ const FORMATO_IB: OpcionesFormato = {
   fuenteNegrita: 'Times-Bold',
   areaUtil: 495,
   etiquetaAlternativa: (l) => `${l}.`,
-  tituloCentrado: true,
   instruccionesEnCaja: true,
   tituloInstrucciones: 'INSTRUCCIONES PARA LOS ALUMNOS',
   lineaPunteada: true,
@@ -397,9 +394,17 @@ function crearEstilos(fmt: OpcionesFormato) {
       fontFamily: fmt.fuenteNegrita,
       fontSize: 18,
       marginBottom: 10,
-      textAlign: fmt.tituloCentrado ? 'center' : 'left',
+      textAlign: 'center',
     },
-    identif: { fontSize: 11, marginBottom: 12 },
+    identifFila: { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 14 },
+    identifCampo: { flexDirection: 'row', alignItems: 'flex-end', marginRight: 12 },
+    identifLabel: { fontSize: 11, marginRight: 4 },
+    identifLinea: {
+      flex: 1,
+      borderBottomWidth: 1,
+      borderBottomColor: '#000000',
+      marginBottom: 2,
+    },
     seccion: {
       fontFamily: fmt.fuenteNegrita,
       fontSize: 10,
@@ -436,10 +441,10 @@ function crearEstilos(fmt: OpcionesFormato) {
     // Fila número + enunciado: flex:1 en el texto garantiza ancho completo en react-pdf
     preguntaFila: { flexDirection: 'row', marginTop: 12, marginBottom: 3 },
     preguntaNumero: { fontFamily: fmt.fuenteNegrita, fontSize: 11, marginRight: 3 },
-    preguntaEnunciado: { fontFamily: fmt.fuenteNegrita, fontSize: 11, flex: 1 },
+    preguntaEnunciado: { fontFamily: fmt.fuente, fontSize: 11, flex: 1 },
     // Estilos de palabra suelta dentro de TextoConFormulas (sin flex: cada
     // palabra es un <Text> propio dentro del View row+wrap).
-    palabraEnunciado: { fontFamily: fmt.fuenteNegrita, fontSize: 11 },
+    palabraEnunciado: { fontFamily: fmt.fuente, fontSize: 11 },
     palabraAlternativa: { fontSize: 10 },
     imagenPregunta: { marginTop: 4, marginBottom: 6 },
     // Fila letra + texto de alternativa
@@ -651,9 +656,20 @@ function PruebaDocument(props: DocumentoProps) {
         </View>
 
         <Text style={est.titulo}>{titulo || 'Prueba'}</Text>
-        <Text style={est.identif}>
-          Nombre: _______________________ Curso: _________ Fecha: _________
-        </Text>
+        <View style={est.identifFila}>
+          <View style={[est.identifCampo, { flex: 2 }]}>
+            <Text style={est.identifLabel}>Nombre:</Text>
+            <View style={est.identifLinea} />
+          </View>
+          <View style={[est.identifCampo, { flex: 1 }]}>
+            <Text style={est.identifLabel}>Curso:</Text>
+            <View style={est.identifLinea} />
+          </View>
+          <View style={[est.identifCampo, { flex: 1, marginRight: 0 }]}>
+            <Text style={est.identifLabel}>Fecha:</Text>
+            <View style={est.identifLinea} />
+          </View>
+        </View>
 
         {bloqueInstrucciones}
 
