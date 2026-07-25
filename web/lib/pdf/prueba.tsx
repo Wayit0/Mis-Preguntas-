@@ -220,14 +220,22 @@ function crearEstilos(fmt: OpcionesFormato) {
           marginBottom: 12,
         }
       : {},
-    instruc: { fontSize: 10, marginBottom: 8, flexShrink: 1 },
-    formulaFila: {
-      flexDirection: 'row',
-      justifyContent: 'center',
+    // Sin marginBottom extra: mismo espaciado entre líneas que un texto
+    // corrido (lo da el lineHeight de la página), no un salto de párrafo.
+    instruc: { fontSize: 10, flexShrink: 1 },
+    formularioTabla: { width: fmt.areaUtil, marginBottom: 8 },
+    formulaFilaTabla: { flexDirection: 'row' },
+    // Cada celda dibuja sus 4 bordes: junto a las vecinas forma la grilla
+    // completa sin necesidad de un borde extra en el contenedor.
+    formulaCelda: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: '#000000',
       alignItems: 'center',
-      marginBottom: 6,
+      justifyContent: 'center',
+      paddingVertical: 6,
+      paddingHorizontal: 4,
     },
-    formulaImg: { marginLeft: 4, marginRight: 4 },
     textoTitulo: {
       fontFamily: fmt.fuenteNegrita,
       fontSize: 11,
@@ -237,15 +245,17 @@ function crearEstilos(fmt: OpcionesFormato) {
     },
     textoBody: { fontSize: 10, marginBottom: 8, flexShrink: 1 },
     preguntaBloque: { marginBottom: 8 },
-    // Fila número + enunciado: flex:1 en el texto garantiza ancho completo en react-pdf
-    preguntaFila: { flexDirection: 'row', marginTop: 12, marginBottom: 3 },
+    // Fila número + enunciado: flex:1 en el texto garantiza ancho completo en react-pdf.
+    // marginBottom mayor que el de alternativaFila: el enunciado se separa más
+    // de las alternativas que lo que se separan las alternativas entre sí.
+    preguntaFila: { flexDirection: 'row', marginTop: 12, marginBottom: 10 },
     preguntaNumero: { fontFamily: fmt.fuenteNegrita, fontSize: 11, marginRight: 3 },
     preguntaEnunciado: { fontFamily: fmt.fuente, fontSize: 11, flex: 1 },
     // Estilos de palabra suelta dentro de TextoConFormulas (sin flex: cada
     // palabra es un <Text> propio dentro del View row+wrap).
     palabraEnunciado: { fontFamily: fmt.fuente, fontSize: 11 },
     palabraAlternativa: { fontSize: 10 },
-    imagenPregunta: { marginTop: 4, marginBottom: 6 },
+    imagenPregunta: { marginTop: 4, marginBottom: 10 },
     // Fila letra + texto de alternativa
     alternativaFila: { flexDirection: 'row', marginLeft: 18, marginBottom: 3 },
     alternativaLetra: { fontFamily: fmt.fuenteNegrita, fontSize: 10, marginRight: 3 },
@@ -472,13 +482,17 @@ function PruebaDocument(props: DocumentoProps) {
         {formulas.length > 0 ? (
           <>
             <Text style={est.seccion}>Formulario</Text>
-            {chunk(formulas, 3).map((fila, ri) => (
-              <View key={ri} style={est.formulaFila}>
-                {fila.map((f, fi) => (
-                  <ImagenPdf key={fi} img={f} style={est.formulaImg} />
-                ))}
-              </View>
-            ))}
+            <View style={est.formularioTabla}>
+              {chunk(formulas, 3).map((fila, ri) => (
+                <View key={ri} style={est.formulaFilaTabla}>
+                  {[0, 1, 2].map((ci) => (
+                    <View key={ci} style={est.formulaCelda}>
+                      {fila[ci] ? <ImagenPdf img={fila[ci]} /> : null}
+                    </View>
+                  ))}
+                </View>
+              ))}
+            </View>
           </>
         ) : null}
 
