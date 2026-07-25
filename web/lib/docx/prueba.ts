@@ -113,9 +113,11 @@ function segmentosARuns(
 function preguntaParrafos(p: PreguntaPreparada): Paragraph[] {
   const parrafos: Paragraph[] = []
 
+  // spacing.after mayor que el de cada alternativa (más abajo): el enunciado
+  // se separa más de las alternativas que lo que se separan entre sí.
   parrafos.push(
     new Paragraph({
-      spacing: { before: 240, after: 60 },
+      spacing: { before: 240, after: 200 },
       children: [
         new TextRun({ text: `${p.numero}. `, bold: true, size: FONT_ENUNCIADO_HALF }),
         ...segmentosARuns(p.enunciadoSegmentos, p.enunciado, {
@@ -127,7 +129,7 @@ function preguntaParrafos(p: PreguntaPreparada): Paragraph[] {
 
   if (p.imagenEnunciado) {
     parrafos.push(
-      new Paragraph({ spacing: { after: 120 }, children: [imagenRun(p.imagenEnunciado)] }),
+      new Paragraph({ spacing: { after: 200 }, children: [imagenRun(p.imagenEnunciado)] }),
     )
   }
 
@@ -230,6 +232,33 @@ function filaIdentificacion(): Table {
   })
 }
 
+/** Tabla del formulario: 3 celdas con borde por fila, fórmula centrada en cada una. */
+function tablaFormulario(formulas: ImagenPreparada[]): Table {
+  const BORDE = { style: BorderStyle.SINGLE, size: 6, color: '000000' } as const
+  const anchoCelda = Math.floor(AREA_UTIL_TWIPS / 3)
+
+  function celda(img: ImagenPreparada | undefined): TableCell {
+    return new TableCell({
+      width: { size: anchoCelda, type: WidthType.DXA },
+      borders: { top: BORDE, left: BORDE, right: BORDE, bottom: BORDE },
+      children: [
+        new Paragraph({
+          alignment: AlignmentType.CENTER,
+          children: img ? [imagenRun(img)] : [],
+        }),
+      ],
+    })
+  }
+
+  return new Table({
+    width: { size: AREA_UTIL_TWIPS, type: WidthType.DXA },
+    columnWidths: [anchoCelda, anchoCelda, anchoCelda],
+    rows: chunk(formulas, 3).map(
+      (fila) => new TableRow({ children: [celda(fila[0]), celda(fila[1]), celda(fila[2])] }),
+    ),
+  })
+}
+
 /** Encabezado repetido en cada página: colegio, profesor y asignatura/título. */
 function encabezado(colegio: string, profesor: string, asignatura: string, titulo: string): Header {
   return new Header({
@@ -324,10 +353,10 @@ export async function generarPruebaDocx(config: PruebaConfig): Promise<Buffer> {
         children: [new TextRun({ text: 'Instrucciones', bold: true, size: 20 })],
       }),
     )
+    // Sin spacing.after: mismo espaciado entre líneas que un texto corrido,
+    // no un salto de párrafo.
     for (const linea of instrucciones.split('\n')) {
-      children.push(
-        new Paragraph({ spacing: { after: 60 }, children: [new TextRun({ text: linea, size: 20 })] }),
-      )
+      children.push(new Paragraph({ children: [new TextRun({ text: linea, size: 20 })] }))
     }
   }
 
@@ -338,17 +367,8 @@ export async function generarPruebaDocx(config: PruebaConfig): Promise<Buffer> {
         children: [new TextRun({ text: 'Formulario', bold: true, size: 20 })],
       }),
     )
-    for (const fila of chunk(formulas, 3)) {
-      children.push(
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { after: 120 },
-          children: fila.flatMap((f, i) =>
-            i === 0 ? [imagenRun(f)] : [new TextRun({ text: '   ' }), imagenRun(f)],
-          ),
-        }),
-      )
-    }
+    children.push(tablaFormulario(formulas))
+    children.push(new Paragraph({ spacing: { after: 120 }, children: [] }))
   }
 
   for (const g of grupos) {
