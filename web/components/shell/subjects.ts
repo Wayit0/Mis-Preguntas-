@@ -24,8 +24,8 @@ export interface Asignatura {
   emoji: string
 }
 
-// Las 8 asignaturas del currículum (paridad con el MVP). El `nombre` se usa tal
-// cual como valor del contexto de asignatura en la URL (`?asignatura=`).
+// Las asignaturas del currículum. El `nombre` se usa tal cual como valor del
+// contexto de asignatura en la URL (`?asignatura=`).
 export const ASIGNATURAS: Asignatura[] = [
   { nombre: 'Física', emoji: '⚛️' },
   { nombre: 'Química', emoji: '🧪' },
@@ -35,4 +35,6 @@ export const ASIGNATURAS: Asignatura[] = [
   { nombre: 'Ciencias de la Ciudadanía', emoji: '🏫' },
   { nombre: 'Lenguaje', emoji: '📖' },
   { nombre: 'SAS', emoji: '🌍' },
+  { nombre: 'Educación Ciudadana', emoji: '⚖️' },
+  { nombre: 'Inglés', emoji: '🇬🇧' },
 ]
