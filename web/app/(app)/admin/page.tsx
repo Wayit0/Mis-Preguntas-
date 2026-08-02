@@ -7,6 +7,8 @@ import {
   resumenUsosIa,
   listarAccesos,
   resumenAccesos,
+  listarFeedback,
+  resumenFeedback,
 } from '@/lib/queries/admin'
 import {
   listarSuscripcionesAdmin,
@@ -26,13 +28,20 @@ import { ConcederCortesia } from '@/components/admin/conceder-cortesia'
 import { LicenciaColegio } from '@/components/admin/licencia-colegio'
 import { CancelarSuscripcion } from '@/components/admin/cancelar-suscripcion'
 
-type Tab = 'colegios' | 'usuarios' | 'costos' | 'accesos' | 'suscripciones'
+type Tab =
+  | 'colegios'
+  | 'usuarios'
+  | 'costos'
+  | 'accesos'
+  | 'suscripciones'
+  | 'feedback'
 
 function normalizarTab(valor?: string): Tab {
   if (valor === 'usuarios') return 'usuarios'
   if (valor === 'costos') return 'costos'
   if (valor === 'accesos') return 'accesos'
   if (valor === 'suscripciones') return 'suscripciones'
+  if (valor === 'feedback') return 'feedback'
   return 'colegios'
 }
 
@@ -64,6 +73,7 @@ export default async function AdminPage({
     { id: 'costos', etiqueta: 'Costos de IA' },
     { id: 'accesos', etiqueta: 'Accesos' },
     { id: 'suscripciones', etiqueta: 'Suscripciones' },
+    { id: 'feedback', etiqueta: 'Feedback' },
   ]
 
   return (
@@ -110,6 +120,8 @@ export default async function AdminPage({
         <CostosTab />
       ) : tabActual === 'accesos' ? (
         <AccesosTab />
+      ) : tabActual === 'feedback' ? (
+        <FeedbackTab />
       ) : (
         <SuscripcionesTab pagosDe={pagosDe} />
       )}
@@ -422,6 +434,116 @@ async function AccesosTab() {
                       {ua ? <span>{ua}</span> : null}
                       {!a.exito && a.motivo ? <span>Motivo: {a.motivo}</span> : null}
                     </div>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        )}
+      </section>
+    </div>
+  )
+}
+
+/** Cara del puntaje 1–5 del feedback (misma escala del widget). */
+const EMOJI_PUNTAJE: Record<number, string> = {
+  1: '😠',
+  2: '🙁',
+  3: '😐',
+  4: '🙂',
+  5: '😍',
+}
+
+/**
+ * Claves del contexto que vale la pena mostrar como chips legibles (las ponen
+ * las encuestas contextuales, p. ej. la de /generar).
+ */
+const ETIQUETA_CONTEXTO: Record<string, string> = {
+  tema: 'Tema',
+  nivel: 'Nivel',
+  tipo: 'Tipo',
+  cantidadGenerada: 'Preguntas',
+}
+
+async function FeedbackTab() {
+  const [resumen, filas] = await Promise.all([
+    resumenFeedback(),
+    listarFeedback(100),
+  ])
+
+  const tarjetas = [
+    { etiqueta: 'Feedbacks totales', valor: String(resumen.total) },
+    { etiqueta: 'Últimos 30 días', valor: String(resumen.ultimos30d) },
+    {
+      etiqueta: 'Puntaje promedio (30 días)',
+      valor: resumen.promedio30d == null ? '—' : `${resumen.promedio30d} / 5`,
+    },
+  ]
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid gap-3 sm:grid-cols-3">
+        {tarjetas.map((t) => (
+          <Card key={t.etiqueta}>
+            <CardContent className="flex flex-col gap-0.5">
+              <span className="text-xs font-medium text-muted-foreground">
+                {t.etiqueta}
+              </span>
+              <span className="font-heading text-2xl font-bold text-foreground">
+                {t.valor}
+              </span>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="font-heading text-base font-semibold text-foreground">
+          Últimos feedbacks{' '}
+          {filas.length === 100 ? '(últimos 100)' : `(${filas.length})`}
+        </h2>
+        {filas.length === 0 ? (
+          <EstadoVacio mensaje="Aún no hay feedback. Aparecerá aquí cuando alguien use el widget 💬 o las encuestas de la app." />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filas.map((f) => {
+              const chips = Object.entries(f.contexto)
+                .filter(([clave]) => clave in ETIQUETA_CONTEXTO)
+                .map(([clave, valor]) => `${ETIQUETA_CONTEXTO[clave]}: ${String(valor)}`)
+              return (
+                <Card key={f.id}>
+                  <CardContent className="flex flex-col gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {f.usuarioNombre ?? 'Usuario eliminado'}
+                          <span className="ml-1.5 font-normal text-muted-foreground">
+                            {f.usuarioEmail ?? ''}
+                          </span>
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {f.pagina} · {formatearFecha(f.createdAt)}
+                        </span>
+                      </div>
+                      <Badge variant="outline" className="text-sm">
+                        <span aria-hidden className="mr-1">
+                          {EMOJI_PUNTAJE[f.puntaje] ?? '❓'}
+                        </span>
+                        {f.puntaje} / 5
+                      </Badge>
+                    </div>
+
+                    {f.comentario ? (
+                      <p className="text-sm text-foreground">{f.comentario}</p>
+                    ) : null}
+
+                    {chips.length > 0 ? (
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        {chips.map((chip) => (
+                          <span key={chip}>{chip}</span>
+                        ))}
+                      </div>
+                    ) : null}
                   </CardContent>
                 </Card>
               )

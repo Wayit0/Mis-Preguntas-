@@ -297,6 +297,30 @@ export const colaboraciones = pgTable(
 )
 
 // ---------------------------------------------------------------------------
+// Feedback de los usuarios (widget flotante y encuestas contextuales). Cada
+// envío inserta una fila; se lee en el panel de administración global. Es
+// append-only: no se edita ni se responde desde la app.
+// ---------------------------------------------------------------------------
+
+export const feedback = pgTable('feedback', {
+  id: serial('id').primaryKey(),
+  // Autor (convención del repo: sin FK formal).
+  userId: integer('user_id').notNull(),
+  // Ruta donde se envió (p. ej. '/generar'), para saber de qué pantalla habla.
+  pagina: text('pagina').notNull(),
+  // Puntaje 1–5. Las encuestas contextuales de 👍/👎 guardan 5/1.
+  puntaje: integer('puntaje').notNull(),
+  comentario: text('comentario'),
+  // Contexto adicional de encuestas contextuales (p. ej. parámetros de la
+  // generación evaluada: tema, nivel, tipo). Vacío en el widget general.
+  contexto: jsonb('contexto')
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+// ---------------------------------------------------------------------------
 // Tablas de better-auth (Task 1.2).
 // Nombres de campo confirmados contra la doc vigente
 // (better-auth.com/docs/concepts/database). IDs numéricos porque la config

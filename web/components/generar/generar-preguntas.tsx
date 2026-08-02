@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { CheckCircle2, Loader2, Sparkles } from 'lucide-react'
 
 import { guardarPreguntasImportadas } from '@/lib/actions/import'
+import { enviarFeedback } from '@/lib/actions/feedback'
 import {
   descartarBorradorImportacion,
   obtenerBorradorImportacion,
@@ -275,6 +276,109 @@ function DisclaimerIa() {
           edítalas antes de guardarlas: tú eres responsable del contenido que
           aplicas a tus estudiantes.
         </p>
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Mini-encuesta contextual de la generación: 👍/👎 + comentario opcional.
+ * Guarda junto al feedback los parámetros usados (tema, nivel, tipo), para
+ * saber qué instrucciones producen buenas o malas preguntas. Desaparece tras
+ * enviarse; no enviarla no afecta en nada al flujo.
+ */
+function EncuestaGeneracion({
+  contexto,
+}: {
+  contexto: Record<string, unknown>
+}) {
+  const [voto, setVoto] = useState<1 | 5 | null>(null)
+  const [comentario, setComentario] = useState('')
+  const [estado, setEstado] = useState<'idle' | 'enviando' | 'enviado'>('idle')
+
+  if (estado === 'enviado') {
+    return (
+      <p className="text-sm text-muted-foreground">
+        🙌 ¡Gracias! Tu opinión nos ayuda a mejorar la generación.
+      </p>
+    )
+  }
+
+  async function onEnviar() {
+    if (voto == null) return
+    setEstado('enviando')
+    try {
+      await enviarFeedback({
+        pagina: '/generar',
+        puntaje: voto,
+        comentario,
+        contexto: { ...contexto, encuesta: 'generacion' },
+      })
+    } catch {
+      // Best-effort: perder un feedback no debe molestar al docente.
+    }
+    setEstado('enviado')
+  }
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="text-sm font-medium text-foreground">
+            ¿Qué te parecieron las preguntas generadas?
+          </p>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              aria-pressed={voto === 5}
+              aria-label="Buenas"
+              onClick={() => setVoto(5)}
+              className={`flex size-9 items-center justify-center rounded-full text-lg transition-transform hover:scale-110 ${
+                voto === 5 ? 'bg-primary/15 ring-2 ring-primary' : 'grayscale hover:grayscale-0'
+              }`}
+            >
+              <span aria-hidden>👍</span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={voto === 1}
+              aria-label="Malas"
+              onClick={() => setVoto(1)}
+              className={`flex size-9 items-center justify-center rounded-full text-lg transition-transform hover:scale-110 ${
+                voto === 1 ? 'bg-primary/15 ring-2 ring-primary' : 'grayscale hover:grayscale-0'
+              }`}
+            >
+              <span aria-hidden>👎</span>
+            </button>
+          </div>
+        </div>
+
+        {voto != null ? (
+          <div className="flex flex-col gap-2">
+            <Textarea
+              aria-label="Comentario sobre las preguntas generadas"
+              value={comentario}
+              maxLength={500}
+              onChange={(e) => setComentario(e.target.value)}
+              rows={2}
+              placeholder={
+                voto === 5
+                  ? '¿Qué te gustó? (opcional)'
+                  : '¿Qué estuvo mal? Ej: muy fáciles, enunciado confuso… (opcional)'
+              }
+            />
+            <div>
+              <Button
+                type="button"
+                size="sm"
+                onClick={onEnviar}
+                disabled={estado === 'enviando'}
+              >
+                {estado === 'enviando' ? 'Enviando…' : 'Enviar opinión'}
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -679,6 +783,15 @@ export function GenerarPreguntas({
             Cancelar
           </Button>
         </div>
+
+        <EncuestaGeneracion
+          contexto={{
+            tema,
+            nivel,
+            tipo,
+            cantidadGenerada: preguntas.length,
+          }}
+        />
       </div>
     )
   }

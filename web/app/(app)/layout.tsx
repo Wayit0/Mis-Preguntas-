@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { requireActor } from '@/lib/authz'
 import { resolverAsignatura } from '@/lib/asignatura'
 import { MobileNavProvider } from '@/components/shell/mobile-nav'
+import { FeedbackWidget } from '@/components/shell/feedback-widget'
 import { Sidebar } from '@/components/shell/sidebar'
 import { Topbar } from '@/components/shell/topbar'
 
@@ -42,6 +43,7 @@ export default async function AppLayout({
             {children}
           </main>
         </div>
+        <FeedbackWidget />
       </div>
     </MobileNavProvider>
   )
