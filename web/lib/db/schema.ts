@@ -143,6 +143,9 @@ export const preguntas = pgTable('preguntas', {
   // Tamaño de las imágenes de la pregunta en el PDF impreso:
   // 'chico' | 'mediano' | 'grande'. Aplica al enunciado y a las alternativas.
   imagenTamano: text('imagen_tamano').notNull().default('mediano'),
+  // Origen de la pregunta: 'manual' (formulario), 'importada' (/importar con
+  // IA) o 'ia' (generada por /generar). Trazabilidad del contenido generado.
+  origen: text('origen').notNull().default('manual'),
 })
 
 export const textos = pgTable('textos', {
@@ -244,6 +247,9 @@ export const borradoresImportacion = pgTable(
     userId: integer('user_id').notNull(),
     asignatura: text('asignatura').notNull(),
     nombreArchivo: text('nombre_archivo').notNull(),
+    // Módulo dueño del borrador: 'importar' (análisis de documento) o
+    // 'generar' (preguntas generadas). Cada módulo lista sólo los suyos.
+    origen: text('origen').notNull().default('importar'),
     // El ResultadoAnalisis ok crudo ({preguntas, imagenes}, imágenes en base64).
     // Lo escribe SOLO el servidor al terminar el análisis; inmutable después.
     resultado: jsonb('resultado').$type<Record<string, unknown>>().notNull(),

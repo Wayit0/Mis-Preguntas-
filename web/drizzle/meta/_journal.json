@@ -113,6 +113,13 @@
       "when": 1784928366558,
       "tag": "0015_special_swarm",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785679853071,
+      "tag": "0016_chief_multiple_man",
+      "breakpoints": true
     }
   ]
 }
