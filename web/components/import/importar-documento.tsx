@@ -393,33 +393,22 @@ export function ImportarDocumento({
   const seleccionadas = preguntas.filter((p) => p.incluir).length
   const sinCupo = cuota.restantes === 0 || sinCupoError
 
-  // Selección para clasificar en lote (carpeta/compartir) durante la revisión
-  // — independiente del checkbox "incluir" de cada tarjeta.
-  const [marcadas, setMarcadas] = useState<Set<string>>(() => new Set())
+  // Clasificación en lote (carpeta/compartir): se aplica a las preguntas
+  // marcadas como "incluir" — un solo checkbox por tarjeta cumple ambos roles
+  // (qué se guarda y a qué aplica la barra de acciones).
   const opcionesCarpeta = opcionesIndentadas(carpetas)
   const nombresCarpeta = new Map(carpetas.map((c) => [c.id, c.nombre]))
 
-  function alternarMarcada(id: string) {
-    setMarcadas((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
+  function clasificarIncluidasEnCarpeta(carpetaId: number | null) {
+    setPreguntas((prev) =>
+      prev.map((p) => (p.incluir ? { ...p, carpetaId } : p)),
+    )
   }
 
-  function clasificarMarcadasEnCarpeta(carpetaId: number | null) {
+  function compartirIncluidas(valor: 0 | 1) {
     setPreguntas((prev) =>
-      prev.map((p) => (marcadas.has(p.id) ? { ...p, carpetaId } : p)),
+      prev.map((p) => (p.incluir ? { ...p, compartida: valor } : p)),
     )
-    setMarcadas(new Set())
-  }
-
-  function compartirMarcadas(valor: 0 | 1) {
-    setPreguntas((prev) =>
-      prev.map((p) => (marcadas.has(p.id) ? { ...p, compartida: valor } : p)),
-    )
-    setMarcadas(new Set())
   }
 
   async function onAnalizar(e: React.FormEvent<HTMLFormElement>) {
@@ -546,7 +535,6 @@ export function ImportarDocumento({
     setSinCupoError(false)
     setAviso(null)
     setRecortando(null)
-    setMarcadas(new Set())
     setFase('subir')
     setBorradorId(null)
     // La lista del server component puede estar desactualizada (p. ej. el
@@ -658,20 +646,20 @@ export function ImportarDocumento({
           )
         })()}
 
-        {marcadas.size > 0 ? (
+        {seleccionadas > 0 ? (
           <div className="sticky top-2 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-card p-3 shadow-sm">
             <span className="text-sm font-medium text-foreground">
-              {marcadas.size} {marcadas.size === 1 ? 'marcada' : 'marcadas'}
+              Clasificar las {seleccionadas} incluidas:
             </span>
 
             <label className="inline-flex items-center gap-1 text-xs text-muted-foreground">
               <span aria-hidden>📁</span>
               <select
-                aria-label="Clasificar marcadas en carpeta"
+                aria-label="Clasificar incluidas en carpeta"
                 defaultValue=""
                 onChange={(e) => {
                   const val = e.target.value
-                  clasificarMarcadasEnCarpeta(
+                  clasificarIncluidasEnCarpeta(
                     val === SIN_CARPETA ? null : Number(val),
                   )
                   e.target.value = ''
@@ -694,7 +682,7 @@ export function ImportarDocumento({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => compartirMarcadas(1)}
+              onClick={() => compartirIncluidas(1)}
             >
               🌐 Compartir
             </Button>
@@ -703,19 +691,9 @@ export function ImportarDocumento({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => compartirMarcadas(0)}
+              onClick={() => compartirIncluidas(0)}
             >
               🔒 Hacer privadas
-            </Button>
-
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="ml-auto"
-              onClick={() => setMarcadas(new Set())}
-            >
-              ✕ Cancelar
             </Button>
           </div>
         ) : null}
@@ -728,13 +706,6 @@ export function ImportarDocumento({
                 <CardContent className="flex flex-col gap-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={marcadas.has(p.id)}
-                        onChange={() => alternarMarcada(p.id)}
-                        aria-label={`Marcar pregunta ${i + 1} para clasificar en lote`}
-                        className="size-4 accent-primary"
-                      />
                       <label className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <input
                           type="checkbox"
