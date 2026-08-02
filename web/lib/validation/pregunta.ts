@@ -46,6 +46,10 @@ export const NIVELES_SUGERIDOS = [
   'Otro',
 ] as const
 
+/** Orígenes posibles de una pregunta (columna `preguntas.origen`). */
+export const ORIGENES_PREGUNTA = ['manual', 'importada', 'ia'] as const
+export type OrigenPregunta = (typeof ORIGENES_PREGUNTA)[number]
+
 const opcional = z
   .string()
   .trim()

@@ -57,7 +57,7 @@ const FUNCIONES = [
     icono: "🧮",
     titulo: "Fórmulas y textos",
     texto:
-      "Ecuaciones LaTeX que se imprimen perfectas, y textos de comprensión lectora con sus preguntas asociadas.",
+      "Ecuaciones con un editor visual que se imprimen perfectas, y textos de comprensión lectora con sus preguntas asociadas.",
   },
   {
     icono: "📁",
@@ -94,7 +94,7 @@ const PREGUNTAS_FRECUENTES = [
   },
   {
     p: "¿Puedo escribir fórmulas?",
-    r: "Sí. Escribe LaTeX entre signos $ en el enunciado o en las alternativas —por ejemplo $v = d/t$— y se renderiza en la app y en el PDF impreso.",
+    r: "Sí. Con el editor de ecuaciones insertas fracciones, raíces, potencias y símbolos griegos con un clic, tanto en el enunciado como en las alternativas, y se ven igual en la app y en el PDF impreso.",
   },
   {
     p: "¿Mis preguntas son privadas?",
@@ -543,7 +543,7 @@ export default async function Home() {
               </p>
               <ul className="mt-5 flex flex-col gap-2 text-sm text-muted-foreground">
                 {[
-                  "Fórmulas LaTeX impresas con calidad de libro",
+                  "Fórmulas impresas con calidad de libro",
                   "Imágenes en tamaño chico, mediano o grande",
                   "Tus instrucciones se recuerdan para la próxima",
                 ].map((t) => (

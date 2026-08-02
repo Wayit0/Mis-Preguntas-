@@ -6,6 +6,12 @@ import Link from 'next/link'
 import { CheckCircle2, FileText, Loader2 } from 'lucide-react'
 
 import { guardarPreguntasImportadas } from '@/lib/actions/import'
+import {
+  descartarBorradorImportacion,
+  obtenerBorradorImportacion,
+  actualizarBorradorImportacion,
+} from '@/lib/actions/borradores-importacion'
+import type { BorradorResumen } from '@/lib/import/borradores'
 import type { ResultadoAnalisis } from '@/lib/import/analizar'
 import {
   TIPOS_PREGUNTA,
@@ -18,6 +24,7 @@ import {
   parsearImagenesAlternativas,
   type ImagenParaGuardar,
   type PreguntaAnalizada,
+  type PreguntaEditableBorrador,
 } from '@/lib/validation/import'
 import type { ImagenExtraida } from '@/lib/docparse/extract'
 import type { Carpeta } from '@/lib/queries/carpetas'
@@ -40,38 +47,12 @@ import { LatexText } from '@/components/preguntas/latex-text'
 
 /* eslint-disable @next/next/no-img-element */
 
-/** Una pregunta detectada, ya en forma editable (sin nulls) + selección. */
-interface PreguntaEditable {
-  id: string
-  incluir: boolean
-  // Clasificación aplicada en la revisión (barra de selección múltiple):
-  // carpeta destino (null = sin carpeta) y si queda compartida al guardar.
-  carpetaId: number | null
-  compartida: 0 | 1
-  pregunta: string
-  A: string
-  B: string
-  C: string
-  D: string
-  E: string
-  correcta: string
-  explicacion: string
-  materia: string
-  nivel: string
-  tipo: TipoPregunta
-  imagenPregunta: ImagenParaGuardar | null
-  imagenA: ImagenParaGuardar | null
-  imagenB: ImagenParaGuardar | null
-  imagenC: ImagenParaGuardar | null
-  imagenD: ImagenParaGuardar | null
-  imagenE: ImagenParaGuardar | null
-  imagenPreguntaOriginal: ImagenParaGuardar | null
-  imagenAOriginal: ImagenParaGuardar | null
-  imagenBOriginal: ImagenParaGuardar | null
-  imagenCOriginal: ImagenParaGuardar | null
-  imagenDOriginal: ImagenParaGuardar | null
-  imagenEOriginal: ImagenParaGuardar | null
-}
+/**
+ * Una pregunta detectada, ya en forma editable (sin nulls) + selección.
+ * La forma es el schema compartido `preguntaEditableBorradorSchema`: es lo
+ * que el auto-guardado persiste y lo que retomar restaura.
+ */
+type PreguntaEditable = PreguntaEditableBorrador
 
 /** Columna de imagen editable de una alternativa (`imagenA`…`imagenE`). */
 type CampoImagenAlternativa = `imagen${(typeof LETRAS)[number]}`
@@ -361,11 +342,14 @@ function AvisoCuotaAgotada({ mensaje }: { mensaje?: string }) {
 export function ImportarDocumento({
   asignaturaInicial,
   cuota,
+  borradores,
   carpetas,
 }: {
   asignaturaInicial?: string
   /** Cuota mensual de importaciones con IA del plan del usuario. */
   cuota: { limite: number; restantes: number }
+  /** Borradores retomables del usuario (para «Importaciones en curso»). */
+  borradores: BorradorResumen[]
   /** Lista plana de carpetas del usuario, para clasificar en lote en la revisión. */
   carpetas: Carpeta[]
 }) {
@@ -390,6 +374,21 @@ export function ImportarDocumento({
     id: string
     campo: CampoImagen
   } | null>(null)
+  // Borrador activo de esta revisión (para el auto-guardado y el borrado al
+  // completar). Null si el análisis no alcanzó a crear uno (best-effort).
+  const [borradorId, setBorradorId] = useState<number | null>(null)
+  // Copia local de la lista para reflejar retomas/descartes sin recargar.
+  const [listaBorradores, setListaBorradores] = useState(borradores)
+  // router.refresh() re-renderiza el server component con props frescas
+  // (nueva referencia de array), pero useState conserva el snapshot del
+  // primer montaje: resincronizar durante el render (patrón recomendado por
+  // React para "ajustar estado cuando cambia una prop"; un useEffect aquí
+  // dispara un setState incondicional, prohibido por react-hooks/set-state-in-effect).
+  const [borradoresPrevios, setBorradoresPrevios] = useState(borradores)
+  if (borradores !== borradoresPrevios) {
+    setBorradoresPrevios(borradores)
+    setListaBorradores(borradores)
+  }
 
   const seleccionadas = preguntas.filter((p) => p.incluir).length
   const sinCupo = cuota.restantes === 0 || sinCupoError
@@ -446,6 +445,7 @@ export function ImportarDocumento({
       setPreguntas(
         resultado.preguntas.map((p) => aEditable(p, resultado.imagenes)),
       )
+      setBorradorId(resultado.borradorId ?? null)
       setFase('revisar')
     } catch {
       setError('Ocurrió un error al analizar el documento. Inténtalo de nuevo.')
@@ -458,6 +458,16 @@ export function ImportarDocumento({
       prev.map((p) => (p.id === id ? { ...p, ...cambios } : p)),
     )
   }
+
+  // Auto-guardado del borrador: 3 s después del último cambio en revisión.
+  // Best-effort: un fallo se ignora (se reintenta con el próximo cambio).
+  useEffect(() => {
+    if (fase !== 'revisar' || borradorId == null) return
+    const timer = setTimeout(() => {
+      actualizarBorradorImportacion(borradorId, preguntas).catch(() => {})
+    }, 3000)
+    return () => clearTimeout(timer)
+  }, [preguntas, fase, borradorId])
 
   async function onGuardar() {
     setError(null)
@@ -498,8 +508,21 @@ export function ImportarDocumento({
         setFase('revisar')
         return
       }
+      // El borrador ya cumplió su función; eliminarlo es best-effort.
+      if (borradorId != null) {
+        try {
+          await descartarBorradorImportacion(borradorId)
+        } catch {
+          // La limpieza perezosa lo recogerá.
+        }
+        // Evita que un autosave en vuelo (o el timer aún pendiente) escriba
+        // contra un borrador ya borrado si el redirect de abajo fallara.
+        setBorradorId(null)
+      }
+      // Sin router.refresh(): crearPregunta ya revalida /preguntas server-side,
+      // y un refresh() justo tras push() corre una carrera que puede abortar
+      // el redirect (visto en e2e: ERR_ABORTED del RSC de la navegación).
       router.push(`/preguntas?asignatura=${encodeURIComponent(asignatura)}`)
-      router.refresh()
     } catch {
       setError('Ocurrió un error al guardar las preguntas. Inténtalo de nuevo.')
       setFase('revisar')
@@ -513,6 +536,40 @@ export function ImportarDocumento({
     setAviso(null)
     setRecortando(null)
     setFase('subir')
+    setBorradorId(null)
+    // La lista del server component puede estar desactualizada (p. ej. el
+    // análisis recién hecho creó un borrador): recargar props.
+    router.refresh()
+  }
+
+  async function onRetomar(id: number) {
+    // La tarjeta de «Importaciones en curso» sólo se ve en fase 'subir', pero
+    // el guard protege si eso cambia (p. ej. se agrega otro punto de entrada).
+    if (fase !== 'subir') return
+    setError(null)
+    const res = await obtenerBorradorImportacion(id)
+    if (!res.ok) {
+      setError(res.error)
+      setListaBorradores((prev) => prev.filter((b) => b.id !== id))
+      return
+    }
+    const { borrador } = res
+    setAsignatura(borrador.asignatura)
+    setNombreArchivo(borrador.nombreArchivo)
+    setPreguntas(
+      borrador.edicion ??
+        borrador.resultado.preguntas.map((p) =>
+          aEditable(p, borrador.resultado.imagenes),
+        ),
+    )
+    setBorradorId(borrador.id)
+    setFase('revisar')
+  }
+
+  async function onDescartar(id: number) {
+    if (!window.confirm('¿Eliminar este borrador? No se puede deshacer.')) return
+    await descartarBorradorImportacion(id).catch(() => {})
+    setListaBorradores((prev) => prev.filter((b) => b.id !== id))
   }
 
   // ───────────────────────────── Encabezado ──────────────────────────────
@@ -954,6 +1011,63 @@ export function ImportarDocumento({
           </form>
         </CardContent>
       </Card>
+
+      {fase !== 'analizando' && listaBorradores.length > 0 ? (
+        <Card>
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex flex-col gap-0.5">
+              <h2 className="text-sm font-semibold text-foreground">
+                Importaciones en curso
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Análisis ya hechos que puedes retomar sin gastar otra
+                importación. Se guardan por 30 días.
+              </p>
+            </div>
+            <ul className="flex flex-col gap-2">
+              {listaBorradores.map((b) => (
+                <li
+                  key={b.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
+                >
+                  <div className="flex min-w-0 flex-col">
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {b.nombreArchivo}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {b.asignatura} ·{' '}
+                      {b.numPreguntas === 1
+                        ? '1 pregunta'
+                        : `${b.numPreguntas} preguntas`}{' '}
+                      ·{' '}
+                      {new Date(b.actualizadoEn).toLocaleString('es-CL', {
+                        day: 'numeric',
+                        month: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        timeZone: 'America/Santiago',
+                      })}
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <Button type="button" size="sm" onClick={() => onRetomar(b.id)}>
+                      Retomar
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onDescartar(b.id)}
+                    >
+                      Descartar
+                    </Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }

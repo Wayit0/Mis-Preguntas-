@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { accesos, colegios, usosIa, usuarios } from '@/lib/db/schema'
+import { accesos, colegios, feedback, usosIa, usuarios } from '@/lib/db/schema'
 
 // ---------------------------------------------------------------------------
 // Lecturas para la administración global (Parte E.2). Son funciones puras: el
@@ -208,5 +208,69 @@ export async function resumenAccesos(): Promise<ResumenAccesos> {
     total: Number(total?.n ?? 0),
     exitos7d: Number(exitos?.n ?? 0),
     fallos7d: Number(fallos?.n ?? 0),
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Feedback de usuarios (widget flotante y encuestas contextuales).
+// ---------------------------------------------------------------------------
+
+/** Una fila de feedback con el autor resuelto, para la tabla de admin. */
+export interface FeedbackAdmin {
+  id: number
+  usuarioNombre: string | null
+  usuarioEmail: string | null
+  pagina: string
+  puntaje: number
+  comentario: string | null
+  contexto: Record<string, unknown>
+  createdAt: Date
+}
+
+export interface ResumenFeedback {
+  total: number
+  /** Promedio de puntaje (1–5) de los últimos 30 días; null sin datos. */
+  promedio30d: number | null
+  ultimos30d: number
+}
+
+/** Últimos feedbacks, más reciente primero, con nombre/email del autor. */
+export async function listarFeedback(limite = 100): Promise<FeedbackAdmin[]> {
+  return db
+    .select({
+      id: feedback.id,
+      usuarioNombre: usuarios.nombre,
+      usuarioEmail: usuarios.email,
+      pagina: feedback.pagina,
+      puntaje: feedback.puntaje,
+      comentario: feedback.comentario,
+      contexto: feedback.contexto,
+      createdAt: feedback.createdAt,
+    })
+    .from(feedback)
+    .leftJoin(usuarios, eq(usuarios.id, feedback.userId))
+    .orderBy(desc(feedback.createdAt), desc(feedback.id))
+    .limit(limite)
+}
+
+/** Total histórico + volumen y promedio de puntaje de los últimos 30 días. */
+export async function resumenFeedback(): Promise<ResumenFeedback> {
+  const hace30d = new Date()
+  hace30d.setDate(hace30d.getDate() - 30)
+
+  const [total] = await db.select({ n: sql<number>`count(*)` }).from(feedback)
+  const [mes] = await db
+    .select({
+      n: sql<number>`count(*)`,
+      promedio: sql<number | null>`avg(${feedback.puntaje})`,
+    })
+    .from(feedback)
+    .where(gte(feedback.createdAt, hace30d))
+
+  const promedio = mes?.promedio == null ? null : Number(mes.promedio)
+  return {
+    total: Number(total?.n ?? 0),
+    ultimos30d: Number(mes?.n ?? 0),
+    promedio30d: promedio == null ? null : Math.round(promedio * 10) / 10,
   }
 }

@@ -99,6 +99,34 @@
       "when": 1784129418636,
       "tag": "0013_reflective_magdalene",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784924326914,
+      "tag": "0014_elite_zaladane",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1784928366558,
+      "tag": "0015_special_swarm",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1785679853071,
+      "tag": "0016_chief_multiple_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1785698248429,
+      "tag": "0017_past_zombie",
+      "breakpoints": true
     }
   ]
 }

@@ -24,11 +24,20 @@ import {
 // esquema (un arreglo de objetos con ~13 campos), ni siquiera reintentando. El
 // código de la extracción no había cambiado: fue una degradación del lado de la
 // API. Tool use es GA, no compila esa gramática y produce el JSON igual de bien;
-// la laxitud eventual la absorbe la criba. Modelo: `claude-opus-4-8`.
+// la laxitud eventual la absorbe la criba.
+//
+// MODELO: `claude-sonnet-5` desde 2026-07 (antes `claude-opus-4-8`) para bajar
+// el costo por importación a ~40% (USD 3/15 por MTok vs 5/25; mismo
+// tokenizador, soporta visión/PDF/tool use igual). OJO: en Sonnet 5 omitir el
+// parámetro `thinking` activa adaptive thinking (a diferencia de Opus 4.8);
+// lo deshabilitamos explícito para mantener el comportamiento y costo
+// predecibles (el thinking se factura como salida y compite con max_tokens).
+// Si la calidad de la resolución de respuestas (`correcta`/pauta) empeora,
+// revisar: quitar `thinking` (adaptive) o volver a Opus.
 // ---------------------------------------------------------------------------
 
 /** Modelo de extracción (id exacto, sin sufijo de fecha). */
-const MODELO = 'claude-opus-4-8'
+const MODELO = 'claude-sonnet-5'
 
 /** Nombre de la herramienta con la que el modelo entrega las preguntas. */
 const HERRAMIENTA = 'entregar_preguntas'
@@ -201,6 +210,9 @@ export async function detectarPreguntas(
   const res = await client.messages.create({
     model: MODELO,
     max_tokens: 16000,
+    // En Sonnet 5 el thinking adaptativo viene ON por defecto si se omite el
+    // parámetro; explícitamente OFF (ver nota de MODELO arriba).
+    thinking: { type: 'disabled' },
     system: SISTEMA,
     messages: [
       { role: 'user', content: [...contentBlocks, { type: 'text', text: instruccion }] },

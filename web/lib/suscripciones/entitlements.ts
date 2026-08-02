@@ -10,6 +10,7 @@ import { lanzamientoGratis } from '@/lib/suscripciones/lanzamiento'
 // ---------------------------------------------------------------------------
 
 export const LIMITE_IMPORTACIONES = { free: 3, pro: 100 } as const
+export const LIMITE_GENERACIONES = { free: 5, pro: 100 } as const
 export const DIAS_GRACIA_MOROSA = 7
 
 export type Suscripcion = typeof suscripciones.$inferSelect
@@ -96,19 +97,33 @@ export interface CuotaImportaciones {
   restantes: number
 }
 
-export async function cuotaImportaciones(userId: number): Promise<CuotaImportaciones> {
+async function cuotaMensualPorAccion(
+  userId: number,
+  accion: string,
+  limites: { free: number; pro: number },
+): Promise<CuotaImportaciones> {
   const { plan } = await planEfectivo(userId)
-  const limite = LIMITE_IMPORTACIONES[plan]
+  const limite = limites[plan]
   const [fila] = await db
     .select({ usadas: count() })
     .from(usosIa)
     .where(
       and(
         eq(usosIa.userId, userId),
-        eq(usosIa.accion, 'importar_documento'),
+        eq(usosIa.accion, accion),
         gte(usosIa.createdAt, INICIO_MES_SANTIAGO_SQL),
       ),
     )
   const usadas = Number(fila?.usadas ?? 0)
   return { plan, limite, usadas, restantes: Math.max(0, limite - usadas) }
+}
+
+/** Cuota mensual de importaciones con IA (/importar). */
+export async function cuotaImportaciones(userId: number): Promise<CuotaImportaciones> {
+  return cuotaMensualPorAccion(userId, 'importar_documento', LIMITE_IMPORTACIONES)
+}
+
+/** Cuota mensual de generaciones de preguntas con IA (/generar). */
+export async function cuotaGeneraciones(userId: number): Promise<CuotaImportaciones> {
+  return cuotaMensualPorAccion(userId, 'generar_preguntas', LIMITE_GENERACIONES)
 }

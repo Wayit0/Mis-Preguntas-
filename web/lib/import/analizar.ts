@@ -6,11 +6,9 @@ import {
   type DocumentoExtraido,
   type ImagenExtraida,
 } from '@/lib/docparse/extract'
-import { detectarPreguntas, type UsoDeteccion } from '@/lib/ai/import'
+import { detectarPreguntas } from '@/lib/ai/import'
 import { aplicarRecortesIA } from '@/lib/import/recorte'
-import { calcularCostoMicroUsd } from '@/lib/ai/costos'
-import { db } from '@/lib/db'
-import { usosIa } from '@/lib/db/schema'
+import { registrarUsoIa } from '@/lib/ai/uso'
 import { MAX_PAGINAS_PDF, type PreguntaAnalizada } from '@/lib/validation/import'
 
 // ---------------------------------------------------------------------------
@@ -25,7 +23,17 @@ import { MAX_PAGINAS_PDF, type PreguntaAnalizada } from '@/lib/validation/import
 
 /** Resultado del análisis de un documento. */
 export type ResultadoAnalisis =
-  | { ok: true; preguntas: PreguntaAnalizada[]; imagenes: ImagenExtraida[] }
+  | {
+      ok: true
+      preguntas: PreguntaAnalizada[]
+      imagenes: ImagenExtraida[]
+      /**
+       * Id del borrador creado por el route handler tras el análisis (para el
+       * auto-guardado y retomar). Ausente si el insert falló: el borrador es
+       * best-effort y su fallo nunca rompe la importación.
+       */
+      borradorId?: number
+    }
   | { ok: false; error: string; sinCupo?: boolean }
 
 /**
@@ -34,33 +42,6 @@ export type ResultadoAnalisis =
  * cada intento deja traza en los logs (un "inicio" sin su "fin" delata una
  * petición cortada por infraestructura).
  */
-/**
- * Registra el uso de IA en `usos_ia` para el panel de costos del admin. Nunca
- * lanza: un fallo al registrar no debe romper el análisis que ya funcionó.
- */
-async function registrarUsoIa(
-  userId: number,
-  accion: string,
-  uso: UsoDeteccion,
-  detalle: Record<string, unknown>,
-): Promise<void> {
-  try {
-    await db.insert(usosIa).values({
-      userId,
-      accion,
-      modelo: uso.modelo,
-      inputTokens: uso.inputTokens,
-      outputTokens: uso.outputTokens,
-      cacheCreationTokens: uso.cacheCreationTokens,
-      cacheReadTokens: uso.cacheReadTokens,
-      costoMicroUsd: calcularCostoMicroUsd(uso.modelo, uso),
-      detalle,
-    })
-  } catch (err) {
-    console.error('[importar] no se pudo registrar el uso de IA:', err)
-  }
-}
-
 export async function analizarArchivo(
   archivo: File,
   asignatura: string,

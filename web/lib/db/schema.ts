@@ -7,6 +7,7 @@ import {
   boolean,
   jsonb,
   primaryKey,
+  index,
 } from 'drizzle-orm/pg-core'
 
 // ---------------------------------------------------------------------------
@@ -142,6 +143,9 @@ export const preguntas = pgTable('preguntas', {
   // Tamaño de las imágenes de la pregunta en el PDF impreso:
   // 'chico' | 'mediano' | 'grande'. Aplica al enunciado y a las alternativas.
   imagenTamano: text('imagen_tamano').notNull().default('mediano'),
+  // Origen de la pregunta: 'manual' (formulario), 'importada' (/importar con
+  // IA) o 'ia' (generada por /generar). Trazabilidad del contenido generado.
+  origen: text('origen').notNull().default('manual'),
 })
 
 export const textos = pgTable('textos', {
@@ -228,6 +232,39 @@ export const usosIa = pgTable('usos_ia', {
 })
 
 // ---------------------------------------------------------------------------
+// Borradores de "Importar Documento con IA": cada análisis exitoso se guarda
+// como borrador retomable, para que cerrar la página a mitad de la revisión
+// (o un deploy que invalide las server actions del bundle abierto) no pierda
+// el trabajo ni obligue a gastar otra importación de la cuota. Diseño en
+// docs/superpowers/specs/2026-07-24-borradores-importacion-design.md.
+// ---------------------------------------------------------------------------
+
+export const borradoresImportacion = pgTable(
+  'borradores_importacion',
+  {
+    id: serial('id').primaryKey(),
+    // Dueño del borrador (convención del repo: sin FK).
+    userId: integer('user_id').notNull(),
+    asignatura: text('asignatura').notNull(),
+    nombreArchivo: text('nombre_archivo').notNull(),
+    // Módulo dueño del borrador: 'importar' (análisis de documento) o
+    // 'generar' (preguntas generadas). Cada módulo lista sólo los suyos.
+    origen: text('origen').notNull().default('importar'),
+    // El ResultadoAnalisis ok crudo ({preguntas, imagenes}, imágenes en base64).
+    // Lo escribe SOLO el servidor al terminar el análisis; inmutable después.
+    resultado: jsonb('resultado').$type<Record<string, unknown>>().notNull(),
+    // Estado editable del cliente (PreguntaEditable[]), sobrescrito completo por
+    // cada auto-guardado. NULL = nunca se editó (retomar deriva de `resultado`).
+    edicion: jsonb('edicion').$type<unknown[]>(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    // Se toca en cada auto-guardado: es la base del tope por usuario (se elimina
+    // el más antiguo) y de la limpieza perezosa a 30 días.
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => [index('borradores_importacion_user_id_idx').on(t.userId)],
+)
+
+// ---------------------------------------------------------------------------
 // Registro de accesos (para el panel de administración global). Cada intento de
 // inicio de sesión —por email/contraseña o por proveedor social— inserta una
 // fila con el resultado (éxito/fallo), el método, la IP y el navegador. Es
@@ -258,6 +295,30 @@ export const colaboraciones = pgTable(
   },
   (t) => [primaryKey({ columns: [t.fromUserId, t.toUserId] })],
 )
+
+// ---------------------------------------------------------------------------
+// Feedback de los usuarios (widget flotante y encuestas contextuales). Cada
+// envío inserta una fila; se lee en el panel de administración global. Es
+// append-only: no se edita ni se responde desde la app.
+// ---------------------------------------------------------------------------
+
+export const feedback = pgTable('feedback', {
+  id: serial('id').primaryKey(),
+  // Autor (convención del repo: sin FK formal).
+  userId: integer('user_id').notNull(),
+  // Ruta donde se envió (p. ej. '/generar'), para saber de qué pantalla habla.
+  pagina: text('pagina').notNull(),
+  // Puntaje 1–5. Las encuestas contextuales de 👍/👎 guardan 5/1.
+  puntaje: integer('puntaje').notNull(),
+  comentario: text('comentario'),
+  // Contexto adicional de encuestas contextuales (p. ej. parámetros de la
+  // generación evaluada: tema, nivel, tipo). Vacío en el widget general.
+  contexto: jsonb('contexto')
+    .$type<Record<string, unknown>>()
+    .notNull()
+    .default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
 
 // ---------------------------------------------------------------------------
 // Tablas de better-auth (Task 1.2).

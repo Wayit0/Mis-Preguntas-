@@ -217,7 +217,7 @@ const MEDIA_TYPES_IMAGEN_GUARDAR = [
  * IA) y la reenvía tal cual: `analizarDocumento` y `guardarPreguntasImportadas`
  * son actions independientes, sin estado compartido en el servidor.
  */
-const imagenObjetoSchema = z.object({
+export const imagenObjetoSchema = z.object({
   base64: z.string().min(1),
   mediaType: z.enum(MEDIA_TYPES_IMAGEN_GUARDAR),
 })
@@ -257,10 +257,67 @@ export const preguntaImportInputSchema = z.object({
 /** Payload de la confirmación: asignatura + preguntas seleccionadas. */
 export const guardarImportSchema = z.object({
   asignatura: z.string().trim().min(1, 'Falta la asignatura'),
+  // Quién genera el guardado: /importar o /generar. Estampa `preguntas.origen`.
+  origen: z.enum(['importada', 'ia']).default('importada'),
   preguntas: z
     .array(preguntaImportInputSchema)
     .min(1, 'Selecciona al menos una pregunta'),
 })
 
 export type PreguntaImportInput = z.infer<typeof preguntaImportInputSchema>
-export type GuardarImportInput = z.infer<typeof guardarImportSchema>
+// `z.input` (no `z.infer`): así `origen` queda OPCIONAL para los llamadores
+// (el default 'importada' lo aplica el parse dentro de
+// `guardarPreguntasImportadas`), y el llamador existente de
+// `importar-documento.tsx` (que no envía `origen`) sigue compilando sin cambios.
+export type GuardarImportInput = z.input<typeof guardarImportSchema>
+/** Forma ya parseada (post-defaults) del payload de guardado. */
+export type GuardarImportParsed = z.infer<typeof guardarImportSchema>
+
+// ---------------------------------------------------------------------------
+// Borradores de importación: estado editable de la revisión.
+// ---------------------------------------------------------------------------
+
+const imagenEditableSchema = imagenObjetoSchema.nullable()
+
+/**
+ * Una pregunta tal como vive en el estado editable de la revisión (la forma
+ * `PreguntaEditable` del cliente). Es lo que el auto-guardado persiste en
+ * `borradores_importacion.edicion` y lo que retomar restaura. Los campos
+ * `…Original` guardan la imagen pre-recorte (para re-recortar sin degradar).
+ */
+export const preguntaEditableBorradorSchema = z.object({
+  id: z.string(),
+  incluir: z.boolean(),
+  pregunta: z.string(),
+  A: z.string(),
+  B: z.string(),
+  C: z.string(),
+  D: z.string(),
+  E: z.string(),
+  correcta: z.string(),
+  explicacion: z.string(),
+  materia: z.string(),
+  nivel: z.string(),
+  tipo: z.enum(TIPOS_PREGUNTA_IMPORT),
+  imagenPregunta: imagenEditableSchema,
+  imagenPreguntaOriginal: imagenEditableSchema,
+  imagenA: imagenEditableSchema,
+  imagenAOriginal: imagenEditableSchema,
+  imagenB: imagenEditableSchema,
+  imagenBOriginal: imagenEditableSchema,
+  imagenC: imagenEditableSchema,
+  imagenCOriginal: imagenEditableSchema,
+  imagenD: imagenEditableSchema,
+  imagenDOriginal: imagenEditableSchema,
+  imagenE: imagenEditableSchema,
+  imagenEOriginal: imagenEditableSchema,
+  // Clasificación aplicada en la revisión (barra de selección múltiple):
+  // carpeta destino (null = sin carpeta) y si queda compartida al guardar.
+  carpetaId: z.number().int().nullable().default(null),
+  compartida: z.number().int().min(0).max(1).default(0),
+})
+
+/** El payload completo del auto-guardado: el arreglo de preguntas editables. */
+export const edicionBorradorSchema = z.array(preguntaEditableBorradorSchema)
+
+export type PreguntaEditableBorrador = z.infer<typeof preguntaEditableBorradorSchema>

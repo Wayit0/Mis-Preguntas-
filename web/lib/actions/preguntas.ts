@@ -11,6 +11,7 @@ import { preguntaSchema, primerErrorPregunta } from '@/lib/validation/pregunta'
 import {
   camposDb,
   extraerCampos,
+  origenDeFormData,
   subirImagenes,
   type ResultadoPregunta,
 } from '@/lib/actions/pregunta-fields'
@@ -67,6 +68,7 @@ export async function crearPregunta(
     userId,
     colegioId,
     asignatura: data.asignatura,
+    origen: origenDeFormData(formData),
     carpetaId: resultadoCarpeta.carpetaId,
     ...camposDb(data),
     imagenPregunta: imagenes.imagenPregunta ?? null,

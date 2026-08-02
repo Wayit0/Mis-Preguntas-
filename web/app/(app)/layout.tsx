@@ -1,6 +1,8 @@
+import { cookies } from 'next/headers'
 import { requireActor } from '@/lib/authz'
 import { resolverAsignatura } from '@/lib/asignatura'
 import { MobileNavProvider } from '@/components/shell/mobile-nav'
+import { FeedbackWidget } from '@/components/shell/feedback-widget'
 import { Sidebar } from '@/components/shell/sidebar'
 import { Topbar } from '@/components/shell/topbar'
 
@@ -21,6 +23,10 @@ export default async function AppLayout({
   const esGlobalAdmin = actor.role === 'global_admin'
   const puedeAdminColegio = actor.role === 'school_admin' || esGlobalAdmin
   const asignaturaActual = await resolverAsignatura(actor.userId)
+  // Estado contraído del sidebar (cookie escrita por el propio Sidebar al
+  // alternar): leerlo aquí evita el parpadeo expandido→contraído al hidratar.
+  const sidebarColapsado =
+    (await cookies()).get('sidebar_colapsado')?.value === '1'
 
   return (
     <MobileNavProvider>
@@ -29,6 +35,7 @@ export default async function AppLayout({
           puedeAdminColegio={puedeAdminColegio}
           esGlobalAdmin={esGlobalAdmin}
           asignaturaActual={asignaturaActual}
+          colapsadoInicial={sidebarColapsado}
         />
         <div className="flex min-w-0 flex-1 flex-col">
           <Topbar user={user} />
@@ -36,6 +43,7 @@ export default async function AppLayout({
             {children}
           </main>
         </div>
+        <FeedbackWidget />
       </div>
     </MobileNavProvider>
   )
