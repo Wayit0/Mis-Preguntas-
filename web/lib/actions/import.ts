@@ -60,7 +60,8 @@ function formDataDePregunta(
   fd.set('materia', p.materia)
   fd.set('nivel', p.nivel)
   fd.set('explicacion', p.explicacion)
-  fd.set('compartida', '0')
+  fd.set('compartida', String(p.compartida))
+  if (p.carpetaId != null) fd.set('carpetaId', String(p.carpetaId))
   setImagenSiExiste(fd, 'imagen_pregunta', p.imagenPregunta)
 
   if (p.tipo === 'seleccion_multiple') {

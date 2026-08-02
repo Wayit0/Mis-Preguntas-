@@ -19,6 +19,8 @@ import { FiltrosPreguntas } from '@/components/preguntas/filtros-preguntas'
 import { TarjetaPregunta } from '@/components/preguntas/tarjeta-pregunta'
 import { NavegadorCarpetas } from '@/components/carpetas/navegador-carpetas'
 import { Paginador } from '@/components/carpetas/paginador'
+import { SeleccionPreguntasProvider } from '@/components/preguntas/seleccion-context'
+import { BarraSeleccionPreguntas } from '@/components/preguntas/barra-seleccion'
 
 const ESTADOS_VALIDOS: EstadoCompartida[] = ['todas', 'compartida', 'privada']
 
@@ -154,11 +156,14 @@ export default async function PreguntasPage({
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {pag.items.map((p) => (
-            <TarjetaPregunta key={p.id} p={p} carpetas={carpetas} />
-          ))}
-        </div>
+        <SeleccionPreguntasProvider>
+          <div className="flex flex-col gap-3">
+            <BarraSeleccionPreguntas carpetas={carpetas} />
+            {pag.items.map((p) => (
+              <TarjetaPregunta key={p.id} p={p} carpetas={carpetas} />
+            ))}
+          </div>
+        </SeleccionPreguntasProvider>
       )}
 
       <Paginador

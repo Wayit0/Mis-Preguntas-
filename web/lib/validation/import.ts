@@ -248,6 +248,10 @@ export const preguntaImportInputSchema = z.object({
   imagenC: imagenParaGuardarSchema,
   imagenD: imagenParaGuardarSchema,
   imagenE: imagenParaGuardarSchema,
+  // Clasificación aplicada en la revisión (barra de selección múltiple):
+  // carpeta destino (null = sin carpeta) y si queda compartida al guardar.
+  carpetaId: z.number().int().nullish(),
+  compartida: z.number().int().min(0).max(1).default(0),
 })
 
 /** Payload de la confirmación: asignatura + preguntas seleccionadas. */
