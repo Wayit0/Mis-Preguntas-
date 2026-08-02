@@ -151,3 +151,27 @@ export async function toggleCompartida(
 
   revalidatePath('/preguntas')
 }
+
+/**
+ * Cambia el estado de compartición de varias preguntas del usuario a la vez
+ * (guard de propiedad vía `inArray` + `userId`). Usada por la barra de
+ * selección múltiple en "Mis Preguntas".
+ */
+export async function cambiarCompartidaEnLote(
+  ids: number[],
+  valor: number,
+): Promise<void> {
+  const session = await getSession()
+  if (!session) return
+  const userId = Number(session.user.id)
+
+  const idsValidos = ids.filter((n) => Number.isInteger(n) && n > 0)
+  if (idsValidos.length === 0) return
+
+  await db
+    .update(preguntas)
+    .set({ compartida: valor })
+    .where(and(inArray(preguntas.id, idsValidos), eq(preguntas.userId, userId)))
+
+  revalidatePath('/preguntas')
+}
