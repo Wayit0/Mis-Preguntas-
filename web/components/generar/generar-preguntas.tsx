@@ -69,6 +69,8 @@ function aEditable(p: PreguntaAnalizada): PreguntaEditable {
   return {
     id: `gen-${contador++}`,
     incluir: true,
+    carpetaId: null,
+    compartida: 0,
     pregunta: p.pregunta ?? '',
     A: p.A ?? '',
     B: p.B ?? '',

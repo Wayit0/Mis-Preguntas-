@@ -248,6 +248,10 @@ export const preguntaImportInputSchema = z.object({
   imagenC: imagenParaGuardarSchema,
   imagenD: imagenParaGuardarSchema,
   imagenE: imagenParaGuardarSchema,
+  // Clasificación aplicada en la revisión (barra de selección múltiple):
+  // carpeta destino (null = sin carpeta) y si queda compartida al guardar.
+  carpetaId: z.number().int().nullish(),
+  compartida: z.number().int().min(0).max(1).default(0),
 })
 
 /** Payload de la confirmación: asignatura + preguntas seleccionadas. */
@@ -307,6 +311,10 @@ export const preguntaEditableBorradorSchema = z.object({
   imagenDOriginal: imagenEditableSchema,
   imagenE: imagenEditableSchema,
   imagenEOriginal: imagenEditableSchema,
+  // Clasificación aplicada en la revisión (barra de selección múltiple):
+  // carpeta destino (null = sin carpeta) y si queda compartida al guardar.
+  carpetaId: z.number().int().nullable().default(null),
+  compartida: z.number().int().min(0).max(1).default(0),
 })
 
 /** El payload completo del auto-guardado: el arreglo de preguntas editables. */

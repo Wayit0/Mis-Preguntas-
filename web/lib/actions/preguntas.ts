@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { preguntas } from '@/lib/db/schema'
 import { getSession } from '@/lib/get-session'
 import { colegioIdDeUsuario } from '@/lib/queries/visibilidad'
+import { rutaCarpeta } from '@/lib/queries/carpetas'
 import { preguntaSchema, primerErrorPregunta } from '@/lib/validation/pregunta'
 import {
   camposDb,
@@ -23,6 +24,26 @@ import {
 // tipo se importa de pregunta-fields donde se necesite, no desde aquí.
 
 /**
+ * Lee `carpetaId` del FormData (si viene) y verifica que la carpeta exista y
+ * sea del usuario. Vive fuera de `preguntaSchema`/`camposDb` (compartidos con
+ * `banco-colegio.ts`, que no maneja carpetas de usuario) — sólo lo usa
+ * `crearPregunta`, para poder clasificar preguntas en carpeta ya al crearlas
+ * (p. ej. desde la barra de selección de "Importar Documento").
+ */
+async function carpetaIdDeFormData(
+  formData: FormData,
+  userId: number,
+): Promise<{ error: string } | { carpetaId: number | null }> {
+  const valor = formData.get('carpetaId')
+  if (valor == null || valor === '') return { carpetaId: null }
+  const carpetaId = Number(valor)
+  if (!Number.isFinite(carpetaId)) return { error: 'Carpeta no válida.' }
+  const ruta = await rutaCarpeta(userId, carpetaId)
+  if (ruta.length === 0) return { error: 'La carpeta destino no existe.' }
+  return { carpetaId }
+}
+
+/**
  * Crea una pregunta del usuario autenticado. Sube las imágenes que vengan e
  * inserta la fila. Revalida la lista (la navegación a ella la hace el cliente).
  */
@@ -37,6 +58,9 @@ export async function crearPregunta(
   if (!parsed.success) return { error: primerErrorPregunta(parsed.error) }
   const data = parsed.data
 
+  const resultadoCarpeta = await carpetaIdDeFormData(formData, userId)
+  if ('error' in resultadoCarpeta) return { error: resultadoCarpeta.error }
+
   const imagenes = await subirImagenes(formData)
   const colegioId = await colegioIdDeUsuario(userId)
 
@@ -45,6 +69,7 @@ export async function crearPregunta(
     colegioId,
     asignatura: data.asignatura,
     origen: origenDeFormData(formData),
+    carpetaId: resultadoCarpeta.carpetaId,
     ...camposDb(data),
     imagenPregunta: imagenes.imagenPregunta ?? null,
     imagenA: imagenes.imagenA ?? null,
