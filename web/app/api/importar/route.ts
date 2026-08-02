@@ -72,6 +72,7 @@ export async function POST(request: Request) {
                 preguntas: resultado.preguntas,
                 imagenes: resultado.imagenes,
               },
+              origen: 'importar',
             })
           } catch (err) {
             console.error('[importar] no se pudo crear el borrador:', err)

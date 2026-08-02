@@ -77,6 +77,7 @@ describe('lib/import/borradores (crear, listar, retención)', () => {
       asignatura: 'Física',
       nombreArchivo: 'prueba.docx',
       resultado: resultadoMinimo(3),
+      origen: 'importar',
     })
     expect(id).toBeGreaterThan(0)
 
@@ -113,6 +114,7 @@ describe('lib/import/borradores (crear, listar, retención)', () => {
       asignatura: 'Física',
       nombreArchivo: 'nuevo.docx',
       resultado: resultadoMinimo(),
+      origen: 'importar',
     })
 
     const lista = await listarBorradores(u.id)
@@ -148,6 +150,7 @@ describe('lib/import/borradores (crear, listar, retención)', () => {
       asignatura: 'Física',
       nombreArchivo: 'de-a.docx',
       resultado: resultadoMinimo(),
+      origen: 'importar',
     })
     expect(await listarBorradores(b.id)).toHaveLength(0)
   })
@@ -161,6 +164,7 @@ describe('actions/borradores-importacion (sesión + pertenencia)', () => {
       asignatura: 'Física',
       nombreArchivo: 'doc.docx',
       resultado: resultadoMinimo(3),
+      origen: 'importar',
     })
 
     const upd = await actualizarBorradorImportacion(id, [
@@ -186,6 +190,7 @@ describe('actions/borradores-importacion (sesión + pertenencia)', () => {
       asignatura: 'Física',
       nombreArchivo: 'doc.docx',
       resultado: resultadoMinimo(),
+      origen: 'importar',
     })
 
     const upd = await actualizarBorradorImportacion(id, [{ pregunta: 'sin campos' }])
@@ -203,6 +208,7 @@ describe('actions/borradores-importacion (sesión + pertenencia)', () => {
       asignatura: 'Física',
       nombreArchivo: 'de-a.docx',
       resultado: resultadoMinimo(),
+      origen: 'importar',
     })
 
     currentUserId = b.id
@@ -222,6 +228,7 @@ describe('actions/borradores-importacion (sesión + pertenencia)', () => {
       asignatura: 'Física',
       nombreArchivo: 'doc.docx',
       resultado: resultadoMinimo(),
+      origen: 'importar',
     })
     expect((await descartarBorradorImportacion(id)).ok).toBe(true)
     expect((await obtenerBorradorImportacion(id)).ok).toBe(false)

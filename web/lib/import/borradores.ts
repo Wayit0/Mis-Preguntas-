@@ -17,6 +17,9 @@ export const MAX_BORRADORES_POR_USUARIO = 10
 /** Días sin tocar tras los cuales un borrador se limpia (limpieza perezosa). */
 export const DIAS_RETENCION_BORRADOR = 30
 
+/** Módulo dueño de un borrador. */
+export type OrigenBorrador = 'importar' | 'generar'
+
 /** Resumen para la tarjeta «Importaciones en curso». */
 export interface BorradorResumen {
   id: number
@@ -57,7 +60,12 @@ async function limpiarExpirados(userId: number): Promise<void> {
  */
 export async function crearBorrador(
   userId: number,
-  datos: { asignatura: string; nombreArchivo: string; resultado: ResultadoBorrador },
+  datos: {
+    asignatura: string
+    nombreArchivo: string
+    resultado: ResultadoBorrador
+    origen: OrigenBorrador
+  },
 ): Promise<number> {
   await limpiarExpirados(userId)
 
@@ -81,6 +89,7 @@ export async function crearBorrador(
       asignatura: datos.asignatura,
       nombreArchivo: datos.nombreArchivo,
       resultado: datos.resultado as unknown as Record<string, unknown>,
+      origen: datos.origen,
     })
     .returning({ id: borradoresImportacion.id })
   return fila.id
@@ -92,7 +101,10 @@ export async function crearBorrador(
  * por las imágenes en base64): sólo columnas escalares y el largo del arreglo
  * de preguntas, calculado en SQL.
  */
-export async function listarBorradores(userId: number): Promise<BorradorResumen[]> {
+export async function listarBorradores(
+  userId: number,
+  origen: OrigenBorrador = 'importar',
+): Promise<BorradorResumen[]> {
   await limpiarExpirados(userId)
   const filas = await db
     .select({
@@ -108,7 +120,12 @@ export async function listarBorradores(userId: number): Promise<BorradorResumen[
       )`,
     })
     .from(borradoresImportacion)
-    .where(eq(borradoresImportacion.userId, userId))
+    .where(
+      and(
+        eq(borradoresImportacion.userId, userId),
+        eq(borradoresImportacion.origen, origen),
+      ),
+    )
     .orderBy(desc(borradoresImportacion.updatedAt))
   return filas.map((f) => ({
     id: f.id,
