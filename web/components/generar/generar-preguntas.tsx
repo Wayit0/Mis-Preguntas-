@@ -772,7 +772,10 @@ export function GenerarPreguntas({
                 placeholder="Ej: que apliquen la segunda ley de Newton en problemas con fuerza de roce, con cálculo numérico"
               />
               <p className="text-xs text-muted-foreground">
-                Mientras más específico seas, mejores serán las preguntas.
+                Mientras más específico seas, mejores serán las preguntas:
+                indica la habilidad (calcular, analizar, interpretar…), el tipo
+                de situación o problema, la dificultad y el contexto que
+                quieres usar.
               </p>
             </div>
 

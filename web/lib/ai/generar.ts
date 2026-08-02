@@ -48,6 +48,15 @@ en español de Chile:
 dificultad apropiados al nivel indicado. Usa LaTeX entre signos $...$ para \
 fórmulas. NO dependas de imágenes, gráficos ni material externo: si la \
 pregunta necesita datos, inclúyelos en el propio enunciado.
+- El enunciado se muestra como TEXTO CORRIDO (los saltos de línea se pierden): \
+NO uses tablas ni columnas separadas con "|" ni ningún formato tabulado. Si \
+necesitas entregar varios datos, preséntalos en prosa enumerada, por ejemplo: \
+"El sismo 1 tuvo magnitud 7,2 y profundidad de 15 km, y provocó tsunami; el \
+sismo 2 tuvo magnitud 7,5 y profundidad de 20 km, y provocó tsunami; ...".
+- NO incluyas en el enunciado la definición ni la teoría del concepto que se \
+está evaluando (si la pregunta evalúa desplazamiento, no expliques qué es el \
+desplazamiento): definir el concepto regala la respuesta y quita valor \
+evaluativo. Entrega solo la situación y los datos necesarios.
 - Si el tipo es "seleccion_multiple": completa "A", "B", "C" y "D" con cuatro \
 alternativas y deja "E" en null. Debe existir UNA SOLA respuesta correcta, \
 claramente defendible; indícala en "correcta" (la letra). Los distractores \
