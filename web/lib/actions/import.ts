@@ -6,8 +6,12 @@ import { LETRAS } from '@/lib/validation/pregunta'
 import {
   guardarImportSchema,
   type GuardarImportInput,
+  type GuardarImportParsed,
   type ImagenParaGuardar,
 } from '@/lib/validation/import'
+
+/** Una pregunta ya parseada (post-defaults), tal como llega en `parsed.data`. */
+type PreguntaParseada = GuardarImportParsed['preguntas'][number]
 
 // ---------------------------------------------------------------------------
 // Server action de "Importar Documento con IA" (Fase 7.2): el guardado en lote
@@ -51,10 +55,12 @@ function setImagenSiExiste(
 /** Construye el FormData de una pregunta para reutilizar `crearPregunta`. */
 function formDataDePregunta(
   asignatura: string,
-  p: GuardarImportInput['preguntas'][number],
+  origen: 'importada' | 'ia',
+  p: PreguntaParseada,
 ): FormData {
   const fd = new FormData()
   fd.set('asignatura', asignatura)
+  fd.set('origen', origen)
   fd.set('tipo', p.tipo)
   fd.set('pregunta', p.pregunta)
   fd.set('materia', p.materia)
@@ -102,11 +108,13 @@ export async function guardarPreguntasImportadas(
       parsed.error.issues[0]?.message ?? 'Datos de importación no válidos.'
     return { ok: false, error: msg }
   }
-  const { asignatura, preguntas } = parsed.data
+  const { asignatura, origen, preguntas } = parsed.data
 
   let guardadas = 0
   for (const p of preguntas) {
-    const resultado = await crearPregunta(formDataDePregunta(asignatura, p))
+    const resultado = await crearPregunta(
+      formDataDePregunta(asignatura, origen, p),
+    )
     if (!(resultado && 'error' in resultado)) guardadas++
   }
 

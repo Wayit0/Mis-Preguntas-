@@ -6,7 +6,11 @@
 // vive en cada action que los usa.
 
 import { uploadImage } from '@/lib/storage/blob'
-import type { PreguntaInput } from '@/lib/validation/pregunta'
+import {
+  ORIGENES_PREGUNTA,
+  type OrigenPregunta,
+  type PreguntaInput,
+} from '@/lib/validation/pregunta'
 
 /** Resultado de una mutación de formulario de pregunta: error legible o nada. */
 export type ResultadoPregunta = { error: string } | void
@@ -44,6 +48,18 @@ export function extraerCampos(formData: FormData): Record<string, unknown> {
     imagenTamano: t('imagen_tamano') || 'mediano',
     compartida: t('compartida') || '0',
   }
+}
+
+/**
+ * Lee el `origen` del FormData con whitelist. Vive FUERA de `preguntaSchema`/
+ * `camposDb` a propósito: sólo la creación lo estampa; la edición nunca lo
+ * toca (editar una pregunta importada/IA no la vuelve 'manual').
+ */
+export function origenDeFormData(formData: FormData): OrigenPregunta {
+  const valor = (formData.get('origen') ?? '').toString()
+  return (ORIGENES_PREGUNTA as readonly string[]).includes(valor)
+    ? (valor as OrigenPregunta)
+    : 'manual'
 }
 
 /**

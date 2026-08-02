@@ -253,13 +253,21 @@ export const preguntaImportInputSchema = z.object({
 /** Payload de la confirmación: asignatura + preguntas seleccionadas. */
 export const guardarImportSchema = z.object({
   asignatura: z.string().trim().min(1, 'Falta la asignatura'),
+  // Quién genera el guardado: /importar o /generar. Estampa `preguntas.origen`.
+  origen: z.enum(['importada', 'ia']).default('importada'),
   preguntas: z
     .array(preguntaImportInputSchema)
     .min(1, 'Selecciona al menos una pregunta'),
 })
 
 export type PreguntaImportInput = z.infer<typeof preguntaImportInputSchema>
-export type GuardarImportInput = z.infer<typeof guardarImportSchema>
+// `z.input` (no `z.infer`): así `origen` queda OPCIONAL para los llamadores
+// (el default 'importada' lo aplica el parse dentro de
+// `guardarPreguntasImportadas`), y el llamador existente de
+// `importar-documento.tsx` (que no envía `origen`) sigue compilando sin cambios.
+export type GuardarImportInput = z.input<typeof guardarImportSchema>
+/** Forma ya parseada (post-defaults) del payload de guardado. */
+export type GuardarImportParsed = z.infer<typeof guardarImportSchema>
 
 // ---------------------------------------------------------------------------
 // Borradores de importación: estado editable de la revisión.
