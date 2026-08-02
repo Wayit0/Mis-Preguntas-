@@ -29,6 +29,7 @@ const GRUPOS: NavGrupo[] = [
       { href: '/textos/nueva', etiqueta: 'Agregar Texto', emoji: '✏️' },
       { href: '/prueba', etiqueta: 'Crear Prueba', emoji: '📝' },
       { href: '/importar', etiqueta: 'Importar Documento', emoji: '📄' },
+      { href: '/generar', etiqueta: 'Crear con IA', emoji: '✨' },
     ],
   },
   {
