@@ -19,7 +19,7 @@ export default async function EditarPruebaPage({
   const prueba = await cargarPruebaPorId(Number(id), userId)
   if (!prueba) notFound()
 
-  const [{ preguntas, materias, textos }, colegio] = await Promise.all([
+  const [{ preguntas, materias, textos, carpetas }, colegio] = await Promise.all([
     cargarDatosGenerador(userId, prueba.asignatura),
     obtenerColegioPorUsuario(userId),
   ])
@@ -31,6 +31,7 @@ export default async function EditarPruebaPage({
       preguntas={preguntas}
       materias={materias}
       textos={textos}
+      carpetas={carpetas}
       colegioInicial={colegio?.nombre ?? prueba.colegio ?? ''}
       logoColegioUrl={colegio?.logo ? imageUrl(colegio.logo) : null}
       pruebaInicial={{

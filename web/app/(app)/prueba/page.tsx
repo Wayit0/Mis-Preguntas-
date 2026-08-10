@@ -34,7 +34,7 @@ export default async function PruebaPage() {
     )
   }
 
-  const [{ preguntas, materias, textos }, colegio, instrucciones] =
+  const [{ preguntas, materias, textos, carpetas }, colegio, instrucciones] =
     await Promise.all([
       cargarDatosGenerador(userId, asignatura),
       obtenerColegioPorUsuario(userId),
@@ -48,6 +48,7 @@ export default async function PruebaPage() {
       preguntas={preguntas}
       materias={materias}
       textos={textos}
+      carpetas={carpetas}
       colegioInicial={colegio?.nombre ?? ''}
       instruccionesInicial={instrucciones}
       logoColegioUrl={colegio?.logo ? imageUrl(colegio.logo) : null}
