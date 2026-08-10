@@ -6,6 +6,7 @@ type SeleccionContextValue = {
   seleccionados: number[]
   estaSeleccionado: (id: number) => boolean
   alternar: (id: number) => void
+  seleccionarTodos: (ids: number[]) => void
   limpiar: () => void
 }
 
@@ -30,6 +31,7 @@ export function SeleccionPreguntasProvider({ children }: { children: ReactNode }
           else next.add(id)
           return next
         }),
+      seleccionarTodos: (ids) => setSeleccionados(new Set(ids)),
       limpiar: () => setSeleccionados(new Set()),
     }),
     [seleccionados],
