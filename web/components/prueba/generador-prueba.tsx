@@ -370,7 +370,7 @@ export function GeneradorPrueba({
   const [busqueda, setBusqueda] = useState('')
   const [soloSeleccionadas, setSoloSeleccionadas] = useState(false)
   const [pagina, setPagina] = useState(0)
-  const POR_PAGINA = 8
+  const POR_PAGINA = 30
   // Array ordenado de IDs seleccionados (el orden importa para el PDF). Al
   // editar, se conservan sólo los IDs que aún existen (los borrados se ignoran).
   const [seleccion, setSeleccion] = useState<number[]>(() =>
