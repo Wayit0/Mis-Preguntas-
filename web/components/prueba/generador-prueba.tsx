@@ -23,6 +23,8 @@ import {
 } from '@/components/ui/select'
 import dynamic from 'next/dynamic'
 import { LatexText } from '@/components/preguntas/latex-text'
+import { opcionesIndentadas } from '@/components/carpetas/mover-a-carpeta'
+import type { Carpeta } from '@/lib/queries/carpetas'
 
 const EditorEcuacion = dynamic(
   () => import('./editor-ecuacion').then((m) => m.EditorEcuacion),
@@ -55,6 +57,7 @@ export interface PreguntaSeleccionable {
   C: string
   D: string
   E: string
+  carpetaId: number | null
 }
 
 export interface TextoSeleccionable {
@@ -319,6 +322,7 @@ export function GeneradorPrueba({
   preguntas,
   materias,
   textos,
+  carpetas,
   colegioInicial = '',
   instruccionesInicial = null,
   logoColegioUrl = null,
@@ -329,6 +333,7 @@ export function GeneradorPrueba({
   preguntas: PreguntaSeleccionable[]
   materias: string[]
   textos: TextoSeleccionable[]
+  carpetas: Carpeta[]
   colegioInicial?: string | null
   /** Instrucciones por defecto del usuario (las de su última prueba), o null. */
   instruccionesInicial?: string | null
@@ -361,6 +366,7 @@ export function GeneradorPrueba({
 
   const [filtroMateria, setFiltroMateria] = useState<string>('__todas__')
   const [filtroNivel, setFiltroNivel] = useState<string>('__todos__')
+  const [filtroCarpeta, setFiltroCarpeta] = useState<string>('__todas__')
   const [busqueda, setBusqueda] = useState('')
   const [soloSeleccionadas, setSoloSeleccionadas] = useState(false)
   const [pagina, setPagina] = useState(0)
@@ -395,8 +401,12 @@ export function GeneradorPrueba({
     return [...s].sort((a, b) => a.localeCompare(b, 'es'))
   }, [preguntas])
 
-  // Preguntas tras aplicar materia + nivel + búsqueda (texto o #código) + "solo
-  // seleccionadas". La paginación se calcula sobre este resultado.
+  // Carpetas del usuario, indentadas por profundidad (para el filtro).
+  const opcionesCarpeta = useMemo(() => opcionesIndentadas(carpetas), [carpetas])
+
+  // Preguntas tras aplicar materia + nivel + carpeta + búsqueda (texto o
+  // #código) + "solo seleccionadas". La paginación se calcula sobre este
+  // resultado.
   const preguntasFiltradas = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     const sinHash = q.replace(/^#/, '')
@@ -404,6 +414,13 @@ export function GeneradorPrueba({
     return preguntas.filter((p) => {
       if (filtroMateria !== '__todas__' && p.materia !== filtroMateria) return false
       if (filtroNivel !== '__todos__' && p.nivel !== filtroNivel) return false
+      if (filtroCarpeta === '__sin_carpeta__' && p.carpetaId != null) return false
+      if (
+        filtroCarpeta !== '__todas__' &&
+        filtroCarpeta !== '__sin_carpeta__' &&
+        p.carpetaId !== Number(filtroCarpeta)
+      )
+        return false
       if (soloSeleccionadas && !seleccion.includes(p.id)) return false
       if (q) {
         if (idBuscado !== null) return p.id === idBuscado
@@ -411,7 +428,15 @@ export function GeneradorPrueba({
       }
       return true
     })
-  }, [preguntas, filtroMateria, filtroNivel, busqueda, soloSeleccionadas, seleccion])
+  }, [
+    preguntas,
+    filtroMateria,
+    filtroNivel,
+    filtroCarpeta,
+    busqueda,
+    soloSeleccionadas,
+    seleccion,
+  ])
 
   const totalPaginas = Math.max(
     1,
@@ -961,6 +986,46 @@ export function GeneradorPrueba({
                             {niveles.map((n) => (
                               <SelectItem key={n} value={n}>
                                 {n}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : null}
+                    {opcionesCarpeta.length > 0 ? (
+                      <div className="w-full sm:w-44">
+                        <Select
+                          value={filtroCarpeta}
+                          onValueChange={(v) =>
+                            conReset(setFiltroCarpeta)(v as string)
+                          }
+                        >
+                          <SelectTrigger
+                            aria-label="Filtrar por carpeta"
+                            className="w-full"
+                          >
+                            <SelectValue>
+                              {(value: string) =>
+                                value === '__todas__'
+                                  ? 'Todas las carpetas'
+                                  : value === '__sin_carpeta__'
+                                    ? 'Sin carpeta'
+                                    : (opcionesCarpeta.find(
+                                        (o) => String(o.id) === value,
+                                      )?.etiqueta ?? value)
+                              }
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__todas__">
+                              Todas las carpetas
+                            </SelectItem>
+                            <SelectItem value="__sin_carpeta__">
+                              Sin carpeta
+                            </SelectItem>
+                            {opcionesCarpeta.map((o) => (
+                              <SelectItem key={o.id} value={String(o.id)}>
+                                {o.etiqueta}
                               </SelectItem>
                             ))}
                           </SelectContent>

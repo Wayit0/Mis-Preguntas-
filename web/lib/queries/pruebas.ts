@@ -3,6 +3,7 @@ import { db } from '@/lib/db'
 import { pruebas, usuarios } from '@/lib/db/schema'
 import { listarPreguntasPropias, opcionesDeFiltros } from '@/lib/queries/preguntas'
 import { cargarTextosPropios, contarPreguntasPorTexto } from '@/lib/queries/textos'
+import { listarCarpetas, type Carpeta } from '@/lib/queries/carpetas'
 import type {
   PreguntaSeleccionable,
   TextoSeleccionable,
@@ -104,14 +105,16 @@ export async function cargarDatosGenerador(
   preguntas: PreguntaSeleccionable[]
   materias: string[]
   textos: TextoSeleccionable[]
+  carpetas: Carpeta[]
 }> {
   // El generador filtra/pagina en el cliente, así que necesita TODAS las
   // preguntas y textos del usuario: se pide una página muy grande.
   const TODO = 100000
-  const [listaPag, opciones, textosPag] = await Promise.all([
+  const [listaPag, opciones, textosPag, carpetas] = await Promise.all([
     listarPreguntasPropias(userId, asignatura, undefined, 1, TODO),
     opcionesDeFiltros(userId, asignatura),
     cargarTextosPropios(userId, asignatura, undefined, 1, TODO),
+    listarCarpetas(userId),
   ])
   const lista = listaPag.items
   const textos = textosPag.items
@@ -136,6 +139,7 @@ export async function cargarDatosGenerador(
       C: p.C ?? '',
       D: p.D ?? '',
       E: p.E ?? '',
+      carpetaId: p.carpetaId,
     }))
 
   const textosUtiles = textos.map((t) => ({
@@ -144,5 +148,5 @@ export async function cargarDatosGenerador(
     nPreguntas: conteos.get(t.id) ?? 0,
   }))
 
-  return { preguntas, materias: opciones.materias, textos: textosUtiles }
+  return { preguntas, materias: opciones.materias, textos: textosUtiles, carpetas }
 }
