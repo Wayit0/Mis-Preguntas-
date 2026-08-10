@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { preguntas } from '@/lib/db/schema'
 import { getSession } from '@/lib/get-session'
-import { colegioIdDeUsuario } from '@/lib/queries/visibilidad'
+import { colegioIdDeUsuario, preguntaCompartidaVisible } from '@/lib/queries/visibilidad'
 import { rutaCarpeta } from '@/lib/queries/carpetas'
 import { preguntaSchema, primerErrorPregunta } from '@/lib/validation/pregunta'
 import {
@@ -15,6 +15,7 @@ import {
   subirImagenes,
   type ResultadoPregunta,
 } from '@/lib/actions/pregunta-fields'
+import type { ResultadoAccion } from '@/lib/actions/carpetas'
 
 // El tipo de resultado y los helpers de mapeo FormData→columnas viven en
 // `pregunta-fields` (módulo puro reutilizable, importable desde cualquier sitio).
@@ -199,4 +200,75 @@ export async function cambiarCompartidaEnLote(
     .where(and(inArray(preguntas.id, idsValidos), eq(preguntas.userId, userId)))
 
   revalidatePath('/preguntas')
+}
+
+/**
+ * Copia preguntas compartidas por otros (Banco Compartido) al banco propio del
+ * usuario, como preguntas privadas nuevas. El SELECT con `preguntaCompartidaVisible`
+ * es el único gate de seguridad: sólo preguntas de otros que sean efectivamente
+ * visibles para el usuario pueden copiarse (excluye automáticamente las propias
+ * y las no compartidas/no visibles). Así el usuario conserva acceso aunque el
+ * autor original deje de compartirlas.
+ */
+export async function adoptarPreguntasCompartidas(
+  ids: number[],
+  carpetaId: number | null,
+): Promise<ResultadoAccion> {
+  const session = await getSession()
+  if (!session) return { error: 'Debes iniciar sesión.' }
+  const userId = Number(session.user.id)
+
+  const idsValidos = ids.filter((n) => Number.isInteger(n) && n > 0)
+  if (idsValidos.length === 0) return { error: 'No hay preguntas para agregar.' }
+
+  const colegioId = await colegioIdDeUsuario(userId)
+
+  if (carpetaId != null) {
+    const ruta = await rutaCarpeta(userId, carpetaId)
+    if (ruta.length === 0) return { error: 'La carpeta destino no existe.' }
+  }
+
+  const filas = await db
+    .select()
+    .from(preguntas)
+    .where(and(inArray(preguntas.id, idsValidos), preguntaCompartidaVisible(userId, colegioId)))
+
+  if (filas.length === 0) {
+    return { error: 'No se encontraron preguntas para agregar.' }
+  }
+
+  await db.insert(preguntas).values(
+    filas.map((f) => ({
+      userId,
+      colegioId,
+      carpetaId,
+      asignatura: f.asignatura,
+      materia: f.materia,
+      contenido: f.contenido,
+      nivel: f.nivel,
+      pregunta: f.pregunta,
+      A: f.A,
+      B: f.B,
+      C: f.C,
+      D: f.D,
+      E: f.E,
+      correcta: f.correcta,
+      explicacion: f.explicacion,
+      imagenPregunta: f.imagenPregunta,
+      imagenA: f.imagenA,
+      imagenB: f.imagenB,
+      imagenC: f.imagenC,
+      imagenD: f.imagenD,
+      imagenE: f.imagenE,
+      tipo: f.tipo,
+      imagenTamano: f.imagenTamano,
+      textoId: f.textoId,
+      origen: f.origen,
+      compartida: 0,
+    })),
+  )
+
+  revalidatePath('/preguntas')
+  revalidatePath('/compartido')
+  return { ok: true }
 }

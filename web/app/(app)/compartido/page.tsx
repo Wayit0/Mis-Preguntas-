@@ -2,7 +2,11 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
 import { resolverAsignatura } from '@/lib/asignatura'
 import { cargarBancoCompartido } from '@/lib/queries/compartido'
+import { listarCarpetas } from '@/lib/queries/carpetas'
 import { TarjetaPregunta } from '@/components/preguntas/tarjeta-pregunta'
+import { SeleccionPreguntasProvider } from '@/components/preguntas/seleccion-context'
+import { SeleccionarTodas } from '@/components/preguntas/seleccionar-todas'
+import { BarraAdopcionPreguntas } from '@/components/preguntas/barra-adopcion'
 
 export default async function CompartidoPage() {
   // Guard explícito (además del layout) para no consultar con un userId inválido.
@@ -13,7 +17,11 @@ export default async function CompartidoPage() {
   // La asignatura es contexto global (cookie), no viene de la URL.
   const asignatura = await resolverAsignatura(userId)
 
-  const lista = await cargarBancoCompartido(userId, asignatura)
+  const [lista, carpetas] = await Promise.all([
+    cargarBancoCompartido(userId, asignatura),
+    listarCarpetas(userId),
+  ])
+  const idsAdoptables = lista.filter((p) => p.userId !== userId).map((p) => p.id)
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
@@ -47,22 +55,27 @@ export default async function CompartidoPage() {
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {lista.map((p) => {
-            // Las tuyas: editables y marcadas "Tuya". Las de otros: solo lectura
-            // con el nombre del autor.
-            const propia = p.userId === userId
-            return (
-              <TarjetaPregunta
-                key={p.id}
-                p={p}
-                autor={propia ? undefined : p.autor}
-                soloLectura={!propia}
-                propia={propia}
-              />
-            )
-          })}
-        </div>
+        <SeleccionPreguntasProvider>
+          <div className="flex flex-col gap-3">
+            <SeleccionarTodas ids={idsAdoptables} />
+            <BarraAdopcionPreguntas carpetas={carpetas} />
+            {lista.map((p) => {
+              // Las tuyas: editables y marcadas "Tuya". Las de otros: solo lectura
+              // con el nombre del autor, con checkbox para adoptarlas a tu banco.
+              const propia = p.userId === userId
+              return (
+                <TarjetaPregunta
+                  key={p.id}
+                  p={p}
+                  autor={propia ? undefined : p.autor}
+                  soloLectura={!propia}
+                  propia={propia}
+                  carpetas={propia ? undefined : carpetas}
+                />
+              )
+            })}
+          </div>
+        </SeleccionPreguntasProvider>
       )}
     </div>
   )
