@@ -14,6 +14,7 @@ import {
   subcarpetas,
   contarItemsEnCarpetas,
 } from '@/lib/queries/carpetas'
+import { contarUsosEnPruebas } from '@/lib/queries/pruebas'
 import { buttonVariants } from '@/components/ui/button'
 import { FiltrosPreguntas } from '@/components/preguntas/filtros-preguntas'
 import { TarjetaPregunta } from '@/components/preguntas/tarjeta-pregunta'
@@ -73,12 +74,13 @@ export default async function PreguntasPage({
     carpetaId: buscando ? undefined : carpetaActual,
   }
 
-  const [pag, opciones, ruta, subs, carpetas] = await Promise.all([
+  const [pag, opciones, ruta, subs, carpetas, usos] = await Promise.all([
     listarPreguntasPropias(userId, asignatura, filtros, pagina),
     opcionesDeFiltros(userId, asignatura),
     buscando ? Promise.resolve([]) : rutaCarpeta(userId, carpetaActual),
     buscando ? Promise.resolve([]) : subcarpetas(userId, carpetaActual),
     listarCarpetas(userId),
+    contarUsosEnPruebas(userId),
   ])
 
   // Carpeta inexistente o ajena → volvemos a la raíz.
@@ -162,7 +164,12 @@ export default async function PreguntasPage({
             <SeleccionarTodas ids={pag.items.map((p) => p.id)} />
             <BarraSeleccionPreguntas carpetas={carpetas} />
             {pag.items.map((p) => (
-              <TarjetaPregunta key={p.id} p={p} carpetas={carpetas} />
+              <TarjetaPregunta
+                key={p.id}
+                p={p}
+                carpetas={carpetas}
+                usos={usos.get(p.id) ?? 0}
+              />
             ))}
           </div>
         </SeleccionPreguntasProvider>

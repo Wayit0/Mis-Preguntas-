@@ -1,6 +1,6 @@
-import { and, count, desc, eq, ilike, isNull, type SQL } from 'drizzle-orm'
+import { and, count, desc, eq, ilike, isNotNull, isNull, type SQL } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { pruebas, usuarios } from '@/lib/db/schema'
+import { preguntas, pruebas, usuarios } from '@/lib/db/schema'
 import { listarPreguntasPropias, opcionesDeFiltros } from '@/lib/queries/preguntas'
 import { cargarTextosPropios, contarPreguntasPorTexto } from '@/lib/queries/textos'
 import { listarCarpetas, type Carpeta } from '@/lib/queries/carpetas'
@@ -92,6 +92,46 @@ export async function instruccionesDefaultDeUsuario(
 }
 
 /**
+ * En cuántas pruebas guardadas DEL PROPIO usuario aparece cada pregunta, ya sea
+ * seleccionada directamente (`preguntasIds`) o incluida vía su texto de
+ * comprensión (`textosIds` + `preguntas.textoId`). Una prueba cuenta una sola
+ * vez por pregunta aunque la incluya por ambas vías. Devuelve un mapa
+ * pregunta → nº de pruebas; las preguntas sin uso no aparecen en el mapa.
+ */
+export async function contarUsosEnPruebas(
+  userId: number,
+): Promise<Map<number, number>> {
+  const [filas, conTexto] = await Promise.all([
+    db
+      .select({ preguntasIds: pruebas.preguntasIds, textosIds: pruebas.textosIds })
+      .from(pruebas)
+      .where(eq(pruebas.userId, userId)),
+    db
+      .select({ id: preguntas.id, textoId: preguntas.textoId })
+      .from(preguntas)
+      .where(and(eq(preguntas.userId, userId), isNotNull(preguntas.textoId))),
+  ])
+
+  // Preguntas asociadas a cada texto, para expandir `textosIds` a preguntas.
+  const porTexto = new Map<number, number[]>()
+  for (const p of conTexto) {
+    const lista = porTexto.get(p.textoId!) ?? []
+    lista.push(p.id)
+    porTexto.set(p.textoId!, lista)
+  }
+
+  const usos = new Map<number, number>()
+  for (const fila of filas) {
+    const enPrueba = new Set<number>(fila.preguntasIds)
+    for (const textoId of fila.textosIds) {
+      for (const id of porTexto.get(textoId) ?? []) enPrueba.add(id)
+    }
+    for (const id of enPrueba) usos.set(id, (usos.get(id) ?? 0) + 1)
+  }
+  return usos
+}
+
+/**
  * Datos que necesita el generador de pruebas (`GeneradorPrueba`): las preguntas
  * sueltas seleccionables (serializadas y sin las asociadas a un texto), las
  * materias para el filtro, y TODOS los textos del usuario (con o sin preguntas
@@ -110,11 +150,12 @@ export async function cargarDatosGenerador(
   // El generador filtra/pagina en el cliente, así que necesita TODAS las
   // preguntas y textos del usuario: se pide una página muy grande.
   const TODO = 100000
-  const [listaPag, opciones, textosPag, carpetas] = await Promise.all([
+  const [listaPag, opciones, textosPag, carpetas, usos] = await Promise.all([
     listarPreguntasPropias(userId, asignatura, undefined, 1, TODO),
     opcionesDeFiltros(userId, asignatura),
     cargarTextosPropios(userId, asignatura, undefined, 1, TODO),
     listarCarpetas(userId),
+    contarUsosEnPruebas(userId),
   ])
   const lista = listaPag.items
   const textos = textosPag.items
@@ -140,6 +181,7 @@ export async function cargarDatosGenerador(
       D: p.D ?? '',
       E: p.E ?? '',
       carpetaId: p.carpetaId,
+      usos: usos.get(p.id) ?? 0,
     }))
 
   const textosUtiles = textos.map((t) => ({
