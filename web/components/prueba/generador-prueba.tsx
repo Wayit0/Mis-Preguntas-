@@ -58,6 +58,8 @@ export interface PreguntaSeleccionable {
   D: string
   E: string
   carpetaId: number | null
+  /** En cuántas pruebas guardadas del usuario aparece ya esta pregunta. */
+  usos: number
 }
 
 export interface TextoSeleccionable {
@@ -226,17 +228,22 @@ function PanelVistaPrevia({
                     {i + 1}
                   </span>
 
-                  {/* Enunciado truncado */}
-                  <span
-                    className="min-w-0 flex-1 text-xs text-foreground"
-                    style={{
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden',
-                    } as React.CSSProperties}
-                  >
-                    <LatexText text={p.enunciado} />
+                  {/* Código + enunciado truncado */}
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="font-mono text-[10px] text-muted-foreground">
+                      #{p.id}
+                    </span>
+                    <span
+                      className="text-xs text-foreground"
+                      style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                      } as React.CSSProperties}
+                    >
+                      <LatexText text={p.enunciado} />
+                    </span>
                   </span>
 
                   {/* Controles */}
@@ -1080,6 +1087,14 @@ export function GeneradorPrueba({
                                       .filter(Boolean)
                                       .join(' · ') || 'Sin clasificar'}
                                   </span>
+                                  {p.usos > 0 && (
+                                    <span className="text-muted-foreground">
+                                      ·{' '}
+                                      {p.usos === 1
+                                        ? 'usada en 1 prueba'
+                                        : `usada en ${p.usos} pruebas`}
+                                    </span>
+                                  )}
                                 </div>
                                 <LatexText
                                   text={p.enunciado}

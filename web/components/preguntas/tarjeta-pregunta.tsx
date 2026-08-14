@@ -33,6 +33,7 @@ export function TarjetaPregunta({
   soloLectura = false,
   propia = false,
   carpetas,
+  usos = 0,
 }: {
   p: Pregunta
   /** Nombre del autor; se muestra en el modo solo lectura (Banco Compartido). */
@@ -43,6 +44,8 @@ export function TarjetaPregunta({
   propia?: boolean
   /** Lista plana de carpetas del usuario; si se pasa, muestra el selector "Mover a" y el checkbox de selección múltiple. */
   carpetas?: Carpeta[]
+  /** En cuántas pruebas guardadas del usuario aparece la pregunta; 0 = no se muestra. */
+  usos?: number
 }) {
   const compartida = (p.compartida ?? 0) > 0
   const tipo = (p.tipo ?? 'seleccion_multiple') as TipoPregunta
@@ -92,6 +95,12 @@ export function TarjetaPregunta({
               <>
                 <span aria-hidden>·</span>
                 <span>{p.nivel}</span>
+              </>
+            ) : null}
+            {usos > 0 ? (
+              <>
+                <span aria-hidden>·</span>
+                <span>{usos === 1 ? 'Usada en 1 prueba' : `Usada en ${usos} pruebas`}</span>
               </>
             ) : null}
           </div>
