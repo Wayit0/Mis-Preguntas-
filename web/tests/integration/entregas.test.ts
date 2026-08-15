@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { usuarios, cursos, inscripciones, asignaciones } from '@/lib/db/schema'
+import { usuarios, cursos, inscripciones, asignaciones, entregas } from '@/lib/db/schema'
+import { eq } from 'drizzle-orm'
 import type { ContenidoAsignacion } from '@/lib/tareas/contenido'
 
 let currentUserId = 0
@@ -98,6 +99,16 @@ describe('tareas del estudiante (contra Postgres)', () => {
     const intruso = await crearUsuario('ent-intruso2', 'student')
     currentUserId = intruso.id
     expect('error' in (await entregarTarea(asig.id, { '0': 'B' }))).toBe(true)
+  })
+
+  it('rechaza no-student (profesor)', async () => {
+    const { prof, asig } = await fixtures()
+    currentUserId = prof.id
+    const res = await entregarTarea(asig.id, { '0': 'B' })
+    expect('error' in res).toBe(true)
+    // Verifica que no se guardó entrega
+    const entregasGuardadas = await db.select().from(entregas).where(eq(entregas.asignacionId, asig.id))
+    expect(entregasGuardadas).toHaveLength(0)
   })
 
   it('listarTareasDeEstudiante calcula estados', async () => {

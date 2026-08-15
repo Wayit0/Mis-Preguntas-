@@ -56,9 +56,14 @@ export async function entregarTarea(
       puntaje,
       total,
     })
-  } catch {
+  } catch (e) {
     // Violación del unique = ya entregó.
-    return { error: 'Ya entregaste esta tarea.' }
+    const code = (e as any)?.code || (e as any)?.cause?.code
+    if (code === '23505') {
+      return { error: 'Ya entregaste esta tarea.' }
+    }
+    console.error('[entregas]', e)
+    return { error: 'No se pudo guardar tu entrega. Intenta de nuevo.' }
   }
   revalidatePath(`/tareas/${asig.id}`)
   revalidatePath('/tareas')
