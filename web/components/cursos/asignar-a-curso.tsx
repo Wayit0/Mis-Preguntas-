@@ -43,6 +43,7 @@ export function AsignarACurso({
   }
 
   async function asignar() {
+    if (pendiente) return
     if (!cursoId) return
     setPendiente(true)
     setError(null)

@@ -21,6 +21,7 @@ export function NuevoCurso() {
 
   async function crear(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+    if (pendiente) return
     setError(null)
     setPendiente(true)
     try {

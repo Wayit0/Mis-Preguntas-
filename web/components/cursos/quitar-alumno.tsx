@@ -24,6 +24,7 @@ export function QuitarAlumno({
   const [pendiente, setPendiente] = useState(false)
 
   async function onClick() {
+    if (pendiente) return
     if (!window.confirm(`¿Quitar a ${nombre} del curso?`)) return
     setError(null)
     setPendiente(true)

@@ -15,6 +15,7 @@ export function EliminarAsignacion({ id }: { id: number }) {
   const [pendiente, setPendiente] = useState(false)
 
   async function onClick() {
+    if (pendiente) return
     if (!window.confirm('Se borrarán también las entregas de los alumnos. ¿Eliminar?')) {
       return
     }
