@@ -26,13 +26,15 @@ export function UnirseACurso() {
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!codigo.trim()) {
+    if (pendiente) return
+    const limpio = codigo.trim()
+    if (!limpio) {
       setError('Ingresa el código del curso.')
       return
     }
     setPendiente(true)
     setError(null)
-    const res = await inscribirConCodigo(codigo)
+    const res = await inscribirConCodigo(limpio)
     setPendiente(false)
     if ('error' in res) {
       setError(res.error)
@@ -59,6 +61,7 @@ export function UnirseACurso() {
           onChange={(e) => setCodigo(e.target.value)}
           placeholder="Código del curso"
           autoComplete="off"
+          disabled={pendiente}
           className="w-40"
         />
         <Button type="submit" disabled={pendiente}>

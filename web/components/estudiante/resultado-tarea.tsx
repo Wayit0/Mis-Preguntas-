@@ -57,7 +57,10 @@ function PreguntaResultado({
                   | 'imagenE'
                 const imagen = p[claveImagen]
                 const esElegida = respuesta === l
-                const esCorrecta = tieneCorrecta && p.correcta === l
+                // Misma normalización que `acerto` arriba y que `corregir()`
+                // en el servidor (trim + mayúsculas), para que el ✓ nunca
+                // contradiga el borde verde/rojo de la tarjeta.
+                const esCorrecta = tieneCorrecta && p.correcta!.trim().toUpperCase() === l
                 return (
                   <div
                     key={l}

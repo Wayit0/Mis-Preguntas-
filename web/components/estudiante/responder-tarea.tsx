@@ -109,6 +109,10 @@ export function ResponderTarea({
   const [respuestas, setRespuestas] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [pendiente, setPendiente] = useState(false)
+  // Se marca justo antes de refrescar tras una entrega exitosa, para que el
+  // guard de beforeunload no dispare durante el hueco entre la respuesta OK
+  // del server y que router.refresh() termine de re-renderizar.
+  const [enviado, setEnviado] = useState(false)
 
   // Lista aplanada con el MISMO orden que el servidor (textos primero), solo
   // para el conteo total; el índice real se calcula al recorrer el contenido
@@ -120,26 +124,36 @@ export function ResponderTarea({
 
   useEffect(() => {
     function onBeforeUnload(e: BeforeUnloadEvent) {
-      if (Object.keys(respuestas).length === 0) return
+      if (enviado || Object.keys(respuestas).length === 0) return
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [respuestas])
+  }, [respuestas, enviado])
 
   function setRespuesta(i: number, valor: string) {
     setRespuestas((r) => ({ ...r, [String(i)]: valor }))
   }
 
   async function onEnviar() {
+    if (pendiente) return
     if (!confirm('¿Enviar tus respuestas? No podrás cambiarlas después.')) return
     setPendiente(true)
     setError(null)
-    const res = await entregarTarea(tarea.id, respuestas)
-    setPendiente(false)
-    if ('error' in res) return setError(res.error)
-    router.refresh()
+    try {
+      const res = await entregarTarea(tarea.id, respuestas)
+      if ('error' in res) {
+        setError(res.error)
+        return
+      }
+      setEnviado(true)
+      router.refresh()
+    } catch {
+      setError('No se pudo enviar tu entrega. Intenta de nuevo.')
+    } finally {
+      setPendiente(false)
+    }
   }
 
   // Contador global: recorre primero las preguntas de cada texto y luego las
