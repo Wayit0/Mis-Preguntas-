@@ -32,6 +32,15 @@ export async function nombreCursoPorCodigo(codigo: string): Promise<string | nul
  * mecanismo aquí, acotado a esta action, en vez de activar ese plugin de forma
  * global en lib/auth.ts para no cambiar el comportamiento de cookies de TODAS
  * las llamadas a auth.api.* del resto de la app.
+ *
+ * IMPORTANTE — orden de operaciones: el Set-Cookie se re-emite AL FINAL, sólo
+ * después de que el UPDATE a role='student' y el INSERT de la inscripción ya
+ * terminaron con éxito. `defaultRole` en better-auth es 'teacher' (ver
+ * lib/auth.ts): si dejáramos la cookie puesta antes y alguna de esas dos
+ * operaciones fallara a mitad de camino, el navegador quedaría con una sesión
+ * autenticada válida para una cuenta 'teacher' mientras la UI reporta un
+ * error genérico. Por eso guardamos los headers y los aplicamos recién al
+ * final del try, nunca dentro de una ruta que pueda desembocar en el catch.
  */
 export async function registrarEstudianteConCodigo(input: {
   codigo: string
@@ -59,8 +68,21 @@ export async function registrarEstudianteConCodigo(input: {
       returnHeaders: true,
     })
     const userId = Number(response.user.id)
+    if (!Number.isFinite(userId)) {
+      return { error: 'No se pudo crear la cuenta. Intenta de nuevo.' }
+    }
 
-    // Re-emite el Set-Cookie de la sesión recién creada hacia el navegador.
+    // El UPDATE de role y el INSERT de inscripción van primero: si cualquiera
+    // falla, saltamos directo al catch SIN haber tocado las cookies, así el
+    // navegador nunca queda con una sesión 'teacher' (el defaultRole) a medio
+    // camino de convertirse en estudiante.
+    await db.update(usuarios).set({ role: 'student' }).where(eq(usuarios.id, userId))
+    await db.insert(inscripciones)
+      .values({ cursoId: curso.id, estudianteId: userId })
+      .onConflictDoNothing()
+
+    // Recién ahora, con la cuenta ya completa como 'student' e inscrita,
+    // re-emitimos el Set-Cookie de la sesión hacia el navegador.
     const setCookie = resHeaders.get('set-cookie')
     if (setCookie) {
       const cookieStore = await cookies()
@@ -77,10 +99,6 @@ export async function registrarEstudianteConCodigo(input: {
       })
     }
 
-    await db.update(usuarios).set({ role: 'student' }).where(eq(usuarios.id, userId))
-    await db.insert(inscripciones)
-      .values({ cursoId: curso.id, estudianteId: userId })
-      .onConflictDoNothing()
     return { ok: true }
   } catch (e) {
     const msg = e instanceof Error ? e.message : ''
