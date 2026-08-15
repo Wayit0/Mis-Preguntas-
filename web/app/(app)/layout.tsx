@@ -1,4 +1,5 @@
 import { cookies } from 'next/headers'
+import { redirect } from 'next/navigation'
 import { requireActor } from '@/lib/authz'
 import { resolverAsignatura } from '@/lib/asignatura'
 import { MobileNavProvider } from '@/components/shell/mobile-nav'
@@ -19,6 +20,8 @@ export default async function AppLayout({
   // /login si no hay sesión. El enlace "Mi Colegio" del sidebar sólo se muestra
   // a quien administra un colegio; el guard real vive igualmente en /colegio.
   const actor = await requireActor()
+  // Los estudiantes tienen su propio portal: nunca ven el shell de profesor.
+  if (actor.role === 'student') redirect('/tareas')
   const user = { name: actor.nombre, email: actor.email }
   const esGlobalAdmin = actor.role === 'global_admin'
   const puedeAdminColegio = actor.role === 'school_admin' || esGlobalAdmin

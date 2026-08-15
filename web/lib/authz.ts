@@ -74,6 +74,16 @@ export async function requireActor(): Promise<Actor> {
 }
 
 /**
+ * Exige un estudiante: redirige a /login sin sesión y a /dashboard si la sesión
+ * es de profesor/admin (los mundos (app) y (estudiante) no se mezclan).
+ */
+export async function requireEstudiante(): Promise<Actor> {
+  const actor = await requireActor()
+  if (actor.role !== 'student') redirect('/dashboard')
+  return actor
+}
+
+/**
  * Exige que el actor tenga uno de los roles permitidos. Redirige a /login si no
  * hay sesión y a "/" si la sesión existe pero el rol no está autorizado (evita
  * filtrar la existencia del recurso a usuarios no autorizados).

@@ -20,8 +20,14 @@ vi.mock('next/navigation', () => ({
 }))
 
 const { auth } = await import('@/lib/auth')
-const { getActor, requireActor, requireRole, esGlobalAdmin, esAdminDeColegio } =
-  await import('@/lib/authz')
+const {
+  getActor,
+  requireActor,
+  requireRole,
+  requireEstudiante,
+  esGlobalAdmin,
+  esAdminDeColegio,
+} = await import('@/lib/authz')
 
 function uniqEmail(p: string) {
   return `${p}-${Date.now()}-${Math.random().toString(36).slice(2)}@x.cl`
@@ -162,5 +168,33 @@ describe('auth roles + admin plugin (Parte C.2)', () => {
 
     // Rol no permitido: redirige a "/".
     await expect(requireRole(['global_admin'])).rejects.toThrow('REDIRECT:/')
+  })
+
+  it('requireEstudiante redirige a /login sin sesión y a /dashboard si no es student', async () => {
+    currentUserId = 0
+    await expect(requireEstudiante()).rejects.toThrow('REDIRECT:/login')
+
+    const teacherEmail = uniqEmail('req-est-teacher')
+    const [teacher] = await db
+      .insert(usuarios)
+      .values({ nombre: 'Profe Req Est', email: teacherEmail, passwordHash: 'x' })
+      .returning()
+    currentUserId = teacher.id
+    await expect(requireEstudiante()).rejects.toThrow('REDIRECT:/dashboard')
+
+    const studentEmail = uniqEmail('req-est-student')
+    const [student] = await db
+      .insert(usuarios)
+      .values({
+        nombre: 'Alumno Req Est',
+        email: studentEmail,
+        passwordHash: 'x',
+        role: 'student',
+      })
+      .returning()
+    currentUserId = student.id
+    const actor = await requireEstudiante()
+    expect(actor.userId).toBe(student.id)
+    expect(actor.role).toBe('student')
   })
 })
