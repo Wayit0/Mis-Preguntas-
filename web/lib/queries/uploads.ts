@@ -99,7 +99,7 @@ export async function puedeVerImagen(
     .innerJoin(cursos, eq(asignaciones.cursoId, cursos.id))
     .where(
       and(
-        sql`${asignaciones.contenido}::text LIKE ${patron} ESCAPE '\'`,
+        sql`${asignaciones.contenido}::text LIKE ${patron} ESCAPE '\\'`,
         or(
           // (a) profesor dueño del curso de la asignación.
           eq(cursos.userId, userId),
