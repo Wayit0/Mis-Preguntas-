@@ -1,7 +1,7 @@
 # Cursos y tareas: cuentas de estudiante y test en línea
 
 **Fecha:** 2026-08-15
-**Estado:** diseño aprobado en chat, pendiente plan de implementación
+**Estado:** implementado en devel 2026-08-15
 **Origen:** pedido de Fernanda (usuaria piloto): cuenta de estudiante para
 mandarles guías y pruebas, "como un test en línea, les dejo unas preguntas y
 que las puedan hacer en su casa".
