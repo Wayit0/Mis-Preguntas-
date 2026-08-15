@@ -1,7 +1,15 @@
 import { describe, it, expect, beforeAll } from 'vitest'
 import { db } from '@/lib/db'
-import { usuarios, preguntas, colaboraciones } from '@/lib/db/schema'
+import {
+  usuarios,
+  preguntas,
+  colaboraciones,
+  cursos,
+  inscripciones,
+  asignaciones,
+} from '@/lib/db/schema'
 import { puedeVerImagen } from '@/lib/queries/uploads'
+import type { ContenidoAsignacion } from '@/lib/tareas/contenido'
 
 // IDs y claves únicos para ser robustos contra la BD de prueba compartida.
 const sello = Date.now()
@@ -76,5 +84,85 @@ describe('puedeVerImagen: autorización por dueño/colaborador', () => {
 
   it('una clave no referenciada por ninguna pregunta no es visible', async () => {
     expect(await puedeVerImagen(kDesconocida, autor)).toBe(false)
+  })
+})
+
+describe('puedeVerImagen: snapshot de una asignación (Cursos y Tareas)', () => {
+  const kTarea = `tarea-${sello}.png`
+
+  let profesor: number
+  let alumnoInscrito: number
+  let alumnoSinInscribir: number
+  let cursoId: number
+
+  beforeAll(async () => {
+    const [p] = await db
+      .insert(usuarios)
+      .values({ nombre: 'Profesor Tarea', email: `profe-tarea-${sello}@x.cl`, passwordHash: 'x', role: 'teacher' })
+      .returning()
+    const [e1] = await db
+      .insert(usuarios)
+      .values({ nombre: 'Alumno Inscrito', email: `alumno-in-${sello}@x.cl`, passwordHash: 'x', role: 'student' })
+      .returning()
+    const [e2] = await db
+      .insert(usuarios)
+      .values({ nombre: 'Alumno Sin Inscribir', email: `alumno-out-${sello}@x.cl`, passwordHash: 'x', role: 'student' })
+      .returning()
+    profesor = p.id
+    alumnoInscrito = e1.id
+    alumnoSinInscribir = e2.id
+
+    const [curso] = await db
+      .insert(cursos)
+      .values({ userId: profesor, nombre: 'Curso Tarea', joinCode: `join-${sello}` })
+      .returning()
+    cursoId = curso.id
+
+    await db.insert(inscripciones).values({ cursoId, estudianteId: alumnoInscrito })
+
+    // Snapshot congelado que referencia kTarea en el enunciado de una pregunta
+    // suelta. El resto de los campos son el mínimo válido de PreguntaSnapshot.
+    const contenido: ContenidoAsignacion = {
+      textos: [],
+      preguntas: [
+        {
+          preguntaId: 999999,
+          tipo: 'seleccion_multiple',
+          enunciado: 'Pregunta con imagen',
+          A: null,
+          B: null,
+          C: null,
+          D: null,
+          E: null,
+          correcta: null,
+          explicacion: null,
+          imagenPregunta: kTarea,
+          imagenA: null,
+          imagenB: null,
+          imagenC: null,
+          imagenD: null,
+          imagenE: null,
+          imagenTamano: 'mediano',
+        },
+      ],
+    }
+    await db.insert(asignaciones).values({
+      cursoId,
+      pruebaId: 0,
+      titulo: 'Asignación de prueba',
+      contenido,
+    })
+  })
+
+  it('un estudiante inscrito ve una imagen del snapshot de su tarea', async () => {
+    expect(await puedeVerImagen(kTarea, alumnoInscrito)).toBe(true)
+  })
+
+  it('un estudiante NO inscrito no ve la imagen del snapshot', async () => {
+    expect(await puedeVerImagen(kTarea, alumnoSinInscribir)).toBe(false)
+  })
+
+  it('el profesor dueño del curso ve la imagen del snapshot (incluso si la pregunta original ya no existe)', async () => {
+    expect(await puedeVerImagen(kTarea, profesor)).toBe(true)
   })
 })
