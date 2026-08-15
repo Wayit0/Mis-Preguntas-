@@ -10,6 +10,7 @@ import {
   index,
   unique,
 } from 'drizzle-orm/pg-core'
+import type { ContenidoAsignacion } from '@/lib/tareas/contenido'
 
 // ---------------------------------------------------------------------------
 // Tablas de dominio — espejo EXACTO del MVP (db.py).
@@ -450,7 +451,7 @@ export const asignaciones = pgTable('asignaciones', {
   // Snapshot congelado (ver lib/tareas/contenido.ts). Correctas y explicaciones
   // viven SOLO aquí en el servidor; nunca se serializan al estudiante antes de
   // que exista su entrega.
-  contenido: jsonb('contenido').notNull(),
+  contenido: jsonb('contenido').$type<ContenidoAsignacion>().notNull(),
   fechaLimite: timestamp('fecha_limite'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
