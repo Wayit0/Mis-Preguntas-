@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { colegios, usuarios } from '@/lib/db/schema'
 import { requireRole, type Rol } from '@/lib/authz'
+import { auth } from '@/lib/auth'
 
 // ---------------------------------------------------------------------------
 // Server actions de administración GLOBAL (Parte E.2).
@@ -58,6 +59,72 @@ async function colegioExiste(colegioId: number): Promise<boolean> {
     .where(eq(colegios.id, colegioId))
     .limit(1)
   return !!c
+}
+
+// Roles que el admin puede asignar al CREAR un usuario. Excluye global_admin a
+// propósito: escalar a admin global se hace después, con asignarRol sobre la
+// fila (un paso extra y deliberado para un privilegio total).
+const ROLES_CREABLES: Rol[] = ['teacher', 'school_admin', 'student']
+
+/**
+ * crearUsuario: alta manual de una cuenta desde el panel de administración.
+ * Crea la cuenta vía better-auth (auth.api.signUpEmail, que hashea y guarda la
+ * contraseña en accounts.password) y luego estampa rol y colegio. NO re-emite
+ * cookies: la sesión del admin no cambia. Solo global_admin.
+ */
+export async function crearUsuario(input: {
+  nombre: string
+  email: string
+  password: string
+  role: string
+  colegioId: number | null
+}): Promise<ResultadoAdmin> {
+  await requireRole(['global_admin'])
+
+  const nombre = (input.nombre ?? '').trim()
+  const email = (input.email ?? '').trim().toLowerCase()
+  const password = input.password ?? ''
+
+  if (!nombre) return { error: 'El nombre es obligatorio.' }
+  if (!email.includes('@')) return { error: 'Ingresa un correo válido.' }
+  if (password.length < 6) {
+    return { error: 'La contraseña debe tener al menos 6 caracteres.' }
+  }
+  if (!ROLES_CREABLES.includes(input.role as Rol)) {
+    return { error: 'Rol inválido.' }
+  }
+  if (input.colegioId !== null) {
+    if (!Number.isFinite(input.colegioId)) return { error: 'Colegio inválido.' }
+    if (!(await colegioExiste(input.colegioId))) {
+      return { error: 'El colegio no existe.' }
+    }
+  }
+  // Los estudiantes quedan fuera del modelo de colegios (spec cursos-y-tareas).
+  const colegioId = input.role === 'student' ? null : input.colegioId
+
+  try {
+    const res = await auth.api.signUpEmail({
+      body: { name: nombre, email, password },
+    })
+    const userId = Number(res.user.id)
+    if (!Number.isFinite(userId)) {
+      return { error: 'No se pudo crear la cuenta. Inténtalo de nuevo.' }
+    }
+    await db
+      .update(usuarios)
+      .set({ role: input.role, colegioId })
+      .where(eq(usuarios.id, userId))
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : ''
+    if (/exist/i.test(msg)) {
+      return { error: 'Ya existe una cuenta con ese correo.' }
+    }
+    console.error('[admin] crearUsuario', e)
+    return { error: 'No se pudo crear la cuenta. Inténtalo de nuevo.' }
+  }
+
+  revalidatePath('/admin')
+  return { ok: true }
 }
 
 /**
