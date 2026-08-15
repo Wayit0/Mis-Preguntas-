@@ -15,8 +15,12 @@ describe('construirSnapshot (contra Postgres)', () => {
     const [t] = await db.insert(textos)
       .values({ userId: u.id, asignatura: 'Física', titulo: 'Lectura', contenido: 'el texto' })
       .returning()
-    const [pt] = await db.insert(preguntas)
-      .values({ userId: u.id, asignatura: 'Física', pregunta: 'del texto', textoId: t.id, correcta: 'A', A: 'sí', explicacion: 'exp' })
+    // Insert two text-bound questions to test deterministic ordering by ID.
+    const [pt1] = await db.insert(preguntas)
+      .values({ userId: u.id, asignatura: 'Física', pregunta: 'texto q1', textoId: t.id, correcta: 'A', A: 'sí', explicacion: 'exp' })
+      .returning()
+    const [pt2] = await db.insert(preguntas)
+      .values({ userId: u.id, asignatura: 'Física', pregunta: 'texto q2', textoId: t.id, correcta: 'B', A: 'x', B: 'y' })
       .returning()
     const [p2] = await db.insert(preguntas)
       .values({ userId: u.id, asignatura: 'Física', pregunta: 'suelta 2', correcta: 'B', A: 'x', B: 'y' })
@@ -30,9 +34,11 @@ describe('construirSnapshot (contra Postgres)', () => {
 
     expect(snap.textos).toHaveLength(1)
     expect(snap.textos[0].titulo).toBe('Lectura')
-    expect(snap.textos[0].preguntas.map((p) => p.preguntaId)).toEqual([pt.id])
+    // Text-bound questions must be in ascending ID order (pt1.id < pt2.id), not insertion order.
+    expect(snap.textos[0].preguntas.map((p) => p.preguntaId)).toEqual([pt1.id, pt2.id])
     expect(snap.textos[0].preguntas[0].correcta).toBe('A')
     expect(snap.textos[0].preguntas[0].explicacion).toBe('exp')
+    expect(snap.textos[0].preguntas[1].correcta).toBe('B')
     expect(snap.preguntas.map((p) => p.preguntaId)).toEqual([p1.id, p2.id])
     expect(snap.preguntas[0].tipo).toBe('desarrollo_corto')
   })

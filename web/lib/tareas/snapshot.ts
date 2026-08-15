@@ -46,6 +46,7 @@ export async function construirSnapshot(prueba: {
   const preguntasDeTextos = filasTextos.length
     ? await db.select().from(preguntas)
         .where(and(inArray(preguntas.textoId, textosIds), eq(preguntas.userId, userId)))
+        .orderBy(preguntas.id)
     : []
 
   return {
