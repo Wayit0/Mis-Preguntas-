@@ -49,10 +49,16 @@ export function AsignarACurso({
     setError(null)
     setAsignada(false)
     try {
+      // El input datetime-local no trae zona horaria: el navegador lo
+      // interpreta en la hora LOCAL del usuario al construir el Date, y
+      // toISOString() lo normaliza a UTC. Si se enviara el string crudo, el
+      // `new Date(...)` del server lo interpretaría en la zona horaria del
+      // SERVIDOR (UTC en Azure) y el plazo dispararía horas antes/después de
+      // lo que el profesor eligió.
       const r = await asignarPruebaACurso({
         pruebaId,
         cursoId: Number(cursoId),
-        fechaLimite: fechaLimite || null,
+        fechaLimite: fechaLimite ? new Date(fechaLimite).toISOString() : null,
       })
       if ('error' in r) {
         setError(r.error)

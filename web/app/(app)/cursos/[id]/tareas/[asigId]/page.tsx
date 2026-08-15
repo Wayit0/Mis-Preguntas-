@@ -8,10 +8,15 @@ import { cn } from '@/lib/utils'
 // Los resultados cambian con cada entrega nueva: siempre frescos.
 export const dynamic = 'force-dynamic'
 
-/** Fecha + hora en español, o vacío si es null. */
+/**
+ * Fecha + hora en español, o vacío si es null. Fija `timeZone` a
+ * 'America/Santiago' — el server corre en UTC en Azure, así que sin esto una
+ * hora de tarde/noche chilena podría mostrarse con el DÍA equivocado.
+ */
 function formatoFechaHora(d: Date | null): string {
   if (!d) return ''
   return new Intl.DateTimeFormat('es-CL', {
+    timeZone: 'America/Santiago',
     day: '2-digit',
     month: 'short',
     year: 'numeric',

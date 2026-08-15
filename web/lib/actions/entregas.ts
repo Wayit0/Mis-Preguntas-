@@ -19,6 +19,7 @@ export async function entregarTarea(
   const actor = await getActor()
   if (!actor) return { error: 'Debes iniciar sesión.' }
   if (actor.role !== 'student') return { error: 'No autorizado.' }
+  if (!Number.isFinite(asignacionId)) return { error: 'Tarea no encontrada.' }
 
   const [asig] = await db
     .select({
@@ -58,7 +59,8 @@ export async function entregarTarea(
     })
   } catch (e) {
     // Violación del unique = ya entregó.
-    const code = (e as any)?.code || (e as any)?.cause?.code
+    const err = e as { code?: string; cause?: { code?: string } }
+    const code = err?.code || err?.cause?.code
     if (code === '23505') {
       return { error: 'Ya entregaste esta tarea.' }
     }

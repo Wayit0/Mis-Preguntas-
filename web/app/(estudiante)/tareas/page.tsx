@@ -47,7 +47,7 @@ export default async function TareasPage() {
                   <p className="text-xs text-muted-foreground">
                     {t.curso}
                     {t.fechaLimite
-                      ? ` · hasta el ${t.fechaLimite.toLocaleDateString('es-CL')}`
+                      ? ` · hasta el ${t.fechaLimite.toLocaleDateString('es-CL', { timeZone: 'America/Santiago' })}`
                       : ''}
                   </p>
                 </div>

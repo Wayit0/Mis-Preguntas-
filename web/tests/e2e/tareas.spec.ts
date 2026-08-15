@@ -119,20 +119,11 @@ test('profesor asigna una prueba, el alumno la responde y el profesor ve el resu
     // El registro redirige con router.push('/tareas'); si la cookie de sesión
     // reemitida por el server action (returnHeaders, Task 8) no prende en el
     // navegador, requireEstudiante() del layout de /tareas rebota a /login sin
-    // sesión. Se detecta el desenlace real en vez de asumir el camino feliz.
+    // sesión. Se verificó en vivo que la reemisión funciona (Task 8/9); esta
+    // aserción dura protege contra una regresión futura en vez de solo
+    // registrarla en el log y seguir de largo.
     await pageEst.waitForURL(/\/(tareas|login)$/, { timeout: 15_000 })
-    const cookieDeRegistroFalló = pageEst.url().includes('/login')
-    if (cookieDeRegistroFalló) {
-      await pageEst.locator('#email').fill(emailEstudiante)
-      await pageEst.locator('#password').fill(PASSWORD)
-      await pageEst.getByRole('button', { name: 'Ingresar' }).click()
-      await expect(pageEst).toHaveURL(/\/tareas$/)
-    }
-    console.log(
-      `[tareas.spec] cookie de sesión tras registro en /unirse: ${
-        cookieDeRegistroFalló ? 'NO PRENDIÓ (se hizo login manual de respaldo)' : 'OK'
-      }`,
-    )
+    expect(pageEst.url().includes('/login')).toBe(false)
 
     // --- 5. Estudiante: abre la tarea, marca la alternativa correcta y la envía.
     await expect(pageEst.getByText(tituloPrueba)).toBeVisible()

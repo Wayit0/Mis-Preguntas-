@@ -17,7 +17,6 @@ export async function listarCursosPropios(userId: number): Promise<CursoResumen[
     .orderBy(desc(cursos.createdAt), desc(cursos.id))
   if (filas.length === 0) return []
 
-  const ids = filas.map((c) => c.id)
   const [alumnos, tareas] = await Promise.all([
     db.select({ cursoId: inscripciones.cursoId, n: count() }).from(inscripciones)
       .innerJoin(cursos, eq(inscripciones.cursoId, cursos.id))

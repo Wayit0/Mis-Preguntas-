@@ -117,7 +117,7 @@ export default async function CursoPage({
                     <p className="text-xs text-muted-foreground">
                       {a.nEntregas}/{a.nAlumnos} entregadas
                       {a.fechaLimite
-                        ? ` · hasta el ${a.fechaLimite.toLocaleDateString('es-CL')}`
+                        ? ` · hasta el ${a.fechaLimite.toLocaleDateString('es-CL', { timeZone: 'America/Santiago' })}`
                         : ''}
                     </p>
                   </div>

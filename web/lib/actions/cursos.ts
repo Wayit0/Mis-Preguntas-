@@ -49,6 +49,9 @@ export async function quitarAlumno(
 ): Promise<{ ok: true } | { error: string }> {
   const actor = await getActor()
   if (!actor) return { error: 'Debes iniciar sesión.' }
+  if (!Number.isFinite(cursoId) || !Number.isFinite(estudianteId)) {
+    return { error: 'Curso no encontrado.' }
+  }
 
   const [curso] = await db.select({ id: cursos.id }).from(cursos)
     .where(and(eq(cursos.id, cursoId), eq(cursos.userId, actor.userId)))
