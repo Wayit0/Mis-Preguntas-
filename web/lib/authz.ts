@@ -18,7 +18,7 @@ import { getSession } from '@/lib/get-session'
 // de inmediato aunque la sesión cacheada traiga un valor antiguo.
 // ---------------------------------------------------------------------------
 
-export type Rol = 'global_admin' | 'school_admin' | 'teacher'
+export type Rol = 'global_admin' | 'school_admin' | 'teacher' | 'student'
 
 export interface Actor {
   userId: number
