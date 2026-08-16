@@ -57,7 +57,7 @@ describe('adoptarPreguntasCompartidas (contra Postgres)', () => {
     const carpetaId = idDe(await crearCarpeta('Adoptadas', null))
 
     const res = await adoptarPreguntasCompartidas([pB.id], carpetaId)
-    expect(res).toEqual({ ok: true })
+    expect(res).toEqual({ ok: true, agregadas: 1, yaExistian: 0 })
 
     const copias = await db
       .select()
@@ -71,11 +71,33 @@ describe('adoptarPreguntasCompartidas (contra Postgres)', () => {
     expect(copia.pregunta).toBe(pB.pregunta)
     expect(copia.A).toBe(pB.A)
     expect(copia.colegioId).toBeNull()
+    expect(copia.adoptadaDeId).toBe(pB.id)
 
     // La original de B no se ve afectada.
     const [original] = await db.select().from(preguntas).where(eq(preguntas.id, pB.id))
     expect(original.compartida).toBe(1)
     expect(original.userId).toBe(b.id)
+  })
+
+  it('no permite adoptar dos veces la misma pregunta compartida', async () => {
+    const a = await crearUsuario('adopt-dup-a')
+    const b = await crearUsuario('adopt-dup-b')
+
+    await db.insert(colaboraciones).values({ fromUserId: b.id, toUserId: a.id })
+    const [pB] = await db
+      .insert(preguntas)
+      .values({ userId: b.id, asignatura: 'Física', pregunta: 'compartida', compartida: 1 })
+      .returning()
+
+    currentUserId = a.id
+    const primera = await adoptarPreguntasCompartidas([pB.id], null)
+    expect(primera).toEqual({ ok: true, agregadas: 1, yaExistian: 0 })
+
+    const segunda = await adoptarPreguntasCompartidas([pB.id], null)
+    expect('error' in segunda).toBe(true)
+
+    const copias = await db.select().from(preguntas).where(eq(preguntas.userId, a.id))
+    expect(copias).toHaveLength(1)
   })
 
   it('un tercero no-colaborador no puede adoptar la pregunta de B aunque pase el id a mano', async () => {

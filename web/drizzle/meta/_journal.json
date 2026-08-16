@@ -134,6 +134,13 @@
       "when": 1786778241902,
       "tag": "0018_bright_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1786893391224,
+      "tag": "0019_real_ben_urich",
+      "breakpoints": true
     }
   ]
 }

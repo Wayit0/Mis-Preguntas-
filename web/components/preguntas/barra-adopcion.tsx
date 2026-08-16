@@ -29,14 +29,14 @@ export function BarraAdopcionPreguntas({ carpetas }: { carpetas: Carpeta[] }) {
 
   function agregar() {
     const carpetaId = destino === '' || destino === SIN_CARPETA ? null : Number(destino)
-    const cantidad = seleccionados.length
     iniciar(async () => {
       const res = await adoptarPreguntasCompartidas(seleccionados, carpetaId)
       if ('error' in res) {
         setMensaje(res.error)
         return
       }
-      setMensaje(`${cantidad} ${cantidad === 1 ? 'pregunta agregada' : 'preguntas agregadas'} a tu banco.`)
+      const base = `${res.agregadas} ${res.agregadas === 1 ? 'pregunta agregada' : 'preguntas agregadas'} a tu banco.`
+      setMensaje(res.yaExistian > 0 ? `${base} ${res.yaExistian} ya la tenías.` : base)
       limpiar()
       router.refresh()
     })
