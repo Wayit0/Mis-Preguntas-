@@ -4,7 +4,7 @@ import { cookies, headers } from 'next/headers'
 import { eq } from 'drizzle-orm'
 import { parseSetCookieHeader, toCookieOptions } from 'better-auth/cookies'
 import { db } from '@/lib/db'
-import { cursos, inscripciones, usuarios } from '@/lib/db/schema'
+import { cursos, usuarios } from '@/lib/db/schema'
 import { auth } from '@/lib/auth'
 
 /** Nombre del curso para el copy de /unirse/CODIGO (null si el código no existe). */
@@ -17,9 +17,12 @@ export async function nombreCursoPorCodigo(codigo: string): Promise<string | nul
 }
 
 /**
- * Alta de estudiante en un paso: valida el código, crea la cuenta con
- * better-auth, estampa role 'student' y crea la inscripción. Los estudiantes
- * SOLO nacen por este flujo.
+ * Alta de estudiante: crea la cuenta con better-auth y estampa role
+ * 'student'. Los estudiantes SOLO nacen por este flujo — no inscribe en
+ * ningún curso; eso lo hace por separado `inscribirConCodigo` (typeando el
+ * código en su portal, o al volver a /unirse/CODIGO ya con sesión), para que
+ * el QR/link de un curso sirva solo para inscribirse, nunca para crear cuentas
+ * en nombre de quien sea que lo escaneó.
  *
  * Sesión iniciada tras el registro: `auth.api.signUpEmail` llamado a mano
  * desde una server action NO deja cookie por sí solo (no hay una Response
@@ -34,21 +37,19 @@ export async function nombreCursoPorCodigo(codigo: string): Promise<string | nul
  * las llamadas a auth.api.* del resto de la app.
  *
  * IMPORTANTE — orden de operaciones: el Set-Cookie se re-emite AL FINAL, sólo
- * después de que el UPDATE a role='student' y el INSERT de la inscripción ya
- * terminaron con éxito. `defaultRole` en better-auth es 'teacher' (ver
- * lib/auth.ts): si dejáramos la cookie puesta antes y alguna de esas dos
- * operaciones fallara a mitad de camino, el navegador quedaría con una sesión
- * autenticada válida para una cuenta 'teacher' mientras la UI reporta un
- * error genérico. Por eso guardamos los headers y los aplicamos recién al
- * final del try, nunca dentro de una ruta que pueda desembocar en el catch.
+ * después de que el UPDATE a role='student' ya terminó con éxito.
+ * `defaultRole` en better-auth es 'teacher' (ver lib/auth.ts): si dejáramos
+ * la cookie puesta antes y ese UPDATE fallara a mitad de camino, el
+ * navegador quedaría con una sesión autenticada válida para una cuenta
+ * 'teacher' mientras la UI reporta un error genérico. Por eso guardamos los
+ * headers y los aplicamos recién al final del try, nunca dentro de una ruta
+ * que pueda desembocar en el catch.
  */
-export async function registrarEstudianteConCodigo(input: {
-  codigo: string
+export async function registrarEstudiante(input: {
   nombre: string
   email: string
   password: string
 }): Promise<{ ok: true } | { error: string }> {
-  const codigo = (input.codigo ?? '').trim()
   const nombre = (input.nombre ?? '').trim()
   const email = (input.email ?? '').trim().toLowerCase()
   const password = input.password ?? ''
@@ -56,10 +57,6 @@ export async function registrarEstudianteConCodigo(input: {
   if (!nombre) return { error: 'Ingresa tu nombre.' }
   if (!email.includes('@')) return { error: 'Ingresa un correo válido.' }
   if (password.length < 6) return { error: 'La contraseña debe tener al menos 6 caracteres.' }
-
-  const [curso] = await db.select({ id: cursos.id }).from(cursos)
-    .where(eq(cursos.joinCode, codigo)).limit(1)
-  if (!curso) return { error: 'El código no corresponde a ningún curso.' }
 
   try {
     const { headers: resHeaders, response } = await auth.api.signUpEmail({
@@ -72,17 +69,13 @@ export async function registrarEstudianteConCodigo(input: {
       return { error: 'No se pudo crear la cuenta. Intenta de nuevo.' }
     }
 
-    // El UPDATE de role y el INSERT de inscripción van primero: si cualquiera
-    // falla, saltamos directo al catch SIN haber tocado las cookies, así el
-    // navegador nunca queda con una sesión 'teacher' (el defaultRole) a medio
-    // camino de convertirse en estudiante.
+    // El UPDATE de role va primero: si falla, saltamos directo al catch SIN
+    // haber tocado las cookies, así el navegador nunca queda con una sesión
+    // 'teacher' (el defaultRole) a medio camino de convertirse en estudiante.
     await db.update(usuarios).set({ role: 'student' }).where(eq(usuarios.id, userId))
-    await db.insert(inscripciones)
-      .values({ cursoId: curso.id, estudianteId: userId })
-      .onConflictDoNothing()
 
-    // Recién ahora, con la cuenta ya completa como 'student' e inscrita,
-    // re-emitimos el Set-Cookie de la sesión hacia el navegador.
+    // Recién ahora, con la cuenta ya completa como 'student', re-emitimos el
+    // Set-Cookie de la sesión hacia el navegador.
     const setCookie = resHeaders.get('set-cookie')
     if (setCookie) {
       const cookieStore = await cookies()

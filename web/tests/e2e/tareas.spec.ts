@@ -5,8 +5,10 @@ import postgres from 'postgres'
 // punta lo que las suites de integración prueban por partes:
 //  1. El profesor crea un curso por UI y asigna una prueba existente a ese curso
 //     desde /mis-pruebas (congela el snapshot, Task 5).
-//  2. El estudiante se registra desde /unirse/CODIGO (Task 8), responde la
-//     tarea marcando la alternativa correcta y la entrega (Task 6/10).
+//  2. El estudiante crea su cuenta desde /unirse (sin código: el link/QR del
+//     curso solo inscribe, no crea cuentas) y vuelve a /unirse/CODIGO para
+//     inscribirse, luego responde la tarea marcando la alternativa correcta
+//     y la entrega (Task 6/10).
 //  3. El profesor ve la entrega reflejada en /cursos/[id]/tareas/[asigId]
 //     (Task 7/11).
 //
@@ -102,26 +104,32 @@ test('profesor asigna una prueba, el alumno la responde y el profesor ve el resu
   await page.getByRole('button', { name: '📤 Asignar' }).click()
   await expect(page.getByRole('button', { name: 'Asignada ✓' })).toBeVisible()
 
-  // --- 4. Estudiante: se registra desde /unirse/CODIGO (contexto/página nuevos,
-  //        sin cookies del profesor).
+  // --- 4. Estudiante: el link/QR del curso (/unirse/CODIGO) sin sesión solo
+  //        ofrece inscribirse, no crea cuentas — primero crea la cuenta desde
+  //        /unirse (contexto/página nuevos, sin cookies del profesor), lo que
+  //        lo devuelve a /unirse/CODIGO ya logueado para inscribirse ahí.
   const ctxEstudiante = await browser.newContext()
   const pageEst = await ctxEstudiante.newPage()
   try {
     await pageEst.goto(`/unirse/${joinCode}`)
     await expect(
-      pageEst.getByText(`Te estás uniendo a «${nombreCurso}»`, { exact: false }),
+      pageEst.getByText(`Únete a «${nombreCurso}»`, { exact: false }),
     ).toBeVisible()
+    await pageEst.getByRole('link', { name: 'Crear cuenta de estudiante' }).click()
+    await expect(pageEst).toHaveURL(/\/unirse\?next=/)
+
     await pageEst.locator('#nombre').fill(nombreEstudiante)
     await pageEst.locator('#email').fill(emailEstudiante)
     await pageEst.locator('#password').fill(PASSWORD)
-    await pageEst.getByRole('button', { name: 'Crear cuenta y unirme' }).click()
+    await pageEst.getByRole('button', { name: 'Crear cuenta' }).click()
 
-    // El registro redirige con router.push('/tareas'); si la cookie de sesión
-    // reemitida por el server action (returnHeaders, Task 8) no prende en el
-    // navegador, requireEstudiante() del layout de /tareas rebota a /login sin
-    // sesión. Se verificó en vivo que la reemisión funciona (Task 8/9); esta
-    // aserción dura protege contra una regresión futura en vez de solo
-    // registrarla en el log y seguir de largo.
+    // La cuenta redirige (next=/unirse/CODIGO) y esa página, ya con sesión de
+    // estudiante, inscribe automáticamente y manda a /tareas. Si la cookie de
+    // sesión reemitida por el server action (returnHeaders, Task 8) no prende
+    // en el navegador, requireEstudiante() del layout de /tareas rebota a
+    // /login sin sesión. Se verificó en vivo que la reemisión funciona (Task
+    // 8/9); esta aserción dura protege contra una regresión futura en vez de
+    // solo registrarla en el log y seguir de largo.
     await pageEst.waitForURL(/\/(tareas|login)$/, { timeout: 15_000 })
     expect(pageEst.url().includes('/login')).toBe(false)
 

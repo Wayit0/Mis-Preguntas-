@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth/auth-card'
 import { proveedoresSocialesHabilitados } from '@/lib/auth-social'
 import { mensajeErrorAuth } from '@/lib/auth-errors'
+import { rutaSegura } from '@/lib/safe-redirect'
 
 // Dinámico: los proveedores sociales dependen de variables de entorno de runtime
 // (credenciales OAuth inyectadas por Key Vault en prod). Si la página se
@@ -14,15 +15,16 @@ export const dynamic = 'force-dynamic'
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>
+  searchParams: Promise<{ error?: string; next?: string }>
 }) {
-  const { error } = await searchParams
+  const { error, next } = await searchParams
 
   return (
     <AuthCard
       modoInicial="login"
       proveedores={proveedoresSocialesHabilitados()}
       errorInicial={error ? mensajeErrorAuth(error) : null}
+      next={rutaSegura(next)}
     />
   )
 }

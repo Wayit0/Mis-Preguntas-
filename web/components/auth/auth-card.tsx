@@ -22,11 +22,14 @@ export function AuthCard({
   modoInicial = 'login',
   proveedores = [],
   errorInicial = null,
+  next = null,
 }: {
   modoInicial?: Modo
   proveedores?: ProveedorSocial[]
   /** Mensaje ya traducido con el que abre la tarjeta (p. ej. ?error= del login social). */
   errorInicial?: string | null
+  /** Adónde volver tras un login exitoso (ya sanitizado); si no viene, /dashboard. */
+  next?: string | null
 }) {
   const router = useRouter()
   const [modo, setModo] = useState<Modo>(modoInicial)
@@ -93,7 +96,7 @@ export function AuthCard({
       }
     }
 
-    router.push('/dashboard')
+    router.push(next || '/dashboard')
     router.refresh()
   }
 
