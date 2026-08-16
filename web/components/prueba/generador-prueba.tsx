@@ -230,8 +230,18 @@ function PanelVistaPrevia({
 
                   {/* Código + enunciado truncado */}
                   <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="font-mono text-[10px] text-muted-foreground">
-                      #{p.id}
+                    <span className="flex items-center gap-1.5">
+                      <span className="font-mono text-[10px] text-muted-foreground">
+                        #{p.id}
+                      </span>
+                      {p.tipo === 'seleccion_multiple' && p.correcta ? (
+                        <span
+                          className="font-mono text-[10px] font-semibold text-primary"
+                          title="Alternativa correcta"
+                        >
+                          {p.correcta}
+                        </span>
+                      ) : null}
                     </span>
                     <span
                       className="text-xs text-foreground"
