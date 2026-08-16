@@ -40,6 +40,7 @@ test('móvil: registro → dashboard → Mis Preguntas → nueva pregunta → Cr
   await expect(page.getByRole('button', { name: 'Crear cuenta' })).toBeVisible()
   await assertSinOverflowHorizontal(page, '/registro')
 
+  await page.getByRole('button', { name: 'Profesor' }).click()
   await page.locator('#nombre').fill(nombre)
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)

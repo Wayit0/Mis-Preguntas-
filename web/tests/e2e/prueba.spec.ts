@@ -43,6 +43,7 @@ test('registrar → crear 2 preguntas → seleccionar → descargar PDF', async 
 
   // 1. Registro → queda autenticado en /dashboard.
   await page.goto('/registro')
+  await page.getByRole('button', { name: 'Profesor' }).click()
   await page.locator('#nombre').fill(nombre)
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)
