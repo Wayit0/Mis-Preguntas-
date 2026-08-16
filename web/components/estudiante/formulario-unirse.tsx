@@ -17,7 +17,7 @@ import { Card, CardContent } from '@/components/ui/card'
  */
 export function FormularioUnirse({ next }: { next?: string | null }) {
   const router = useRouter()
-  const [form, setForm] = useState({ nombre: '', email: '', password: '' })
+  const [form, setForm] = useState({ nombre: '', email: '', password: '', password2: '' })
   const [error, setError] = useState<string | null>(null)
   const [pendiente, setPendiente] = useState(false)
 
@@ -37,9 +37,17 @@ export function FormularioUnirse({ next }: { next?: string | null }) {
       setError('La contraseña debe tener al menos 6 caracteres.')
       return
     }
+    if (form.password !== form.password2) {
+      setError('Las contraseñas no coinciden.')
+      return
+    }
 
     setPendiente(true)
-    const res = await registrarEstudiante(form)
+    const res = await registrarEstudiante({
+      nombre: form.nombre,
+      email: form.email,
+      password: form.password,
+    })
     setPendiente(false)
     if ('error' in res) {
       setError(res.error)
@@ -97,6 +105,18 @@ export function FormularioUnirse({ next }: { next?: string | null }) {
               autoComplete="new-password"
               value={form.password}
               onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="password2">Repetir contraseña</Label>
+            <Input
+              id="password2"
+              name="password2"
+              type="password"
+              autoComplete="new-password"
+              value={form.password2}
+              onChange={(e) => setForm((f) => ({ ...f, password2: e.target.value }))}
             />
           </div>
 

@@ -122,6 +122,7 @@ test('profesor asigna una prueba, el alumno la responde y el profesor ve el resu
     await pageEst.locator('#nombre').fill(nombreEstudiante)
     await pageEst.locator('#email').fill(emailEstudiante)
     await pageEst.locator('#password').fill(PASSWORD)
+    await pageEst.locator('#password2').fill(PASSWORD)
     await pageEst.getByRole('button', { name: 'Crear cuenta' }).click()
 
     // La cuenta redirige (next=/unirse/CODIGO) y esa página, ya con sesión de
