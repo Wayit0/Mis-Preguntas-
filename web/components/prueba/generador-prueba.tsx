@@ -1086,6 +1086,11 @@ export function GeneradorPrueba({
                                       #{orden + 1}
                                     </span>
                                   )}
+                                  {p.usos > 0 && (
+                                    <span className="text-muted-foreground">
+                                      {p.usos === 1 ? 'Utilizada: 1 vez' : `Utilizada: ${p.usos} veces`}
+                                    </span>
+                                  )}
                                   <span className="font-mono text-muted-foreground">
                                     #{p.id}
                                   </span>
@@ -1097,14 +1102,6 @@ export function GeneradorPrueba({
                                       .filter(Boolean)
                                       .join(' · ') || 'Sin clasificar'}
                                   </span>
-                                  {p.usos > 0 && (
-                                    <span className="text-muted-foreground">
-                                      ·{' '}
-                                      {p.usos === 1
-                                        ? 'usada en 1 prueba'
-                                        : `usada en ${p.usos} pruebas`}
-                                    </span>
-                                  )}
                                 </div>
                                 <LatexText
                                   text={p.enunciado}
