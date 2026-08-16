@@ -8,6 +8,7 @@ import {
   jsonb,
   primaryKey,
   index,
+  unique,
 } from 'drizzle-orm/pg-core'
 
 // ---------------------------------------------------------------------------
@@ -108,45 +109,54 @@ export const carpetas = pgTable('carpetas', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
-export const preguntas = pgTable('preguntas', {
-  id: serial('id').primaryKey(),
-  userId: integer('user_id').notNull(),
-  // Colegio dueño del contenido (nullable = contenido personal, sin colegio).
-  // Se estampa al crear con el colegio del autor y ANCLA el contenido al
-  // colegio: permanece en el banco aunque el autor sea suspendido/eliminado.
-  colegioId: integer('colegio_id'),
-  // Carpeta personal del autor (nullable = sin carpeta). Organización propia; no
-  // afecta la visibilidad ni el banco compartido.
-  carpetaId: integer('carpeta_id'),
-  asignatura: text('asignatura').notNull(),
-  materia: text('materia'),
-  contenido: text('contenido'),
-  nivel: text('nivel'),
-  pregunta: text('pregunta').notNull(),
-  A: text('A'),
-  B: text('B'),
-  C: text('C'),
-  D: text('D'),
-  E: text('E'),
-  correcta: text('correcta'),
-  explicacion: text('explicacion'),
-  compartida: integer('compartida').default(0),
-  createdAt: timestamp('created_at').defaultNow(),
-  imagenPregunta: text('imagen_pregunta'),
-  imagenA: text('imagen_A'),
-  imagenB: text('imagen_B'),
-  imagenC: text('imagen_C'),
-  imagenD: text('imagen_D'),
-  imagenE: text('imagen_E'),
-  tipo: text('tipo').default('seleccion_multiple'),
-  textoId: integer('texto_id'),
-  // Tamaño de las imágenes de la pregunta en el PDF impreso:
-  // 'chico' | 'mediano' | 'grande'. Aplica al enunciado y a las alternativas.
-  imagenTamano: text('imagen_tamano').notNull().default('mediano'),
-  // Origen de la pregunta: 'manual' (formulario), 'importada' (/importar con
-  // IA) o 'ia' (generada por /generar). Trazabilidad del contenido generado.
-  origen: text('origen').notNull().default('manual'),
-})
+export const preguntas = pgTable(
+  'preguntas',
+  {
+    id: serial('id').primaryKey(),
+    userId: integer('user_id').notNull(),
+    // Colegio dueño del contenido (nullable = contenido personal, sin colegio).
+    // Se estampa al crear con el colegio del autor y ANCLA el contenido al
+    // colegio: permanece en el banco aunque el autor sea suspendido/eliminado.
+    colegioId: integer('colegio_id'),
+    // Carpeta personal del autor (nullable = sin carpeta). Organización propia; no
+    // afecta la visibilidad ni el banco compartido.
+    carpetaId: integer('carpeta_id'),
+    asignatura: text('asignatura').notNull(),
+    materia: text('materia'),
+    contenido: text('contenido'),
+    nivel: text('nivel'),
+    pregunta: text('pregunta').notNull(),
+    A: text('A'),
+    B: text('B'),
+    C: text('C'),
+    D: text('D'),
+    E: text('E'),
+    correcta: text('correcta'),
+    explicacion: text('explicacion'),
+    compartida: integer('compartida').default(0),
+    createdAt: timestamp('created_at').defaultNow(),
+    imagenPregunta: text('imagen_pregunta'),
+    imagenA: text('imagen_A'),
+    imagenB: text('imagen_B'),
+    imagenC: text('imagen_C'),
+    imagenD: text('imagen_D'),
+    imagenE: text('imagen_E'),
+    tipo: text('tipo').default('seleccion_multiple'),
+    textoId: integer('texto_id'),
+    // Tamaño de las imágenes de la pregunta en el PDF impreso:
+    // 'chico' | 'mediano' | 'grande'. Aplica al enunciado y a las alternativas.
+    imagenTamano: text('imagen_tamano').notNull().default('mediano'),
+    // Origen de la pregunta: 'manual' (formulario), 'importada' (/importar con
+    // IA) o 'ia' (generada por /generar). Trazabilidad del contenido generado.
+    origen: text('origen').notNull().default('manual'),
+    // Id de la pregunta compartida original de la que esta es una copia
+    // adoptada (Banco Compartido → "Agregar a mi banco"). NULL = no es una
+    // adopción. Sin FK formal, igual que el resto del dominio; el unique de
+    // abajo evita adoptar la misma pregunta ajena dos veces.
+    adoptadaDeId: integer('adoptada_de_id'),
+  },
+  (t) => [unique('preguntas_user_adoptada_de').on(t.userId, t.adoptadaDeId)],
+)
 
 export const textos = pgTable('textos', {
   id: serial('id').primaryKey(),

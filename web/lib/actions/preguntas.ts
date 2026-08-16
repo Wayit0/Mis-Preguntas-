@@ -15,7 +15,6 @@ import {
   subirImagenes,
   type ResultadoPregunta,
 } from '@/lib/actions/pregunta-fields'
-import type { ResultadoAccion } from '@/lib/actions/carpetas'
 
 // El tipo de resultado y los helpers de mapeo FormData→columnas viven en
 // `pregunta-fields` (módulo puro reutilizable, importable desde cualquier sitio).
@@ -202,6 +201,10 @@ export async function cambiarCompartidaEnLote(
   revalidatePath('/preguntas')
 }
 
+export type ResultadoAdopcion =
+  | { error: string }
+  | { ok: true; agregadas: number; yaExistian: number }
+
 /**
  * Copia preguntas compartidas por otros (Banco Compartido) al banco propio del
  * usuario, como preguntas privadas nuevas. El SELECT con `preguntaCompartidaVisible`
@@ -209,11 +212,16 @@ export async function cambiarCompartidaEnLote(
  * visibles para el usuario pueden copiarse (excluye automáticamente las propias
  * y las no compartidas/no visibles). Así el usuario conserva acceso aunque el
  * autor original deje de compartirlas.
+ *
+ * Idempotente por pregunta original: el unique (userId, adoptadaDeId) impide
+ * adoptar dos veces la misma, así que las que el usuario ya había agregado se
+ * filtran antes del insert (y, ante una carrera de doble clic, el propio
+ * unique las descarta igual).
  */
 export async function adoptarPreguntasCompartidas(
   ids: number[],
   carpetaId: number | null,
-): Promise<ResultadoAccion> {
+): Promise<ResultadoAdopcion> {
   const session = await getSession()
   if (!session) return { error: 'Debes iniciar sesión.' }
   const userId = Number(session.user.id)
@@ -237,38 +245,69 @@ export async function adoptarPreguntasCompartidas(
     return { error: 'No se encontraron preguntas para agregar.' }
   }
 
-  await db.insert(preguntas).values(
-    filas.map((f) => ({
-      userId,
-      colegioId,
-      carpetaId,
-      asignatura: f.asignatura,
-      materia: f.materia,
-      contenido: f.contenido,
-      nivel: f.nivel,
-      pregunta: f.pregunta,
-      A: f.A,
-      B: f.B,
-      C: f.C,
-      D: f.D,
-      E: f.E,
-      correcta: f.correcta,
-      explicacion: f.explicacion,
-      imagenPregunta: f.imagenPregunta,
-      imagenA: f.imagenA,
-      imagenB: f.imagenB,
-      imagenC: f.imagenC,
-      imagenD: f.imagenD,
-      imagenE: f.imagenE,
-      tipo: f.tipo,
-      imagenTamano: f.imagenTamano,
-      textoId: f.textoId,
-      origen: f.origen,
-      compartida: 0,
-    })),
-  )
+  const yaAdoptadas = await db
+    .select({ adoptadaDeId: preguntas.adoptadaDeId })
+    .from(preguntas)
+    .where(
+      and(
+        eq(preguntas.userId, userId),
+        inArray(
+          preguntas.adoptadaDeId,
+          filas.map((f) => f.id),
+        ),
+      ),
+    )
+  const idsYaAdoptados = new Set(yaAdoptadas.map((r) => r.adoptadaDeId))
+  const nuevas = filas.filter((f) => !idsYaAdoptados.has(f.id))
+
+  if (nuevas.length === 0) {
+    return { error: 'Ya tenías esa(s) pregunta(s) en tu banco.' }
+  }
+
+  try {
+    await db.insert(preguntas).values(
+      nuevas.map((f) => ({
+        userId,
+        colegioId,
+        carpetaId,
+        asignatura: f.asignatura,
+        materia: f.materia,
+        contenido: f.contenido,
+        nivel: f.nivel,
+        pregunta: f.pregunta,
+        A: f.A,
+        B: f.B,
+        C: f.C,
+        D: f.D,
+        E: f.E,
+        correcta: f.correcta,
+        explicacion: f.explicacion,
+        imagenPregunta: f.imagenPregunta,
+        imagenA: f.imagenA,
+        imagenB: f.imagenB,
+        imagenC: f.imagenC,
+        imagenD: f.imagenD,
+        imagenE: f.imagenE,
+        tipo: f.tipo,
+        imagenTamano: f.imagenTamano,
+        textoId: f.textoId,
+        origen: f.origen,
+        adoptadaDeId: f.id,
+        compartida: 0,
+      })),
+    )
+  } catch (e) {
+    // Violación del unique (userId, adoptadaDeId) = carrera de doble clic.
+    const err = e as { code?: string; cause?: { code?: string } }
+    const code = err?.code || err?.cause?.code
+    if (code === '23505') {
+      return { error: 'Ya tenías esa(s) pregunta(s) en tu banco.' }
+    }
+    console.error('[preguntas.adoptar]', e)
+    return { error: 'No se pudieron agregar las preguntas. Intenta de nuevo.' }
+  }
 
   revalidatePath('/preguntas')
   revalidatePath('/compartido')
-  return { ok: true }
+  return { ok: true, agregadas: nuevas.length, yaExistian: filas.length - nuevas.length }
 }
