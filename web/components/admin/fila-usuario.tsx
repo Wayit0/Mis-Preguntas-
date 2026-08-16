@@ -6,6 +6,7 @@ import {
   asignarRol,
   asignarColegio,
   designarAdminColegio,
+  eliminarUsuario,
 } from '@/lib/actions/admin'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -78,6 +79,19 @@ export function FilaUsuario({
     void ejecutar(() => designarAdminColegio(usuario.id, Number(colegioSel)))
   }
 
+  function onEliminar() {
+    if (
+      !window.confirm(
+        `¿Eliminar la cuenta de ${usuario.email}? Esto borra TODO su contenido ` +
+          '(preguntas, pruebas, textos, cursos si es profesor, inscripciones, ' +
+          'etc.) de forma permanente. No se puede deshacer.',
+      )
+    ) {
+      return
+    }
+    void ejecutar(() => eliminarUsuario(usuario.id))
+  }
+
   return (
     <Card size="sm">
       <CardContent className="flex flex-col gap-3">
@@ -131,6 +145,18 @@ export function FilaUsuario({
             aria-label={`Designar administrador de ${usuario.email}`}
           >
             Designar admin
+          </Button>
+
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={onEliminar}
+            disabled={pendiente}
+            aria-label={`Eliminar cuenta de ${usuario.email}`}
+            className="sm:ml-auto"
+          >
+            {pendiente ? 'Eliminando…' : '🗑️ Eliminar'}
           </Button>
         </div>
 
