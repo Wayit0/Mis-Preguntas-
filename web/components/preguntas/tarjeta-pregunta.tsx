@@ -69,6 +69,11 @@ export function TarjetaPregunta({
               {propia ? <Badge>Tuya</Badge> : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
+              {usos > 0 ? (
+                <span className="text-xs text-muted-foreground">
+                  {usos === 1 ? 'Utilizada: 1 vez' : `Utilizada: ${usos} veces`}
+                </span>
+              ) : null}
               <span className="font-mono text-xs text-muted-foreground">#{p.id}</span>
               {soloLectura ? (
                 autor ? (
@@ -95,12 +100,6 @@ export function TarjetaPregunta({
               <>
                 <span aria-hidden>·</span>
                 <span>{p.nivel}</span>
-              </>
-            ) : null}
-            {usos > 0 ? (
-              <>
-                <span aria-hidden>·</span>
-                <span>{usos === 1 ? 'Usada en 1 prueba' : `Usada en ${usos} pruebas`}</span>
               </>
             ) : null}
           </div>
