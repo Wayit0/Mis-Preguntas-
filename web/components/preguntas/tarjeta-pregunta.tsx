@@ -44,7 +44,7 @@ export function TarjetaPregunta({
   propia?: boolean
   /** Lista plana de carpetas del usuario; si se pasa, muestra el selector "Mover a" y el checkbox de selección múltiple. */
   carpetas?: Carpeta[]
-  /** En cuántas pruebas guardadas del usuario aparece la pregunta; 0 = no se muestra. */
+  /** En cuántas pruebas guardadas del usuario aparece la pregunta. */
   usos?: number
 }) {
   const compartida = (p.compartida ?? 0) > 0
@@ -69,11 +69,9 @@ export function TarjetaPregunta({
               {propia ? <Badge>Tuya</Badge> : null}
             </div>
             <div className="flex shrink-0 items-center gap-2">
-              {usos > 0 ? (
-                <span className="text-xs text-muted-foreground">
-                  {usos === 1 ? 'Utilizada: 1 vez' : `Utilizada: ${usos} veces`}
-                </span>
-              ) : null}
+              <span className="text-xs text-muted-foreground">
+                {usos === 1 ? 'Utilizada: 1 vez' : `Utilizada: ${usos} veces`}
+              </span>
               <span className="font-mono text-xs text-muted-foreground">#{p.id}</span>
               {soloLectura ? (
                 autor ? (
