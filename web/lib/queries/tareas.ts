@@ -10,6 +10,7 @@ import {
 export interface TareaResumen {
   id: number
   titulo: string
+  cursoId: number
   curso: string
   // De la prueba de origen (asignaciones.pruebaId es informativa, puede
   // quedar huérfana si se borró la prueba) — null si ya no existe.
@@ -37,6 +38,7 @@ export async function listarTareasDeEstudiante(
     .select({
       id: asignaciones.id,
       titulo: asignaciones.titulo,
+      cursoId: cursos.id,
       curso: cursos.nombre,
       asignatura: pruebas.asignatura,
       fechaLimite: asignaciones.fechaLimite,
@@ -60,6 +62,7 @@ export async function listarTareasDeEstudiante(
     return {
       id: f.id,
       titulo: f.titulo,
+      cursoId: f.cursoId,
       curso: f.curso,
       asignatura: f.asignatura,
       fechaLimite: f.fechaLimite,
