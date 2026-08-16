@@ -50,7 +50,7 @@ export default async function CursoPage({
         <p className="text-sm text-muted-foreground">
           Comparte este link con tus alumnos para que se unan al curso.
         </p>
-        <CopiarCodigo texto={linkInscripcion} />
+        <CopiarCodigo codigo={curso.joinCode} texto={linkInscripcion} />
       </section>
 
       <section className="flex flex-col gap-3">
