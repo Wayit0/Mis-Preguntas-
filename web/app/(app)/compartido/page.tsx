@@ -21,7 +21,9 @@ export default async function CompartidoPage() {
     cargarBancoCompartido(userId, asignatura),
     listarCarpetas(userId),
   ])
-  const idsAdoptables = lista.filter((p) => p.userId !== userId).map((p) => p.id)
+  const misCompartidas = lista.filter((p) => p.userId === userId)
+  const compartidasConmigo = lista.filter((p) => p.userId !== userId)
+  const idsAdoptables = compartidasConmigo.map((p) => p.id)
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-5">
@@ -55,27 +57,53 @@ export default async function CompartidoPage() {
           </p>
         </div>
       ) : (
-        <SeleccionPreguntasProvider>
-          <div className="flex flex-col gap-3">
-            <SeleccionarTodas ids={idsAdoptables} />
-            <BarraAdopcionPreguntas carpetas={carpetas} />
-            {lista.map((p) => {
-              // Las tuyas: editables y marcadas "Tuya". Las de otros: solo lectura
-              // con el nombre del autor, con checkbox para adoptarlas a tu banco.
-              const propia = p.userId === userId
-              return (
-                <TarjetaPregunta
-                  key={p.id}
-                  p={p}
-                  autor={propia ? undefined : p.autor}
-                  soloLectura={!propia}
-                  propia={propia}
-                  carpetas={propia ? undefined : carpetas}
-                />
-              )
-            })}
-          </div>
-        </SeleccionPreguntasProvider>
+        <div className="flex flex-col gap-8">
+          <section className="flex flex-col gap-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Mis compartidas ({misCompartidas.length})
+            </h2>
+            {misCompartidas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no has compartido ninguna pregunta.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {misCompartidas.map((p) => (
+                  <TarjetaPregunta key={p.id} p={p} soloLectura={false} propia />
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Compartidas conmigo ({compartidasConmigo.length})
+            </h2>
+            {compartidasConmigo.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Todavía nadie ha compartido preguntas contigo.
+              </p>
+            ) : (
+              <SeleccionPreguntasProvider>
+                <div className="flex flex-col gap-3">
+                  <SeleccionarTodas ids={idsAdoptables} />
+                  <BarraAdopcionPreguntas carpetas={carpetas} />
+                  {compartidasConmigo.map((p) => (
+                    // Solo lectura, con el nombre del autor y checkbox para
+                    // adoptarlas a tu banco propio.
+                    <TarjetaPregunta
+                      key={p.id}
+                      p={p}
+                      autor={p.autor}
+                      soloLectura
+                      carpetas={carpetas}
+                    />
+                  ))}
+                </div>
+              </SeleccionPreguntasProvider>
+            )}
+          </section>
+        </div>
       )}
     </div>
   )
