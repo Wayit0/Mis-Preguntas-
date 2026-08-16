@@ -87,6 +87,10 @@ export async function inscribirConCodigo(
   await db.insert(inscripciones)
     .values({ cursoId: curso.id, estudianteId: actor.userId })
     .onConflictDoNothing()
-  revalidatePath('/tareas')
+  // Sin revalidatePath aquí: esta action la llama tanto un Client Component
+  // (UnirseACurso, que ya hace router.refresh()) como /unirse/[codigo]/page.tsx
+  // DIRECTO durante el render de un Server Component — ahí revalidatePath
+  // revienta ("used ... during render, which is unsupported"). No hace falta
+  // de todos modos: (estudiante)/layout.tsx y /tareas ya son force-dynamic.
   return { ok: true, cursoId: curso.id }
 }
