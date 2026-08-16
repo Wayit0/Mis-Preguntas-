@@ -60,23 +60,6 @@ export default async function CompartidoPage() {
         <div className="flex flex-col gap-8">
           <section className="flex flex-col gap-3">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Mis compartidas ({misCompartidas.length})
-            </h2>
-            {misCompartidas.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aún no has compartido ninguna pregunta.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-3">
-                {misCompartidas.map((p) => (
-                  <TarjetaPregunta key={p.id} p={p} soloLectura={false} propia />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Compartidas conmigo ({compartidasConmigo.length})
             </h2>
             {compartidasConmigo.length === 0 ? (
@@ -101,6 +84,23 @@ export default async function CompartidoPage() {
                   ))}
                 </div>
               </SeleccionPreguntasProvider>
+            )}
+          </section>
+
+          <section className="flex flex-col gap-3">
+            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Mis compartidas ({misCompartidas.length})
+            </h2>
+            {misCompartidas.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                Aún no has compartido ninguna pregunta.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-3">
+                {misCompartidas.map((p) => (
+                  <TarjetaPregunta key={p.id} p={p} soloLectura={false} propia />
+                ))}
+              </div>
             )}
           </section>
         </div>
