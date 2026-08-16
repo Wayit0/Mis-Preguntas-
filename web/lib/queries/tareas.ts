@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { asignaciones, cursos, entregas, inscripciones } from '@/lib/db/schema'
+import { asignaciones, cursos, entregas, inscripciones, pruebas } from '@/lib/db/schema'
 import {
   sinRespuestas,
   type ContenidoAsignacion,
@@ -11,6 +11,9 @@ export interface TareaResumen {
   id: number
   titulo: string
   curso: string
+  // De la prueba de origen (asignaciones.pruebaId es informativa, puede
+  // quedar huérfana si se borró la prueba) — null si ya no existe.
+  asignatura: string | null
   fechaLimite: Date | null
   estado: 'pendiente' | 'entregada' | 'vencida'
   puntaje: number | null
@@ -35,11 +38,13 @@ export async function listarTareasDeEstudiante(
       id: asignaciones.id,
       titulo: asignaciones.titulo,
       curso: cursos.nombre,
+      asignatura: pruebas.asignatura,
       fechaLimite: asignaciones.fechaLimite,
     })
     .from(inscripciones)
     .innerJoin(cursos, eq(inscripciones.cursoId, cursos.id))
     .innerJoin(asignaciones, eq(asignaciones.cursoId, cursos.id))
+    .leftJoin(pruebas, eq(pruebas.id, asignaciones.pruebaId))
     .where(eq(inscripciones.estudianteId, estudianteId))
     .orderBy(desc(asignaciones.createdAt), desc(asignaciones.id))
   if (filas.length === 0) return []
@@ -56,6 +61,7 @@ export async function listarTareasDeEstudiante(
       id: f.id,
       titulo: f.titulo,
       curso: f.curso,
+      asignatura: f.asignatura,
       fechaLimite: f.fechaLimite,
       estado: estadoDe(f.fechaLimite, entrega),
       puntaje: entrega?.puntaje ?? null,

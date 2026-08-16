@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { requireEstudiante } from '@/lib/authz'
 import { listarTareasDeEstudiante } from '@/lib/queries/tareas'
 import { cursosDeEstudiante } from '@/lib/queries/cursos'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { UnirseACurso } from '@/components/estudiante/unirse-a-curso'
 
@@ -30,7 +31,15 @@ export default async function TareasPage() {
         <p className="text-sm text-muted-foreground">
           Aún no estás en ningún curso. Pídele el código a tu profesor.
         </p>
-      ) : null}
+      ) : (
+        <div className="flex flex-wrap gap-1.5">
+          {cursos.map((c) => (
+            <Badge key={c.id} variant="secondary">
+              🎓 {c.nombre}
+            </Badge>
+          ))}
+        </div>
+      )}
       {tareas.length === 0 && cursos.length > 0 ? (
         <p className="text-sm text-muted-foreground">
           Todavía no tienes tareas asignadas.
@@ -46,6 +55,7 @@ export default async function TareasPage() {
                   <p className="truncate font-medium text-foreground">{t.titulo}</p>
                   <p className="text-xs text-muted-foreground">
                     {t.curso}
+                    {t.asignatura ? ` · ${t.asignatura}` : ''}
                     {t.fechaLimite
                       ? ` · hasta el ${t.fechaLimite.toLocaleDateString('es-CL', { timeZone: 'America/Santiago' })}`
                       : ''}
