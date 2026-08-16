@@ -22,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CopiarCodigo } from '@/components/colegio/copiar-codigo'
 import { CrearColegio } from '@/components/admin/crear-colegio'
+import { CrearUsuario } from '@/components/admin/crear-usuario'
 import { EditarColegio } from '@/components/admin/editar-colegio'
 import { FilaUsuario } from '@/components/admin/fila-usuario'
 import { ConcederCortesia } from '@/components/admin/conceder-cortesia'
@@ -197,6 +198,7 @@ async function UsuariosTab() {
       <h2 className="font-heading text-base font-semibold text-foreground">
         Usuarios ({usuarios.length})
       </h2>
+      <CrearUsuario colegios={opcionesColegio} />
       {usuarios.length === 0 ? (
         <EstadoVacio mensaje="No hay usuarios registrados." />
       ) : (

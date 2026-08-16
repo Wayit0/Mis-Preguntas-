@@ -18,7 +18,7 @@ import { getSession } from '@/lib/get-session'
 // de inmediato aunque la sesión cacheada traiga un valor antiguo.
 // ---------------------------------------------------------------------------
 
-export type Rol = 'global_admin' | 'school_admin' | 'teacher'
+export type Rol = 'global_admin' | 'school_admin' | 'teacher' | 'student'
 
 export interface Actor {
   userId: number
@@ -70,6 +70,16 @@ export async function getActor(): Promise<Actor | null> {
 export async function requireActor(): Promise<Actor> {
   const actor = await getActor()
   if (!actor) redirect('/login')
+  return actor
+}
+
+/**
+ * Exige un estudiante: redirige a /login sin sesión y a /dashboard si la sesión
+ * es de profesor/admin (los mundos (app) y (estudiante) no se mezclan).
+ */
+export async function requireEstudiante(): Promise<Actor> {
+  const actor = await requireActor()
+  if (actor.role !== 'student') redirect('/dashboard')
   return actor
 }
 

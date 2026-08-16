@@ -25,6 +25,7 @@ test.afterAll(async () => {
 
 async function registrar(page: Page, nombre: string, email: string) {
   await page.goto('/registro')
+  await page.getByRole('button', { name: 'Profesor' }).click()
   await page.locator('#nombre').fill(nombre)
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(PASSWORD)

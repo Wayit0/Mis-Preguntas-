@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/get-session'
 import { resolverAsignatura } from '@/lib/asignatura'
 import { listarPruebasPropias, POR_PAGINA_PRUEBAS } from '@/lib/queries/pruebas'
+import { listarCursosPropios } from '@/lib/queries/cursos'
 import {
   listarCarpetas,
   rutaCarpeta,
@@ -35,11 +36,12 @@ export default async function MisPruebasPage({
 
   const filtros = { busqueda, carpetaId: buscando ? undefined : carpetaActual }
 
-  const [pag, ruta, subs, carpetas] = await Promise.all([
+  const [pag, ruta, subs, carpetas, cursos] = await Promise.all([
     listarPruebasPropias(userId, asignatura, filtros, pagina),
     buscando ? Promise.resolve([]) : rutaCarpeta(userId, carpetaActual),
     buscando ? Promise.resolve([]) : subcarpetas(userId, carpetaActual),
     listarCarpetas(userId),
+    listarCursosPropios(userId),
   ])
 
   if (!buscando && carpetaActual != null && ruta.length === 0) {
@@ -105,7 +107,7 @@ export default async function MisPruebasPage({
       ) : (
         <div className="flex flex-col gap-3">
           {pag.items.map((p) => (
-            <TarjetaPrueba key={p.id} prueba={p} carpetas={carpetas} />
+            <TarjetaPrueba key={p.id} prueba={p} carpetas={carpetas} cursos={cursos} />
           ))}
         </div>
       )}

@@ -10,6 +10,7 @@ import {
   index,
   unique,
 } from 'drizzle-orm/pg-core'
+import type { ContenidoAsignacion } from '@/lib/tareas/contenido'
 
 // ---------------------------------------------------------------------------
 // Tablas de dominio — espejo EXACTO del MVP (db.py).
@@ -419,3 +420,63 @@ export const pagosSuscripcion = pgTable('pagos_suscripcion', {
   detalle: jsonb('detalle').$type<Record<string, unknown>>().notNull().default({}),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
+
+// ---------------------------------------------------------------------------
+// Cursos y tareas (spec 2026-08-15): un profesor crea cursos con código de
+// inscripción; los estudiantes (role 'student') se inscriben y responden
+// asignaciones. `asignaciones.contenido` es un SNAPSHOT congelado de la prueba
+// al momento de asignar: editar/borrar la prueba original no afecta la tarea.
+// Ids enteros sin FK formal, igual que el resto del dominio.
+// ---------------------------------------------------------------------------
+
+export const cursos = pgTable('cursos', {
+  id: serial('id').primaryKey(),
+  // Profesor dueño del curso.
+  userId: integer('user_id').notNull(),
+  nombre: text('nombre').notNull(),
+  // Código de inscripción (link /unirse/CODIGO). Único, largo y secreto.
+  joinCode: text('join_code').notNull().unique(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export const inscripciones = pgTable(
+  'inscripciones',
+  {
+    id: serial('id').primaryKey(),
+    cursoId: integer('curso_id').notNull(),
+    estudianteId: integer('estudiante_id').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (t) => [unique('inscripciones_curso_estudiante').on(t.cursoId, t.estudianteId)],
+)
+
+export const asignaciones = pgTable('asignaciones', {
+  id: serial('id').primaryKey(),
+  cursoId: integer('curso_id').notNull(),
+  // Referencia informativa a la prueba de origen; puede quedar huérfana.
+  pruebaId: integer('prueba_id').notNull(),
+  titulo: text('titulo').notNull(),
+  instrucciones: text('instrucciones'),
+  // Snapshot congelado (ver lib/tareas/contenido.ts). Correctas y explicaciones
+  // viven SOLO aquí en el servidor; nunca se serializan al estudiante antes de
+  // que exista su entrega.
+  contenido: jsonb('contenido').$type<ContenidoAsignacion>().notNull(),
+  fechaLimite: timestamp('fecha_limite'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export const entregas = pgTable(
+  'entregas',
+  {
+    id: serial('id').primaryKey(),
+    asignacionId: integer('asignacion_id').notNull(),
+    estudianteId: integer('estudiante_id').notNull(),
+    // Respuestas por índice de pregunta aplanada: {"0":"A","1":"texto libre"}.
+    respuestas: jsonb('respuestas').$type<Record<string, string>>().notNull(),
+    // Puntaje de alternativas (las de desarrollo no puntúan).
+    puntaje: integer('puntaje').notNull(),
+    total: integer('total').notNull(),
+    enviadoEl: timestamp('enviado_el').defaultNow().notNull(),
+  },
+  (t) => [unique('entregas_asignacion_estudiante').on(t.asignacionId, t.estudianteId)],
+)

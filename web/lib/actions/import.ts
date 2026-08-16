@@ -1,6 +1,6 @@
 'use server'
 
-import { getSession } from '@/lib/get-session'
+import { getActor } from '@/lib/authz'
 import { crearPregunta } from '@/lib/actions/preguntas'
 import { LETRAS } from '@/lib/validation/pregunta'
 import {
@@ -100,8 +100,11 @@ function formDataDePregunta(
 export async function guardarPreguntasImportadas(
   input: GuardarImportInput,
 ): Promise<ResultadoGuardado> {
-  const session = await getSession()
-  if (!session) return { ok: false, error: 'Debes iniciar sesión.' }
+  const actor = await getActor()
+  if (!actor) return { ok: false, error: 'Debes iniciar sesión.' }
+  // Guarda el resultado de /generar o /importar: ambas son herramientas de
+  // profesor, así que el guardado también queda vetado para estudiantes.
+  if (actor.role === 'student') return { ok: false, error: 'No autorizado.' }
 
   const parsed = guardarImportSchema.safeParse(input)
   if (!parsed.success) {

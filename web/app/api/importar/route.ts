@@ -1,4 +1,4 @@
-import { getSession } from '@/lib/get-session'
+import { getActor } from '@/lib/authz'
 import { analizarArchivo, type ResultadoAnalisis } from '@/lib/import/analizar'
 import { crearBorrador } from '@/lib/import/borradores'
 import { cuotaImportaciones } from '@/lib/suscripciones/entitlements'
@@ -18,9 +18,12 @@ export const runtime = 'nodejs'
  * el análisis.
  */
 export async function POST(request: Request) {
-  const session = await getSession()
-  if (!session) return new Response('No autorizado', { status: 401 })
-  const userId = Number(session.user.id)
+  const actor = await getActor()
+  if (!actor) return new Response('No autorizado', { status: 401 })
+  // La importación con IA es una herramienta de profesor: los estudiantes no
+  // gastan cupo ni tokens de IA aquí.
+  if (actor.role === 'student') return new Response('No autorizado', { status: 403 })
+  const userId = actor.userId
 
   // Cuota de importaciones IA del plan (free 3/mes, pro 100/mes). Se corta
   // ANTES de gastar tokens. La respuesta usa la misma forma {resultado} que el

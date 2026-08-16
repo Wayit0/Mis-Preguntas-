@@ -8,6 +8,7 @@ import { BotonDescargarDocx } from '@/components/pruebas/boton-descargar-docx'
 import type { Prueba } from '@/lib/queries/pruebas'
 import type { Carpeta } from '@/lib/queries/carpetas'
 import { MoverACarpeta } from '@/components/carpetas/mover-a-carpeta'
+import { AsignarACurso } from '@/components/cursos/asignar-a-curso'
 
 /** Formatea una fecha en español (día mes año); vacío si es null. */
 function formatoFecha(d: Date | null): string {
@@ -25,10 +26,13 @@ const ACCION = 'h-9 px-3 sm:h-7 sm:px-2.5'
 export function TarjetaPrueba({
   prueba,
   carpetas,
+  cursos,
 }: {
   prueba: Prueba
   /** Lista plana de carpetas; si se pasa, muestra el selector "Mover a". */
   carpetas?: Carpeta[]
+  /** Cursos del profesor; si se pasa, muestra el control "Asignar a curso". */
+  cursos?: { id: number; nombre: string }[]
 }) {
   const nPreguntas = prueba.preguntasIds?.length ?? 0
   const nTextos = prueba.textosIds?.length ?? 0
@@ -127,6 +131,12 @@ export function TarjetaPrueba({
             />
           ) : null}
         </div>
+
+        {cursos ? (
+          <div className="border-t border-border pt-3">
+            <AsignarACurso pruebaId={prueba.id} cursos={cursos} />
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   )

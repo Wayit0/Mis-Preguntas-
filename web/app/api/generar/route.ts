@@ -1,4 +1,4 @@
-import { getSession } from '@/lib/get-session'
+import { getActor } from '@/lib/authz'
 import { ejecutarGeneracion } from '@/lib/generar/core'
 import { crearBorrador } from '@/lib/import/borradores'
 import { cuotaGeneraciones } from '@/lib/suscripciones/entitlements'
@@ -16,9 +16,12 @@ export const runtime = 'nodejs'
  * peticiones sin tráfico a los ~230 s.
  */
 export async function POST(request: Request) {
-  const session = await getSession()
-  if (!session) return new Response('No autorizado', { status: 401 })
-  const userId = Number(session.user.id)
+  const actor = await getActor()
+  if (!actor) return new Response('No autorizado', { status: 401 })
+  // Generar preguntas con IA es una herramienta de profesor: los estudiantes
+  // no gastan cupo ni tokens de IA aquí.
+  if (actor.role === 'student') return new Response('No autorizado', { status: 403 })
+  const userId = actor.userId
 
   // Cuota mensual (free 5 / pro 100). Se corta ANTES de gastar tokens, con la
   // misma forma {resultado} del stream para que el cliente no tenga caso especial.

@@ -8,6 +8,7 @@ async function registrar(page: Page): Promise<{ nombre: string; email: string }>
   const password = 'clave-segura-123'
 
   await page.goto('/registro')
+  await page.getByRole('button', { name: 'Profesor' }).click()
   await page.locator('#nombre').fill(nombre)
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)

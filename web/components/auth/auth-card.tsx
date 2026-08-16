@@ -22,14 +22,22 @@ export function AuthCard({
   modoInicial = 'login',
   proveedores = [],
   errorInicial = null,
+  next = null,
 }: {
   modoInicial?: Modo
   proveedores?: ProveedorSocial[]
   /** Mensaje ya traducido con el que abre la tarjeta (p. ej. ?error= del login social). */
   errorInicial?: string | null
+  /** Adónde volver tras un login exitoso (ya sanitizado); si no viene, /dashboard. */
+  next?: string | null
 }) {
   const router = useRouter()
   const [modo, setModo] = useState<Modo>(modoInicial)
+  // Antes de mostrar el formulario de "Crear cuenta" preguntamos el rol: los
+  // profesores siguen este mismo formulario (social + correo de colegio); los
+  // estudiantes se van a /unirse, que es un formulario distinto (sin social,
+  // sin confirmar contraseña) y crea la cuenta con role='student'.
+  const [rolRegistro, setRolRegistro] = useState<'profesor' | 'estudiante' | null>(null)
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -40,9 +48,14 @@ export function AuthCard({
   function cambiarModo(nuevo: Modo) {
     if (nuevo === modo) return
     setModo(nuevo)
+    setRolRegistro(null)
     setError(null)
     // Refleja el modo en la URL sin recargar (deep-link + refresh consistentes).
     window.history.replaceState(null, '', nuevo === 'login' ? '/login' : '/registro')
+  }
+
+  function onElegirEstudiante() {
+    router.push(next ? `/unirse?next=${encodeURIComponent(next)}` : '/unirse')
   }
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -93,7 +106,7 @@ export function AuthCard({
       }
     }
 
-    router.push('/dashboard')
+    router.push(next || '/dashboard')
     router.refresh()
   }
 
@@ -140,6 +153,41 @@ export function AuthCard({
         </div>
 
         {/* El key fuerza el re-montaje para re-disparar la animación al cambiar */}
+        {modo === 'registro' && rolRegistro === null ? (
+          <div key="elegir-rol" className={`flex flex-col gap-4 ${animClase}`}>
+            <div>
+              <h1 className="font-heading text-xl font-semibold tracking-tight text-foreground">
+                Crea tu cuenta
+              </h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                ¿Eres estudiante o profesor?
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setRolRegistro('profesor')}
+                className="flex flex-col items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-4 text-center transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <span aria-hidden className="text-2xl">
+                  🧑‍🏫
+                </span>
+                <span className="text-sm font-medium text-foreground">Profesor</span>
+              </button>
+              <button
+                type="button"
+                onClick={onElegirEstudiante}
+                className="flex flex-col items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-4 text-center transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                <span aria-hidden className="text-2xl">
+                  🎓
+                </span>
+                <span className="text-sm font-medium text-foreground">Estudiante</span>
+              </button>
+            </div>
+          </div>
+        ) : (
         <form
           key={modo}
           onSubmit={onSubmit}
@@ -147,6 +195,15 @@ export function AuthCard({
           noValidate
         >
           <div>
+            {modo === 'registro' ? (
+              <button
+                type="button"
+                onClick={() => setRolRegistro(null)}
+                className="mb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+              >
+                ‹ Volver
+              </button>
+            ) : null}
             <h1 className="font-heading text-xl font-semibold tracking-tight text-foreground">
               {modo === 'login' ? 'Bienvenido de vuelta' : 'Crea tu cuenta'}
             </h1>
@@ -254,6 +311,7 @@ export function AuthCard({
                 : 'Crear cuenta'}
           </Button>
         </form>
+        )}
       </CardContent>
     </Card>
   )

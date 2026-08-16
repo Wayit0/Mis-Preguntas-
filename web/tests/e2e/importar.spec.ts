@@ -34,6 +34,7 @@ test('importar: subir documento → preguntas detectadas (IA mockeada) → guard
 
   // 1. Registro → queda autenticado en /dashboard.
   await page.goto('/registro')
+  await page.getByRole('button', { name: 'Profesor' }).click()
   await page.locator('#nombre').fill(nombre)
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)
@@ -80,6 +81,7 @@ test('importar: DOCX con imagen incrustada → miniatura en revisión → guarda
 
   // 1. Registro → queda autenticado en /dashboard.
   await page.goto('/registro')
+  await page.getByRole('button', { name: 'Profesor' }).click()
   await page.locator('#nombre').fill(nombre)
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)
@@ -129,6 +131,7 @@ test('importar: recortar imagen a mano en la revisión y restaurar', async ({
   // además `imagenPreguntaRecorte`, pero con la imagen de 4×4 px el recorte
   // server-side queda bajo el mínimo y se ignora: la miniatura es la original.
   await page.goto('/registro')
+  await page.getByRole('button', { name: 'Profesor' }).click()
   await page.locator('#nombre').fill(`ImportaCrop ${sufijo}`)
   await page.locator('#email').fill(email)
   await page.locator('#password').fill(password)
@@ -188,6 +191,7 @@ test('importar: el borrador se retoma tras recargar y desaparece al guardar', as
 
   // 1. Registro y análisis (IA mockeada) con una imagen 1x1.
   await page.goto('/registro')
+  await page.getByRole('button', { name: 'Profesor' }).click()
   await page.locator('#nombre').fill(`Borrador ${sufijo}`)
   await page.locator('#email').fill(`borrador${sufijo}@x.cl`)
   await page.locator('#password').fill(password)
