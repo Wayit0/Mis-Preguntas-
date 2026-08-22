@@ -155,6 +155,13 @@
       "when": 1787411761807,
       "tag": "0021_pink_cargill",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1787413861004,
+      "tag": "0022_lush_dragon_lord",
+      "breakpoints": true
     }
   ]
 }

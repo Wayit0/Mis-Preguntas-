@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation'
 import { eliminarUsuario } from '@/lib/actions/admin'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import type { UsuarioAdmin, EstadisticaUsuario } from '@/lib/queries/admin'
-import { EstadisticaActividad } from '@/components/admin/estadistica-actividad'
+import type { UsuarioAdmin, EstadisticaEstudiante } from '@/lib/queries/admin'
+import { EstadisticaEstudianteVista } from '@/components/admin/estadistica-actividad'
 
 /**
  * Fila de estudiante en el panel de administración global: los estudiantes no
@@ -18,7 +18,7 @@ export function FilaEstudiante({
   estadistica,
 }: {
   usuario: UsuarioAdmin
-  estadistica: EstadisticaUsuario
+  estadistica: EstadisticaEstudiante
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -72,7 +72,7 @@ export function FilaEstudiante({
           </Button>
         </div>
 
-        <EstadisticaActividad estadistica={estadistica} />
+        <EstadisticaEstudianteVista estadistica={estadistica} />
 
         {error ? (
           <p role="alert" className="text-xs text-destructive">

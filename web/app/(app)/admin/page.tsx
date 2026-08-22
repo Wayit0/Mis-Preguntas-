@@ -12,7 +12,9 @@ import {
   contarPreguntasPorUsuario,
   contarPruebasPorUsuario,
   listarColaboracionesAdmin,
-  armarEstadisticasUsuarios,
+  armarEstadisticasProfesores,
+  listarDocumentosEntregados,
+  armarEstadisticasEstudiantes,
 } from '@/lib/queries/admin'
 import {
   listarSuscripcionesAdmin,
@@ -192,23 +194,32 @@ async function ColegiosTab() {
 }
 
 async function UsuariosTab() {
-  const [usuarios, colegios, conteoPreguntas, conteoPruebas, colaboracionesAdmin] =
-    await Promise.all([
-      listarUsuarios(),
-      listarColegios(),
-      contarPreguntasPorUsuario(),
-      contarPruebasPorUsuario(),
-      listarColaboracionesAdmin(),
-    ])
+  const [
+    usuarios,
+    colegios,
+    conteoPreguntas,
+    conteoPruebas,
+    colaboracionesAdmin,
+    documentosEntregados,
+  ] = await Promise.all([
+    listarUsuarios(),
+    listarColegios(),
+    contarPreguntasPorUsuario(),
+    contarPruebasPorUsuario(),
+    listarColaboracionesAdmin(),
+    listarDocumentosEntregados(),
+  ])
   const opcionesColegio = colegios.map((c) => ({ id: c.id, nombre: c.nombre }))
   const profesores = usuarios.filter((u) => u.role !== 'student')
   const estudiantes = usuarios.filter((u) => u.role === 'student')
-  const estadisticas = armarEstadisticasUsuarios(
+  const estadisticasProfesores = armarEstadisticasProfesores(
     usuarios,
     conteoPreguntas,
     conteoPruebas,
     colaboracionesAdmin,
   )
+  const estadisticasEstudiantes = armarEstadisticasEstudiantes(documentosEntregados)
+  const sinDocumentos = { documentos: 0, detalle: [] }
 
   return (
     <div className="flex flex-col gap-6">
@@ -227,7 +238,7 @@ async function UsuariosTab() {
                 key={u.id}
                 usuario={u}
                 colegios={opcionesColegio}
-                estadistica={estadisticas.get(u.id)!}
+                estadistica={estadisticasProfesores.get(u.id)!}
               />
             ))}
           </div>
@@ -246,7 +257,7 @@ async function UsuariosTab() {
               <FilaEstudiante
                 key={u.id}
                 usuario={u}
-                estadistica={estadisticas.get(u.id)!}
+                estadistica={estadisticasEstudiantes.get(u.id) ?? sinDocumentos}
               />
             ))}
           </div>

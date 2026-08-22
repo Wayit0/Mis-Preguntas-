@@ -2,8 +2,10 @@ import { and, asc, count, desc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import {
   accesos,
+  asignaciones,
   colaboraciones,
   colegios,
+  entregas,
   feedback,
   preguntas,
   pruebas,
@@ -140,8 +142,8 @@ export interface ColegaEstadistica {
   nombre: string
 }
 
-/** Estadística de actividad de un usuario para la pestaña «Usuarios» del admin. */
-export interface EstadisticaUsuario {
+/** Estadística de actividad de un profesor para la pestaña «Usuarios» del admin. */
+export interface EstadisticaProfesor {
   preguntas: number
   preguntasCompartidas: number
   pruebas: number
@@ -149,18 +151,18 @@ export interface EstadisticaUsuario {
 }
 
 /**
- * Arma, por usuario, las estadísticas de actividad a partir de las tres
+ * Arma, por profesor, las estadísticas de actividad a partir de las tres
  * queries agregadas (preguntas, pruebas, colaboraciones) — sin N+1: cada una
  * es una sola consulta a la BD; esta función solo las combina en memoria.
  * `colaboraciones` se trata como bidireccional a propósito: "con quién
  * colabora" incluye tanto a quienes invitó como a quienes lo invitaron a él.
  */
-export function armarEstadisticasUsuarios(
+export function armarEstadisticasProfesores(
   usuarios: UsuarioAdmin[],
   conteoPreguntas: ConteoPreguntasUsuario[],
   conteoPruebas: ConteoPruebasUsuario[],
   colaboracionesAdmin: ColaboracionAdmin[],
-): Map<number, EstadisticaUsuario> {
+): Map<number, EstadisticaProfesor> {
   const nombrePorId = new Map(usuarios.map((u) => [u.id, u.nombre]))
   const preguntasPorId = new Map(conteoPreguntas.map((c) => [c.userId, c]))
   const pruebasPorId = new Map(conteoPruebas.map((c) => [c.userId, c.total]))
@@ -178,7 +180,7 @@ export function armarEstadisticasUsuarios(
     agregar(c.toUserId, c.fromUserId)
   }
 
-  const estadisticas = new Map<number, EstadisticaUsuario>()
+  const estadisticas = new Map<number, EstadisticaProfesor>()
   for (const u of usuarios) {
     estadisticas.set(u.id, {
       preguntas: preguntasPorId.get(u.id)?.total ?? 0,
@@ -186,6 +188,50 @@ export function armarEstadisticasUsuarios(
       pruebas: pruebasPorId.get(u.id) ?? 0,
       colaborandoCon: colaborandoPorId.get(u.id) ?? [],
     })
+  }
+  return estadisticas
+}
+
+/** Un documento (tarea/evaluación) entregado por un estudiante, con sus intentos. */
+export interface DocumentoEntregadoAdmin {
+  estudianteId: number
+  titulo: string
+  intentos: number
+}
+
+/**
+ * Todos los documentos entregados por cualquier estudiante, con su título
+ * (vía join con `asignaciones`, que siempre existe: `eliminarAsignacion` borra
+ * sus entregas en la misma transacción) y cuántas veces se entregaron
+ * (`entregas.intentos`, ver entregarTarea). Una sola query, no N+1.
+ */
+export async function listarDocumentosEntregados(): Promise<DocumentoEntregadoAdmin[]> {
+  return db
+    .select({
+      estudianteId: entregas.estudianteId,
+      titulo: asignaciones.titulo,
+      intentos: entregas.intentos,
+    })
+    .from(entregas)
+    .innerJoin(asignaciones, eq(asignaciones.id, entregas.asignacionId))
+}
+
+/** Estadística de actividad de un estudiante para la pestaña «Usuarios» del admin. */
+export interface EstadisticaEstudiante {
+  documentos: number
+  detalle: { titulo: string; intentos: number }[]
+}
+
+/** Arma, por estudiante, cuántos documentos entregó y las repeticiones de cada uno. */
+export function armarEstadisticasEstudiantes(
+  documentos: DocumentoEntregadoAdmin[],
+): Map<number, EstadisticaEstudiante> {
+  const estadisticas = new Map<number, EstadisticaEstudiante>()
+  for (const d of documentos) {
+    const actual = estadisticas.get(d.estudianteId) ?? { documentos: 0, detalle: [] }
+    actual.documentos += 1
+    actual.detalle.push({ titulo: d.titulo, intentos: d.intentos })
+    estadisticas.set(d.estudianteId, actual)
   }
   return estadisticas
 }
