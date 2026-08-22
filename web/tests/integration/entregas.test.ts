@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { db } from '@/lib/db'
-import { usuarios, cursos, inscripciones, asignaciones, entregas } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
+import { usuarios, cursos, inscripciones, asignaciones, entregas, borradoresTarea } from '@/lib/db/schema'
+import { and, eq } from 'drizzle-orm'
 import type { ContenidoAsignacion } from '@/lib/tareas/contenido'
 
 let currentUserId = 0
@@ -11,7 +11,7 @@ vi.mock('@/lib/get-session', () => ({
 }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 
-const { entregarTarea } = await import('@/lib/actions/entregas')
+const { entregarTarea, guardarBorradorTarea } = await import('@/lib/actions/entregas')
 const { cargarTareaParaEstudiante, listarTareasDeEstudiante } = await import('@/lib/queries/tareas')
 
 async function crearUsuario(prefijo: string, role = 'teacher') {
@@ -86,11 +86,17 @@ describe('tareas del estudiante (contra Postgres)', () => {
     }
   })
 
-  it('rechaza segundo intento, fuera de plazo y no inscrito', async () => {
+  it('permite rehacer (sobrescribe, no duplica), pero rechaza fuera de plazo y no inscrito', async () => {
     const { est, asig } = await fixtures()
     currentUserId = est.id
-    await entregarTarea(asig.id, { '0': 'A' })
-    expect('error' in (await entregarTarea(asig.id, { '0': 'B' }))).toBe(true)
+    const primero = await entregarTarea(asig.id, { '0': 'A' })
+    expect(primero).toEqual({ ok: true, puntaje: 0, total: 1 })
+    const segundo = await entregarTarea(asig.id, { '0': 'B' })
+    expect(segundo).toEqual({ ok: true, puntaje: 1, total: 1 })
+
+    const filas = await db.select().from(entregas).where(eq(entregas.asignacionId, asig.id))
+    expect(filas).toHaveLength(1)
+    expect(filas[0].respuestas).toEqual({ '0': 'B' })
 
     const vencida = await fixtures(new Date('2020-01-01'))
     currentUserId = vencida.est.id
@@ -99,6 +105,45 @@ describe('tareas del estudiante (contra Postgres)', () => {
     const intruso = await crearUsuario('ent-intruso2', 'student')
     currentUserId = intruso.id
     expect('error' in (await entregarTarea(asig.id, { '0': 'B' }))).toBe(true)
+  })
+
+  it('guardarBorradorTarea pre-guarda respuestas sin crear una entrega, y entregar borra el borrador', async () => {
+    const { est, asig } = await fixtures()
+    currentUserId = est.id
+
+    const guardado = await guardarBorradorTarea(asig.id, { '0': 'A' })
+    expect(guardado).toEqual({ ok: true })
+
+    const tarea = await cargarTareaParaEstudiante(asig.id, est.id)
+    expect(tarea?.entregada).toBe(false)
+    if (tarea && !tarea.entregada) {
+      expect(tarea.borrador).toEqual({ '0': 'A' })
+    }
+    expect(
+      await db.select().from(entregas).where(eq(entregas.asignacionId, asig.id)),
+    ).toHaveLength(0)
+
+    await entregarTarea(asig.id, { '0': 'B' })
+    expect(
+      await db.select().from(borradoresTarea).where(and(
+        eq(borradoresTarea.asignacionId, asig.id),
+        eq(borradoresTarea.estudianteId, est.id),
+      )),
+    ).toHaveLength(0)
+  })
+
+  it('guardarBorradorTarea rechaza fuera de plazo, no inscrito y no-student', async () => {
+    const vencida = await fixtures(new Date('2020-01-01'))
+    currentUserId = vencida.est.id
+    expect('error' in (await guardarBorradorTarea(vencida.asig.id, { '0': 'A' }))).toBe(true)
+
+    const { prof, asig } = await fixtures()
+    currentUserId = prof.id
+    expect('error' in (await guardarBorradorTarea(asig.id, { '0': 'A' }))).toBe(true)
+
+    const intruso = await crearUsuario('ent-intruso3', 'student')
+    currentUserId = intruso.id
+    expect('error' in (await guardarBorradorTarea(asig.id, { '0': 'A' }))).toBe(true)
   })
 
   it('rechaza no-student (profesor)', async () => {

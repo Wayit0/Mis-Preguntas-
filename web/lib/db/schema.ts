@@ -480,3 +480,23 @@ export const entregas = pgTable(
   },
   (t) => [unique('entregas_asignacion_estudiante').on(t.asignacionId, t.estudianteId)],
 )
+
+// ---------------------------------------------------------------------------
+// Borrador de una tarea en curso (pre-guardado): permite al estudiante cerrar
+// la tarea a medio responder y retomarla después sin perder lo avanzado. Se
+// sobrescribe completo en cada autoguardado (mismo patrón que
+// `borradoresImportacion`) y se borra al entregar de verdad (ver
+// `entregarTarea`), así que nunca convive con una `entrega` ya enviada.
+// ---------------------------------------------------------------------------
+
+export const borradoresTarea = pgTable(
+  'borradores_tarea',
+  {
+    id: serial('id').primaryKey(),
+    asignacionId: integer('asignacion_id').notNull(),
+    estudianteId: integer('estudiante_id').notNull(),
+    respuestas: jsonb('respuestas').$type<Record<string, string>>().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (t) => [unique('borradores_tarea_asignacion_estudiante').on(t.asignacionId, t.estudianteId)],
+)

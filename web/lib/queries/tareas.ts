@@ -1,6 +1,13 @@
 import { and, desc, eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { asignaciones, cursos, entregas, inscripciones, pruebas } from '@/lib/db/schema'
+import {
+  asignaciones,
+  borradoresTarea,
+  cursos,
+  entregas,
+  inscripciones,
+  pruebas,
+} from '@/lib/db/schema'
 import {
   sinRespuestas,
   type ContenidoAsignacion,
@@ -82,7 +89,12 @@ interface TareaBase {
 }
 
 export type TareaEstudiante =
-  | (TareaBase & { entregada: false; contenido: ContenidoEstudiante })
+  | (TareaBase & {
+      entregada: false
+      contenido: ContenidoEstudiante
+      /** Último pre-guardado (autoguardado) de la tarea en curso, si existe. */
+      borrador: Record<string, string>
+    })
   | (TareaBase & {
       entregada: true
       contenido: ContenidoAsignacion
@@ -121,10 +133,26 @@ async function cargarFilaAsignacion(
   return fila ?? null
 }
 
+/** Respuestas del último pre-guardado de la tarea, o `{}` si no hay ninguno. */
+async function cargarBorrador(
+  asignacionId: number,
+  estudianteId: number,
+): Promise<Record<string, string>> {
+  const [borrador] = await db.select({ respuestas: borradoresTarea.respuestas })
+    .from(borradoresTarea)
+    .where(and(
+      eq(borradoresTarea.asignacionId, asignacionId),
+      eq(borradoresTarea.estudianteId, estudianteId),
+    ))
+    .limit(1)
+  return borrador?.respuestas ?? {}
+}
+
 /**
  * Carga una tarea PARA el estudiante: null si la asignación no existe o él no
  * está inscrito en su curso. Sin entrega, el contenido va SIN correctas ni
- * explicaciones; con entrega, va completo más sus respuestas y puntaje.
+ * explicaciones (más el último pre-guardado, si existe); con entrega, va
+ * completo más sus respuestas y puntaje.
  */
 export async function cargarTareaParaEstudiante(
   asignacionId: number,
@@ -146,7 +174,8 @@ export async function cargarTareaParaEstudiante(
     curso: fila.curso,
   }
   if (!entrega) {
-    return { ...base, entregada: false, contenido: sinRespuestas(fila.contenido) }
+    const borrador = await cargarBorrador(asignacionId, estudianteId)
+    return { ...base, entregada: false, contenido: sinRespuestas(fila.contenido), borrador }
   }
   return {
     ...base,
@@ -161,15 +190,24 @@ export async function cargarTareaParaEstudiante(
 /**
  * Carga una tarea YA entregada para rehacerla: mismo guard de inscripción,
  * pero el contenido siempre va SIN correctas ni explicaciones (como una tarea
- * nueva), ignorando la entrega previa que se sobrescribirá al reenviar. El
- * llamador (la página) es responsable de no ofrecer esto si el plazo venció.
+ * nueva) más el pre-guardado del intento en curso, si existe. Ignora la
+ * entrega previa, que se sobrescribirá al reenviar. El llamador (la página) es
+ * responsable de no ofrecer esto si el plazo venció.
  */
 export async function cargarTareaParaRehacer(
   asignacionId: number,
   estudianteId: number,
-): Promise<(TareaBase & { entregada: false; contenido: ContenidoEstudiante }) | null> {
+): Promise<
+  | (TareaBase & {
+      entregada: false
+      contenido: ContenidoEstudiante
+      borrador: Record<string, string>
+    })
+  | null
+> {
   const fila = await cargarFilaAsignacion(asignacionId, estudianteId)
   if (!fila) return null
+  const borrador = await cargarBorrador(asignacionId, estudianteId)
   return {
     id: fila.id,
     titulo: fila.titulo,
@@ -178,5 +216,6 @@ export async function cargarTareaParaRehacer(
     curso: fila.curso,
     entregada: false,
     contenido: sinRespuestas(fila.contenido),
+    borrador,
   }
 }
