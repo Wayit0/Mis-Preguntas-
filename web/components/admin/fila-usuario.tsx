@@ -11,7 +11,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import type { UsuarioAdmin } from '@/lib/queries/admin'
+import type { UsuarioAdmin, EstadisticaUsuario } from '@/lib/queries/admin'
+import { EstadisticaActividad } from '@/components/admin/estadistica-actividad'
 
 const ETIQUETA_ROL: Record<string, string> = {
   global_admin: 'Admin global',
@@ -34,9 +35,11 @@ const SELECT_CLASS =
 export function FilaUsuario({
   usuario,
   colegios,
+  estadistica,
 }: {
   usuario: UsuarioAdmin
   colegios: { id: number; nombre: string }[]
+  estadistica: EstadisticaUsuario
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -159,6 +162,8 @@ export function FilaUsuario({
             {pendiente ? 'Eliminando…' : '🗑️ Eliminar'}
           </Button>
         </div>
+
+        <EstadisticaActividad estadistica={estadistica} />
 
         {error ? (
           <p role="alert" className="text-xs text-destructive">

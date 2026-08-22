@@ -9,6 +9,10 @@ import {
   resumenAccesos,
   listarFeedback,
   resumenFeedback,
+  contarPreguntasPorUsuario,
+  contarPruebasPorUsuario,
+  listarColaboracionesAdmin,
+  armarEstadisticasUsuarios,
 } from '@/lib/queries/admin'
 import {
   listarSuscripcionesAdmin,
@@ -25,6 +29,7 @@ import { CrearColegio } from '@/components/admin/crear-colegio'
 import { CrearUsuario } from '@/components/admin/crear-usuario'
 import { EditarColegio } from '@/components/admin/editar-colegio'
 import { FilaUsuario } from '@/components/admin/fila-usuario'
+import { FilaEstudiante } from '@/components/admin/fila-estudiante'
 import { ConcederCortesia } from '@/components/admin/conceder-cortesia'
 import { LicenciaColegio } from '@/components/admin/licencia-colegio'
 import { CancelarSuscripcion } from '@/components/admin/cancelar-suscripcion'
@@ -187,28 +192,67 @@ async function ColegiosTab() {
 }
 
 async function UsuariosTab() {
-  const [usuarios, colegios] = await Promise.all([
-    listarUsuarios(),
-    listarColegios(),
-  ])
+  const [usuarios, colegios, conteoPreguntas, conteoPruebas, colaboracionesAdmin] =
+    await Promise.all([
+      listarUsuarios(),
+      listarColegios(),
+      contarPreguntasPorUsuario(),
+      contarPruebasPorUsuario(),
+      listarColaboracionesAdmin(),
+    ])
   const opcionesColegio = colegios.map((c) => ({ id: c.id, nombre: c.nombre }))
+  const profesores = usuarios.filter((u) => u.role !== 'student')
+  const estudiantes = usuarios.filter((u) => u.role === 'student')
+  const estadisticas = armarEstadisticasUsuarios(
+    usuarios,
+    conteoPreguntas,
+    conteoPruebas,
+    colaboracionesAdmin,
+  )
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="font-heading text-base font-semibold text-foreground">
-        Usuarios ({usuarios.length})
-      </h2>
+    <div className="flex flex-col gap-6">
       <CrearUsuario colegios={opcionesColegio} />
-      {usuarios.length === 0 ? (
-        <EstadoVacio mensaje="No hay usuarios registrados." />
-      ) : (
-        <div className="flex flex-col gap-3">
-          {usuarios.map((u) => (
-            <FilaUsuario key={u.id} usuario={u} colegios={opcionesColegio} />
-          ))}
-        </div>
-      )}
-    </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="font-heading text-base font-semibold text-foreground">
+          Profesores ({profesores.length})
+        </h2>
+        {profesores.length === 0 ? (
+          <EstadoVacio mensaje="No hay profesores registrados." />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {profesores.map((u) => (
+              <FilaUsuario
+                key={u.id}
+                usuario={u}
+                colegios={opcionesColegio}
+                estadistica={estadisticas.get(u.id)!}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <h2 className="font-heading text-base font-semibold text-foreground">
+          Estudiantes ({estudiantes.length})
+        </h2>
+        {estudiantes.length === 0 ? (
+          <EstadoVacio mensaje="No hay estudiantes registrados." />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {estudiantes.map((u) => (
+              <FilaEstudiante
+                key={u.id}
+                usuario={u}
+                estadistica={estadisticas.get(u.id)!}
+              />
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
   )
 }
 
