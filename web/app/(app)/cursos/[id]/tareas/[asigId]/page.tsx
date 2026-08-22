@@ -137,26 +137,24 @@ export default async function ResultadosPage({
                                 </div>
                               )
                             })}
-                            {!respuesta ? (
+                            {!respuesta && !dibujo ? (
                               <p className="text-xs text-muted-foreground">
                                 No respondió esta pregunta.
                               </p>
                             ) : null}
                           </div>
                         ) : (
-                          <>
-                            <p className="mt-2 whitespace-pre-wrap rounded-md border border-border bg-background p-2 text-sm text-foreground">
-                              {respuesta || (dibujo ? '(ver dibujo abajo)' : 'No respondió esta pregunta.')}
-                            </p>
-                            {dibujo ? (
-                              <img
-                                src={imageUrl(dibujo)}
-                                alt={`Desarrollo dibujado de ${f.nombre}`}
-                                className="mt-2 w-full max-w-md rounded-md border border-border bg-white object-contain"
-                              />
-                            ) : null}
-                          </>
+                          <p className="mt-2 whitespace-pre-wrap rounded-md border border-border bg-background p-2 text-sm text-foreground">
+                            {respuesta || (dibujo ? '(ver dibujo abajo)' : 'No respondió esta pregunta.')}
+                          </p>
                         )}
+                        {dibujo ? (
+                          <img
+                            src={imageUrl(dibujo)}
+                            alt={`Desarrollo dibujado de ${f.nombre}`}
+                            className="mt-2 w-full max-w-md rounded-md border border-border bg-white object-contain"
+                          />
+                        ) : null}
                       </div>
                     )
                   })}

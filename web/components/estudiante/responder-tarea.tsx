@@ -43,6 +43,9 @@ function PreguntaItem({
   dibujoInicial?: string
 }) {
   const esSeleccion = p.tipo === 'seleccion_multiple'
+  // Contraído por defecto; ya expandido si esta pregunta ya tenía un dibujo
+  // guardado (borrador o rehacer), para que el estudiante lo vea sin buscarlo.
+  const [mostrarDibujo, setMostrarDibujo] = useState(!!dibujoInicial)
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-4">
@@ -92,17 +95,25 @@ function PreguntaItem({
             })}
           </div>
         ) : (
-          <>
-            <textarea
-              rows={4}
-              value={valor}
-              onChange={(e) => onCambiar(e.target.value)}
-              placeholder="Escribe tu respuesta (opcional si prefieres solo dibujar)…"
-              className="rounded-md border border-border bg-background p-2 text-sm"
-            />
-            <CanvasDibujo asignacionId={asignacionId} indice={i} claveInicial={dibujoInicial} />
-          </>
+          <textarea
+            rows={4}
+            value={valor}
+            onChange={(e) => onCambiar(e.target.value)}
+            placeholder="Escribe tu respuesta (opcional si prefieres solo dibujar)…"
+            className="rounded-md border border-border bg-background p-2 text-sm"
+          />
         )}
+
+        <button
+          type="button"
+          onClick={() => setMostrarDibujo((v) => !v)}
+          className="self-start text-xs font-medium text-primary underline-offset-4 hover:underline"
+        >
+          {mostrarDibujo ? '▾ Ocultar cuadro de dibujo' : '▸ Agregar desarrollo dibujado (opcional)'}
+        </button>
+        {mostrarDibujo ? (
+          <CanvasDibujo asignacionId={asignacionId} indice={i} claveInicial={dibujoInicial} />
+        ) : null}
       </CardContent>
     </Card>
   )

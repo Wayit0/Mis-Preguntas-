@@ -92,7 +92,7 @@ function PreguntaResultado({
             {tieneCorrecta ? (
               <p className="text-xs text-muted-foreground">
                 Correcta: {p.correcta}
-                {!respuesta ? ' (no respondiste)' : ''}
+                {!respuesta && !dibujo ? ' (no respondiste)' : ''}
               </p>
             ) : null}
             {p.explicacion ? (
@@ -106,16 +106,17 @@ function PreguntaResultado({
             <p className="whitespace-pre-wrap rounded-md border border-border bg-background p-2 text-sm">
               {respuesta || (dibujo ? '(ver dibujo abajo)' : 'No respondiste esta pregunta.')}
             </p>
-            {dibujo ? (
-              <img
-                src={imageUrl(dibujo)}
-                alt="Tu desarrollo dibujado"
-                className="w-full max-w-md rounded-md border border-border bg-white object-contain"
-              />
-            ) : null}
             <p className="text-xs text-muted-foreground">La revisará tu profesor.</p>
           </>
         )}
+
+        {dibujo ? (
+          <img
+            src={imageUrl(dibujo)}
+            alt="Tu desarrollo dibujado"
+            className="w-full max-w-md rounded-md border border-border bg-white object-contain"
+          />
+        ) : null}
       </CardContent>
     </Card>
   )
