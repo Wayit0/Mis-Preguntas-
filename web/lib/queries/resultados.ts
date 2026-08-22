@@ -47,6 +47,8 @@ export interface FilaResultado {
   nombre: string
   entrega: {
     respuestas: Record<string, string>
+    /** Dibujos del desarrollo, por índice de pregunta (ver `entregas.dibujos`). */
+    dibujos: Record<string, string>
     puntaje: number
     total: number
     enviadoEl: Date
@@ -102,7 +104,13 @@ export async function cargarResultados(
         estudianteId: a.id,
         nombre: a.nombre,
         entrega: e
-          ? { respuestas: e.respuestas, puntaje: e.puntaje, total: e.total, enviadoEl: e.enviadoEl }
+          ? {
+              respuestas: e.respuestas,
+              dibujos: e.dibujos,
+              puntaje: e.puntaje,
+              total: e.total,
+              enviadoEl: e.enviadoEl,
+            }
           : null,
       }
     }),

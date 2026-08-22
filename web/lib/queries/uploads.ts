@@ -1,6 +1,14 @@
 import { and, eq, exists, or, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { asignaciones, colegios, cursos, inscripciones, preguntas } from '@/lib/db/schema'
+import {
+  asignaciones,
+  borradoresTarea,
+  colegios,
+  cursos,
+  entregas,
+  inscripciones,
+  preguntas,
+} from '@/lib/db/schema'
 import {
   colegioIdDeUsuario,
   preguntaCompartidaVisible,
@@ -20,7 +28,7 @@ function escaparLike(valor: string): string {
 /**
  * Autoriza el acceso a una imagen del Blob por su clave.
  *
- * Hay dos caminos independientes que autorizan una clave (basta con uno):
+ * Hay tres caminos independientes que autorizan una clave (basta con uno):
  *
  * 1. Referenciada por una `pregunta` (se sube dentro de `crearPregunta`, junto
  *    con la fila; los `textos` no tienen imágenes y el logo del PDF no se
@@ -39,7 +47,13 @@ function escaparLike(valor: string): string {
  *    INDEPENDIENTE de la pregunta original: sigue sirviendo la imagen aunque
  *    la pregunta fuente se haya borrado (por eso no basta con el camino 1).
  *
- * Si ninguno de los dos caminos autoriza la clave, devuelve `false` (la route
+ * 3. Referenciada por `dibujos` (el desarrollo dibujado a mano de una
+ *    pregunta, ver `guardarDibujoTarea`) de una `entrega` o de un `borrador de
+ *    tarea` del propio usuario, o de una `entrega` del curso que dicta. Sirve
+ *    tanto mientras el estudiante todavía está dibujando (borrador) como
+ *    después de entregar, para que el profesor pueda revisarlo.
+ *
+ * Si ninguno de los caminos autoriza la clave, devuelve `false` (la route
  * responde 404, sin revelar la existencia del blob a usuarios no
  * autorizados). Crítico: NO reintroducir el IDOR — el dueño y la visibilidad
  * son la ÚNICA puerta de acceso.
@@ -120,6 +134,37 @@ export async function puedeVerImagen(
     )
     .limit(1)
   if (filaAsignacion) return true
+
+  // Camino 3: la clave está en `dibujos` (mismo formato jsonb que
+  // `asignaciones.contenido`, buscado igual: entre comillas). Primero las
+  // entregas ya enviadas (dueño o profesor del curso)...
+  const [filaEntrega] = await db
+    .select({ id: entregas.id })
+    .from(entregas)
+    .innerJoin(asignaciones, eq(entregas.asignacionId, asignaciones.id))
+    .innerJoin(cursos, eq(asignaciones.cursoId, cursos.id))
+    .where(
+      and(
+        sql`${entregas.dibujos}::text LIKE ${patron} ESCAPE '\\'`,
+        or(eq(entregas.estudianteId, userId), eq(cursos.userId, userId)),
+      ),
+    )
+    .limit(1)
+  if (filaEntrega) return true
+
+  // ...y luego los borradores en curso (solo el propio estudiante: todavía no
+  // hay nada que revisar del lado del profesor).
+  const [filaBorrador] = await db
+    .select({ id: borradoresTarea.id })
+    .from(borradoresTarea)
+    .where(
+      and(
+        sql`${borradoresTarea.dibujos}::text LIKE ${patron} ESCAPE '\\'`,
+        eq(borradoresTarea.estudianteId, userId),
+      ),
+    )
+    .limit(1)
+  if (filaBorrador) return true
 
   return false
 }

@@ -8,6 +8,7 @@ import { db } from '@/lib/db'
 import {
   asignaciones,
   borradoresImportacion,
+  borradoresTarea,
   carpetas,
   colaboraciones,
   colegios,
@@ -270,9 +271,11 @@ export async function designarAdminColegio(
  *
  * Cascada manual en una transacción (sin FK formal en el dominio, así que
  * nada de esto lo hace la base de datos sola):
- *  - Si es profesor con cursos propios: sus entregas/asignaciones/inscripciones
- *    y los cursos mismos (el curso completo desaparece con su dueño).
- *  - Sus propias entregas/inscripciones como estudiante (en cursos de OTROS).
+ *  - Si es profesor con cursos propios: sus entregas/borradores de
+ *    tarea/asignaciones/inscripciones y los cursos mismos (el curso completo
+ *    desaparece con su dueño).
+ *  - Sus propias entregas/borradores de tarea/inscripciones como estudiante
+ *    (en cursos de OTROS).
  *  - Su contenido: preguntas, textos, pruebas, carpetas, usos de IA,
  *    borradores de importación, feedback enviado, colaboraciones (en
  *    cualquiera de los dos sentidos) y suscripción/pagos.
@@ -313,6 +316,9 @@ export async function eliminarUsuario(userId: number): Promise<ResultadoAdmin> {
 
       if (asignacionIds.length > 0) {
         await tx.delete(entregas).where(inArray(entregas.asignacionId, asignacionIds))
+        await tx
+          .delete(borradoresTarea)
+          .where(inArray(borradoresTarea.asignacionId, asignacionIds))
         await tx.delete(asignaciones).where(inArray(asignaciones.id, asignacionIds))
       }
       await tx.delete(inscripciones).where(inArray(inscripciones.cursoId, cursoIds))
@@ -321,6 +327,7 @@ export async function eliminarUsuario(userId: number): Promise<ResultadoAdmin> {
 
     // Su propia participación como estudiante en cursos de otros.
     await tx.delete(entregas).where(eq(entregas.estudianteId, userId))
+    await tx.delete(borradoresTarea).where(eq(borradoresTarea.estudianteId, userId))
     await tx.delete(inscripciones).where(eq(inscripciones.estudianteId, userId))
 
     await tx.delete(usosIa).where(eq(usosIa.userId, userId))

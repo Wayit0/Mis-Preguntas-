@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { entregarTarea } from '@/lib/actions/entregas'
+import { entregarTarea, guardarBorradorTarea } from '@/lib/actions/entregas'
 import { LatexText } from '@/components/preguntas/latex-text'
+import { CanvasDibujo } from '@/components/estudiante/canvas-dibujo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { LETRAS } from '@/lib/validation/pregunta'
@@ -31,13 +32,20 @@ function PreguntaItem({
   i,
   valor,
   onCambiar,
+  asignacionId,
+  dibujoInicial,
 }: {
   p: PreguntaEstudiante
   i: number
   valor: string
   onCambiar: (valor: string) => void
+  asignacionId: number
+  dibujoInicial?: string
 }) {
   const esSeleccion = p.tipo === 'seleccion_multiple'
+  // Contraído por defecto; ya expandido si esta pregunta ya tenía un dibujo
+  // guardado (borrador o rehacer), para que el estudiante lo vea sin buscarlo.
+  const [mostrarDibujo, setMostrarDibujo] = useState(!!dibujoInicial)
   return (
     <Card>
       <CardContent className="flex flex-col gap-3 p-4">
@@ -91,10 +99,21 @@ function PreguntaItem({
             rows={4}
             value={valor}
             onChange={(e) => onCambiar(e.target.value)}
-            placeholder="Escribe tu respuesta…"
+            placeholder="Escribe tu respuesta (opcional si prefieres solo dibujar)…"
             className="rounded-md border border-border bg-background p-2 text-sm"
           />
         )}
+
+        <button
+          type="button"
+          onClick={() => setMostrarDibujo((v) => !v)}
+          className="self-start text-xs font-medium text-primary underline-offset-4 hover:underline"
+        >
+          {mostrarDibujo ? '▾ Ocultar cuadro de dibujo' : '▸ Agregar desarrollo dibujado (opcional)'}
+        </button>
+        {mostrarDibujo ? (
+          <CanvasDibujo asignacionId={asignacionId} indice={i} claveInicial={dibujoInicial} />
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -106,13 +125,37 @@ export function ResponderTarea({
   tarea: Extract<TareaEstudiante, { entregada: false }>
 }) {
   const router = useRouter()
-  const [respuestas, setRespuestas] = useState<Record<string, string>>({})
+  // Arranca con el último pre-guardado (si el estudiante ya había avanzado y
+  // cerró la tarea antes de entregarla de verdad).
+  const [respuestas, setRespuestas] = useState<Record<string, string>>(tarea.borrador)
   const [error, setError] = useState<string | null>(null)
   const [pendiente, setPendiente] = useState(false)
   // Se marca justo antes de refrescar tras una entrega exitosa, para que el
   // guard de beforeunload no dispare durante el hueco entre la respuesta OK
   // del server y que router.refresh() termine de re-renderizar.
   const [enviado, setEnviado] = useState(false)
+  const [estadoGuardado, setEstadoGuardado] = useState<
+    'inactivo' | 'guardando' | 'guardado' | 'error'
+  >('inactivo')
+  // No autoguarda en el primer render (evita un POST inútil con el borrador
+  // recién cargado, que ya está guardado tal cual en el servidor).
+  const primerRender = useRef(true)
+
+  // Autoguardado con debounce: cada cambio de respuesta reinicia el temporizador
+  // y solo se persiste 1.5s después de la última tecla/selección.
+  useEffect(() => {
+    if (primerRender.current) {
+      primerRender.current = false
+      return
+    }
+    setEstadoGuardado('guardando')
+    const temporizador = setTimeout(() => {
+      void guardarBorradorTarea(tarea.id, respuestas)
+        .then((r) => setEstadoGuardado('error' in r ? 'error' : 'guardado'))
+        .catch(() => setEstadoGuardado('error'))
+    }, 1500)
+    return () => clearTimeout(temporizador)
+  }, [respuestas, tarea.id])
 
   // Lista aplanada con el MISMO orden que el servidor (textos primero), solo
   // para el conteo total; el índice real se calcula al recorrer el contenido
@@ -124,13 +167,16 @@ export function ResponderTarea({
 
   useEffect(() => {
     function onBeforeUnload(e: BeforeUnloadEvent) {
-      if (enviado || Object.keys(respuestas).length === 0) return
+      // Solo advierte si hay cambios que el autoguardado todavía no persistió
+      // (en curso o fallido); una vez guardado, cerrar es seguro.
+      const hayPendiente = estadoGuardado === 'guardando' || estadoGuardado === 'error'
+      if (enviado || !hayPendiente || Object.keys(respuestas).length === 0) return
       e.preventDefault()
       e.returnValue = ''
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [respuestas, enviado])
+  }, [respuestas, enviado, estadoGuardado])
 
   function setRespuesta(i: number, valor: string) {
     setRespuestas((r) => ({ ...r, [String(i)]: valor }))
@@ -138,7 +184,7 @@ export function ResponderTarea({
 
   async function onEnviar() {
     if (pendiente) return
-    if (!confirm('¿Enviar tus respuestas? No podrás cambiarlas después.')) return
+    if (!confirm('¿Enviar tus respuestas?')) return
     setPendiente(true)
     setError(null)
     try {
@@ -197,6 +243,8 @@ export function ResponderTarea({
                 i={i}
                 valor={respuestas[String(i)] ?? ''}
                 onCambiar={(v) => setRespuesta(i, v)}
+                asignacionId={tarea.id}
+                dibujoInicial={tarea.dibujos[String(i)]}
               />
             )
           })}
@@ -212,6 +260,8 @@ export function ResponderTarea({
             i={i}
             valor={respuestas[String(i)] ?? ''}
             onCambiar={(v) => setRespuesta(i, v)}
+            asignacionId={tarea.id}
+            dibujoInicial={tarea.dibujos[String(i)]}
           />
         )
       })}
@@ -226,9 +276,20 @@ export function ResponderTarea({
         </p>
       ) : null}
 
-      <Button onClick={onEnviar} disabled={pendiente} className="self-start">
-        {pendiente ? 'Enviando…' : '📨 Enviar respuestas'}
-      </Button>
+      <div className="flex items-center gap-3">
+        <Button onClick={onEnviar} disabled={pendiente} className="self-start">
+          {pendiente ? 'Enviando…' : '📨 Enviar respuestas'}
+        </Button>
+        <p aria-live="polite" className="text-xs text-muted-foreground">
+          {estadoGuardado === 'guardando'
+            ? 'Guardando progreso…'
+            : estadoGuardado === 'guardado'
+              ? '✓ Progreso guardado, puedes seguir después'
+              : estadoGuardado === 'error'
+                ? 'No se pudo guardar tu progreso automáticamente.'
+                : null}
+        </p>
+      </div>
     </div>
   )
 }

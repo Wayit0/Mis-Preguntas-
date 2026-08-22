@@ -141,6 +141,20 @@
       "when": 1786903439886,
       "tag": "0019_vengeful_sphinx",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1787410465379,
+      "tag": "0020_classy_daredevil",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787411761807,
+      "tag": "0021_pink_cargill",
+      "breakpoints": true
     }
   ]
 }

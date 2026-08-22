@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
+import { buttonVariants } from '@/components/ui/button'
 import { LatexText } from '@/components/preguntas/latex-text'
 import { LETRAS } from '@/lib/validation/pregunta'
 import { imageUrl } from '@/lib/storage/blob'
@@ -12,10 +14,12 @@ function PreguntaResultado({
   p,
   i,
   respuesta,
+  dibujo,
 }: {
   p: PreguntaSnapshot
   i: number
   respuesta: string | undefined
+  dibujo: string | undefined
 }) {
   const esSeleccion = p.tipo === 'seleccion_multiple'
   const tieneCorrecta = !!p.correcta?.trim()
@@ -88,7 +92,7 @@ function PreguntaResultado({
             {tieneCorrecta ? (
               <p className="text-xs text-muted-foreground">
                 Correcta: {p.correcta}
-                {!respuesta ? ' (no respondiste)' : ''}
+                {!respuesta && !dibujo ? ' (no respondiste)' : ''}
               </p>
             ) : null}
             {p.explicacion ? (
@@ -100,11 +104,19 @@ function PreguntaResultado({
         ) : (
           <>
             <p className="whitespace-pre-wrap rounded-md border border-border bg-background p-2 text-sm">
-              {respuesta || 'No respondiste esta pregunta.'}
+              {respuesta || (dibujo ? '(ver dibujo abajo)' : 'No respondiste esta pregunta.')}
             </p>
             <p className="text-xs text-muted-foreground">La revisará tu profesor.</p>
           </>
         )}
+
+        {dibujo ? (
+          <img
+            src={imageUrl(dibujo)}
+            alt="Tu desarrollo dibujado"
+            className="w-full max-w-md rounded-md border border-border bg-white object-contain"
+          />
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -112,8 +124,10 @@ function PreguntaResultado({
 
 export function ResultadoTarea({
   tarea,
+  puedeRehacer,
 }: {
   tarea: Extract<TareaEstudiante, { entregada: true }>
+  puedeRehacer: boolean
 }) {
   // Contador global: mismo orden que aplanarPreguntas() del servidor (textos
   // primero, luego sueltas) — el índice es la clave de `tarea.respuestas`.
@@ -150,7 +164,13 @@ export function ResultadoTarea({
           {t.preguntas.map((p) => {
             const i = indice++
             return (
-              <PreguntaResultado key={i} p={p} i={i} respuesta={tarea.respuestas[String(i)]} />
+              <PreguntaResultado
+                key={i}
+                p={p}
+                i={i}
+                respuesta={tarea.respuestas[String(i)]}
+                dibujo={tarea.dibujos[String(i)]}
+              />
             )
           })}
         </div>
@@ -159,9 +179,24 @@ export function ResultadoTarea({
       {tarea.contenido.preguntas.map((p) => {
         const i = indice++
         return (
-          <PreguntaResultado key={i} p={p} i={i} respuesta={tarea.respuestas[String(i)]} />
+          <PreguntaResultado
+            key={i}
+            p={p}
+            i={i}
+            respuesta={tarea.respuestas[String(i)]}
+            dibujo={tarea.dibujos[String(i)]}
+          />
         )
       })}
+
+      {puedeRehacer ? (
+        <Link
+          href={`/tareas/${tarea.id}?rehacer=1`}
+          className={buttonVariants({ variant: 'outline', className: 'self-start' })}
+        >
+          🔁 Rehacer evaluación
+        </Link>
+      ) : null}
     </div>
   )
 }
