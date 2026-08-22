@@ -94,11 +94,15 @@ export type TareaEstudiante =
       contenido: ContenidoEstudiante
       /** Último pre-guardado (autoguardado) de la tarea en curso, si existe. */
       borrador: Record<string, string>
+      /** Dibujos del desarrollo pre-guardados, por índice de pregunta. */
+      dibujos: Record<string, string>
     })
   | (TareaBase & {
       entregada: true
       contenido: ContenidoAsignacion
       respuestas: Record<string, string>
+      /** Dibujos del desarrollo entregados, por índice de pregunta. */
+      dibujos: Record<string, string>
       puntaje: number
       total: number
     })
@@ -133,19 +137,20 @@ async function cargarFilaAsignacion(
   return fila ?? null
 }
 
-/** Respuestas del último pre-guardado de la tarea, o `{}` si no hay ninguno. */
+/** Respuestas y dibujos del último pre-guardado, o vacíos si no hay ninguno. */
 async function cargarBorrador(
   asignacionId: number,
   estudianteId: number,
-): Promise<Record<string, string>> {
-  const [borrador] = await db.select({ respuestas: borradoresTarea.respuestas })
+): Promise<{ respuestas: Record<string, string>; dibujos: Record<string, string> }> {
+  const [borrador] = await db
+    .select({ respuestas: borradoresTarea.respuestas, dibujos: borradoresTarea.dibujos })
     .from(borradoresTarea)
     .where(and(
       eq(borradoresTarea.asignacionId, asignacionId),
       eq(borradoresTarea.estudianteId, estudianteId),
     ))
     .limit(1)
-  return borrador?.respuestas ?? {}
+  return { respuestas: borrador?.respuestas ?? {}, dibujos: borrador?.dibujos ?? {} }
 }
 
 /**
@@ -174,14 +179,21 @@ export async function cargarTareaParaEstudiante(
     curso: fila.curso,
   }
   if (!entrega) {
-    const borrador = await cargarBorrador(asignacionId, estudianteId)
-    return { ...base, entregada: false, contenido: sinRespuestas(fila.contenido), borrador }
+    const { respuestas: borrador, dibujos } = await cargarBorrador(asignacionId, estudianteId)
+    return {
+      ...base,
+      entregada: false,
+      contenido: sinRespuestas(fila.contenido),
+      borrador,
+      dibujos,
+    }
   }
   return {
     ...base,
     entregada: true,
     contenido: fila.contenido,
     respuestas: entrega.respuestas,
+    dibujos: entrega.dibujos,
     puntaje: entrega.puntaje,
     total: entrega.total,
   }
@@ -202,12 +214,13 @@ export async function cargarTareaParaRehacer(
       entregada: false
       contenido: ContenidoEstudiante
       borrador: Record<string, string>
+      dibujos: Record<string, string>
     })
   | null
 > {
   const fila = await cargarFilaAsignacion(asignacionId, estudianteId)
   if (!fila) return null
-  const borrador = await cargarBorrador(asignacionId, estudianteId)
+  const { respuestas: borrador, dibujos } = await cargarBorrador(asignacionId, estudianteId)
   return {
     id: fila.id,
     titulo: fila.titulo,
@@ -217,5 +230,6 @@ export async function cargarTareaParaRehacer(
     entregada: false,
     contenido: sinRespuestas(fila.contenido),
     borrador,
+    dibujos,
   }
 }

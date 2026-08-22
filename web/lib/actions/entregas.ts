@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { asignaciones, borradoresTarea, entregas, inscripciones } from '@/lib/db/schema'
 import { getActor, type Actor } from '@/lib/authz'
 import { aplanarPreguntas, corregir, type ContenidoAsignacion } from '@/lib/tareas/contenido'
+import { deleteBlob, uploadImage } from '@/lib/storage/blob'
 
 interface AsignacionVigente {
   id: number
@@ -65,9 +66,10 @@ function requireEstudianteActor(actor: Actor | null): { error: string } | null {
  * alternativas contra el snapshot del servidor y persiste. El estudiante puede
  * rehacerla mientras no venza el plazo: `onConflictDoUpdate` sobre el unique
  * (asignacionId, estudianteId) sobrescribe la entrega anterior (respuestas,
- * puntaje y fecha) en vez de fallar por duplicado. El borrador (pre-guardado)
- * se borra al entregar: ya cumplió su propósito y no debe convivir con la
- * entrega final.
+ * puntaje y fecha) en vez de fallar por duplicado. Los dibujos NO viajan como
+ * parámetro (ya se subieron al Blob uno por uno desde `guardarDibujoTarea`):
+ * se toman tal cual del borrador vigente. El borrador se borra al entregar:
+ * ya cumplió su propósito y no debe convivir con la entrega final.
  */
 export async function entregarTarea(
   asignacionId: number,
@@ -87,18 +89,29 @@ export async function entregarTarea(
   const { puntaje, total } = corregir(asig.contenido, limpias)
   try {
     await db.transaction(async (tx) => {
+      const [borrador] = await tx
+        .select({ dibujos: borradoresTarea.dibujos })
+        .from(borradoresTarea)
+        .where(and(
+          eq(borradoresTarea.asignacionId, asig.id),
+          eq(borradoresTarea.estudianteId, actor!.userId),
+        ))
+        .limit(1)
+      const dibujos = borrador?.dibujos ?? {}
+
       await tx
         .insert(entregas)
         .values({
           asignacionId: asig.id,
           estudianteId: actor!.userId,
           respuestas: limpias,
+          dibujos,
           puntaje,
           total,
         })
         .onConflictDoUpdate({
           target: [entregas.asignacionId, entregas.estudianteId],
-          set: { respuestas: limpias, puntaje, total, enviadoEl: new Date() },
+          set: { respuestas: limpias, dibujos, puntaje, total, enviadoEl: new Date() },
         })
       await tx
         .delete(borradoresTarea)
@@ -151,4 +164,75 @@ export async function guardarBorradorTarea(
     return { error: 'No se pudo guardar el borrador.' }
   }
   return { ok: true }
+}
+
+/**
+ * Guarda (o reemplaza) el dibujo de una pregunta de desarrollo: sube el PNG
+ * del `<canvas>` al Blob y persiste su clave en el borrador, bajo el mismo
+ * índice de pregunta aplanada que usa `respuestas`. Reemplaza siempre el
+ * dibujo anterior de esa pregunta (si había) y borra su blob para no dejar
+ * huérfanos — cada trazo termina subiendo la imagen completa, no un delta.
+ */
+export async function guardarDibujoTarea(
+  asignacionId: number,
+  indice: number,
+  formData: FormData,
+): Promise<{ ok: true; key: string } | { error: string }> {
+  const actor = await getActor()
+  const rechazo = requireEstudianteActor(actor)
+  if (rechazo) return rechazo
+  if (!Number.isInteger(indice) || indice < 0) return { error: 'Pregunta inválida.' }
+
+  const asig = await cargarAsignacionVigente(asignacionId, actor!.userId)
+  if (!asig) return { error: 'Tarea no encontrada.' }
+  if (asig.fechaLimite && asig.fechaLimite < new Date()) {
+    return { error: 'El plazo de entrega ya venció.' }
+  }
+  if (indice >= aplanarPreguntas(asig.contenido).length) {
+    return { error: 'Pregunta inválida.' }
+  }
+
+  const archivo = formData.get('imagen')
+  if (!(archivo instanceof File) || archivo.size === 0) {
+    return { error: 'Dibujo inválido.' }
+  }
+
+  let key: string
+  try {
+    key = await uploadImage(archivo)
+  } catch (e) {
+    console.error('[borradores-tarea:dibujo]', e)
+    return { error: 'No se pudo guardar el dibujo.' }
+  }
+
+  const [actual] = await db
+    .select({ dibujos: borradoresTarea.dibujos })
+    .from(borradoresTarea)
+    .where(and(
+      eq(borradoresTarea.asignacionId, asig.id),
+      eq(borradoresTarea.estudianteId, actor!.userId),
+    ))
+    .limit(1)
+  const keyAnterior = actual?.dibujos?.[String(indice)]
+  const dibujos = { ...actual?.dibujos, [String(indice)]: key }
+
+  try {
+    await db
+      .insert(borradoresTarea)
+      .values({ asignacionId: asig.id, estudianteId: actor!.userId, respuestas: {}, dibujos })
+      .onConflictDoUpdate({
+        target: [borradoresTarea.asignacionId, borradoresTarea.estudianteId],
+        set: { dibujos, updatedAt: new Date() },
+      })
+  } catch (e) {
+    console.error('[borradores-tarea:dibujo]', e)
+    // El blob ya se subió pero no se pudo referenciar: se limpia para no
+    // dejarlo huérfano.
+    await deleteBlob(key).catch(() => {})
+    return { error: 'No se pudo guardar el dibujo.' }
+  }
+  if (keyAnterior && keyAnterior !== key) {
+    await deleteBlob(keyAnterior).catch(() => {})
+  }
+  return { ok: true, key }
 }

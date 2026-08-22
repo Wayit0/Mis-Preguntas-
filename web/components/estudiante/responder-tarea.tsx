@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { entregarTarea, guardarBorradorTarea } from '@/lib/actions/entregas'
 import { LatexText } from '@/components/preguntas/latex-text'
+import { CanvasDibujo } from '@/components/estudiante/canvas-dibujo'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { LETRAS } from '@/lib/validation/pregunta'
@@ -31,11 +32,15 @@ function PreguntaItem({
   i,
   valor,
   onCambiar,
+  asignacionId,
+  dibujoInicial,
 }: {
   p: PreguntaEstudiante
   i: number
   valor: string
   onCambiar: (valor: string) => void
+  asignacionId: number
+  dibujoInicial?: string
 }) {
   const esSeleccion = p.tipo === 'seleccion_multiple'
   return (
@@ -87,13 +92,16 @@ function PreguntaItem({
             })}
           </div>
         ) : (
-          <textarea
-            rows={4}
-            value={valor}
-            onChange={(e) => onCambiar(e.target.value)}
-            placeholder="Escribe tu respuesta…"
-            className="rounded-md border border-border bg-background p-2 text-sm"
-          />
+          <>
+            <textarea
+              rows={4}
+              value={valor}
+              onChange={(e) => onCambiar(e.target.value)}
+              placeholder="Escribe tu respuesta (opcional si prefieres solo dibujar)…"
+              className="rounded-md border border-border bg-background p-2 text-sm"
+            />
+            <CanvasDibujo asignacionId={asignacionId} indice={i} claveInicial={dibujoInicial} />
+          </>
         )}
       </CardContent>
     </Card>
@@ -224,6 +232,8 @@ export function ResponderTarea({
                 i={i}
                 valor={respuestas[String(i)] ?? ''}
                 onCambiar={(v) => setRespuesta(i, v)}
+                asignacionId={tarea.id}
+                dibujoInicial={tarea.dibujos[String(i)]}
               />
             )
           })}
@@ -239,6 +249,8 @@ export function ResponderTarea({
             i={i}
             valor={respuestas[String(i)] ?? ''}
             onCambiar={(v) => setRespuesta(i, v)}
+            asignacionId={tarea.id}
+            dibujoInicial={tarea.dibujos[String(i)]}
           />
         )
       })}

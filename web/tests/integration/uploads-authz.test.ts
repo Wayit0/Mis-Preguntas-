@@ -7,6 +7,8 @@ import {
   cursos,
   inscripciones,
   asignaciones,
+  entregas,
+  borradoresTarea,
 } from '@/lib/db/schema'
 import { puedeVerImagen } from '@/lib/queries/uploads'
 import type { ContenidoAsignacion } from '@/lib/tareas/contenido'
@@ -164,5 +166,76 @@ describe('puedeVerImagen: snapshot de una asignación (Cursos y Tareas)', () => 
 
   it('el profesor dueño del curso ve la imagen del snapshot (incluso si la pregunta original ya no existe)', async () => {
     expect(await puedeVerImagen(kTarea, profesor)).toBe(true)
+  })
+})
+
+describe('puedeVerImagen: dibujos del desarrollo (entregas y borradores de tarea)', () => {
+  const kDibujoEntregado = `dibujo-entregado-${sello}.png`
+  const kDibujoBorrador = `dibujo-borrador-${sello}.png`
+
+  let profesor: number
+  let autorEntrega: number
+  let otroEstudiante: number
+  let asignacionId: number
+
+  beforeAll(async () => {
+    const [p] = await db.insert(usuarios)
+      .values({ nombre: 'Profesor Dibujo', email: `profe-dibujo-${sello}@x.cl`, passwordHash: 'x', role: 'teacher' })
+      .returning()
+    const [e1] = await db.insert(usuarios)
+      .values({ nombre: 'Alumno Dibuja', email: `alumno-dibuja-${sello}@x.cl`, passwordHash: 'x', role: 'student' })
+      .returning()
+    const [e2] = await db.insert(usuarios)
+      .values({ nombre: 'Otro Alumno', email: `otro-alumno-${sello}@x.cl`, passwordHash: 'x', role: 'student' })
+      .returning()
+    profesor = p.id
+    autorEntrega = e1.id
+    otroEstudiante = e2.id
+
+    const [curso] = await db.insert(cursos)
+      .values({ userId: profesor, nombre: 'Curso Dibujo', joinCode: `join-dibujo-${sello}` })
+      .returning()
+    await db.insert(inscripciones).values({ cursoId: curso.id, estudianteId: autorEntrega })
+
+    const contenido: ContenidoAsignacion = { textos: [], preguntas: [] }
+    const [asig] = await db.insert(asignaciones)
+      .values({ cursoId: curso.id, pruebaId: 0, titulo: 'Asignación con dibujo', contenido })
+      .returning()
+    asignacionId = asig.id
+
+    await db.insert(entregas).values({
+      asignacionId,
+      estudianteId: autorEntrega,
+      respuestas: {},
+      dibujos: { '0': kDibujoEntregado },
+      puntaje: 0,
+      total: 0,
+    })
+    await db.insert(borradoresTarea).values({
+      asignacionId,
+      estudianteId: autorEntrega,
+      respuestas: {},
+      dibujos: { '0': kDibujoBorrador },
+    })
+  })
+
+  it('el autor de la entrega ve su propio dibujo entregado', async () => {
+    expect(await puedeVerImagen(kDibujoEntregado, autorEntrega)).toBe(true)
+  })
+
+  it('el profesor del curso ve el dibujo entregado por su alumno', async () => {
+    expect(await puedeVerImagen(kDibujoEntregado, profesor)).toBe(true)
+  })
+
+  it('otro estudiante sin relación NO ve el dibujo entregado', async () => {
+    expect(await puedeVerImagen(kDibujoEntregado, otroEstudiante)).toBe(false)
+  })
+
+  it('el autor del borrador ve su propio dibujo en curso', async () => {
+    expect(await puedeVerImagen(kDibujoBorrador, autorEntrega)).toBe(true)
+  })
+
+  it('otro estudiante sin relación NO ve el dibujo en curso de otro', async () => {
+    expect(await puedeVerImagen(kDibujoBorrador, otroEstudiante)).toBe(false)
   })
 })

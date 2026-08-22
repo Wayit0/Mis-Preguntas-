@@ -473,6 +473,12 @@ export const entregas = pgTable(
     estudianteId: integer('estudiante_id').notNull(),
     // Respuestas por índice de pregunta aplanada: {"0":"A","1":"texto libre"}.
     respuestas: jsonb('respuestas').$type<Record<string, string>>().notNull(),
+    // Dibujos del desarrollo (preguntas de tipo desarrollo_corto), por el mismo
+    // índice de pregunta aplanada: {"1": "<clave del blob>"}. Se llenan con lo
+    // que ya estaba en el borrador al momento de entregar (ver entregarTarea);
+    // el estudiante dibuja con lápiz/mouse en un <canvas> y cada trazo se sube
+    // como PNG (lib/storage/blob.ts), por eso aquí solo vive la clave.
+    dibujos: jsonb('dibujos').$type<Record<string, string>>().notNull().default({}),
     // Puntaje de alternativas (las de desarrollo no puntúan).
     puntaje: integer('puntaje').notNull(),
     total: integer('total').notNull(),
@@ -496,6 +502,9 @@ export const borradoresTarea = pgTable(
     asignacionId: integer('asignacion_id').notNull(),
     estudianteId: integer('estudiante_id').notNull(),
     respuestas: jsonb('respuestas').$type<Record<string, string>>().notNull(),
+    // Ver el comentario en `entregas.dibujos`: mismo formato, autoguardado por
+    // separado desde el <canvas> (no viaja junto al resto de las respuestas).
+    dibujos: jsonb('dibujos').$type<Record<string, string>>().notNull().default({}),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
   (t) => [unique('borradores_tarea_asignacion_estudiante').on(t.asignacionId, t.estudianteId)],

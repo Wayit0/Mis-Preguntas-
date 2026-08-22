@@ -11,8 +11,18 @@ vi.mock('@/lib/get-session', () => ({
 }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 
-const { entregarTarea, guardarBorradorTarea } = await import('@/lib/actions/entregas')
+const { entregarTarea, guardarBorradorTarea, guardarDibujoTarea } = await import('@/lib/actions/entregas')
 const { cargarTareaParaEstudiante, listarTareasDeEstudiante } = await import('@/lib/queries/tareas')
+
+// guardarDibujoTarea sube al Blob real: requiere Azurite vía
+// AZURE_STORAGE_CONNECTION_STRING (mismo gate que tests/integration/blob.test.ts).
+const hasBlobConfig = Boolean(process.env.AZURE_STORAGE_CONNECTION_STRING)
+
+function pngDePrueba(nombre = 'dibujo.png'): File {
+  return new File([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])], nombre, {
+    type: 'image/png',
+  })
+}
 
 async function crearUsuario(prefijo: string, role = 'teacher') {
   const email = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2)}@x.cl`
@@ -144,6 +154,77 @@ describe('tareas del estudiante (contra Postgres)', () => {
     const intruso = await crearUsuario('ent-intruso3', 'student')
     currentUserId = intruso.id
     expect('error' in (await guardarBorradorTarea(asig.id, { '0': 'A' }))).toBe(true)
+  })
+
+  it.runIf(hasBlobConfig)(
+    'guardarDibujoTarea sube el dibujo al borrador y entregar lo copia a la entrega',
+    async () => {
+      const { est, asig } = await fixtures()
+      currentUserId = est.id
+
+      const fd = new FormData()
+      fd.append('imagen', pngDePrueba())
+      const subida = await guardarDibujoTarea(asig.id, 1, fd)
+      expect(subida).toMatchObject({ ok: true })
+      if (!('key' in subida)) return
+
+      const enBorrador = await cargarTareaParaEstudiante(asig.id, est.id)
+      if (enBorrador && !enBorrador.entregada) {
+        expect(enBorrador.dibujos['1']).toBe(subida.key)
+      } else {
+        throw new Error('esperaba una tarea sin entregar')
+      }
+
+      await entregarTarea(asig.id, { '0': 'B' })
+      const entregada = await cargarTareaParaEstudiante(asig.id, est.id)
+      if (entregada?.entregada) {
+        expect(entregada.dibujos['1']).toBe(subida.key)
+      } else {
+        throw new Error('esperaba una tarea entregada')
+      }
+    },
+  )
+
+  it.runIf(hasBlobConfig)('guardarDibujoTarea reemplaza el dibujo anterior de la misma pregunta', async () => {
+    const { est, asig } = await fixtures()
+    currentUserId = est.id
+
+    const fd1 = new FormData()
+    fd1.append('imagen', pngDePrueba())
+    const primero = await guardarDibujoTarea(asig.id, 1, fd1)
+    expect(primero).toMatchObject({ ok: true })
+
+    const fd2 = new FormData()
+    fd2.append('imagen', pngDePrueba())
+    const segundo = await guardarDibujoTarea(asig.id, 1, fd2)
+    expect(segundo).toMatchObject({ ok: true })
+    if (!('key' in primero) || !('key' in segundo)) return
+    expect(segundo.key).not.toBe(primero.key)
+
+    const [fila] = await db.select().from(borradoresTarea).where(and(
+      eq(borradoresTarea.asignacionId, asig.id),
+      eq(borradoresTarea.estudianteId, est.id),
+    ))
+    expect(fila.dibujos).toEqual({ '1': segundo.key })
+  })
+
+  it.runIf(hasBlobConfig)('guardarDibujoTarea rechaza pregunta fuera de rango, fuera de plazo y no-student', async () => {
+    const { prof, est, asig } = await fixtures()
+    currentUserId = est.id
+    const fdFueraDeRango = new FormData()
+    fdFueraDeRango.append('imagen', pngDePrueba())
+    expect('error' in (await guardarDibujoTarea(asig.id, 99, fdFueraDeRango))).toBe(true)
+
+    const vencida = await fixtures(new Date('2020-01-01'))
+    currentUserId = vencida.est.id
+    const fdVencida = new FormData()
+    fdVencida.append('imagen', pngDePrueba())
+    expect('error' in (await guardarDibujoTarea(vencida.asig.id, 1, fdVencida))).toBe(true)
+
+    currentUserId = prof.id
+    const fdProfesor = new FormData()
+    fdProfesor.append('imagen', pngDePrueba())
+    expect('error' in (await guardarDibujoTarea(asig.id, 1, fdProfesor))).toBe(true)
   })
 
   it('rechaza no-student (profesor)', async () => {

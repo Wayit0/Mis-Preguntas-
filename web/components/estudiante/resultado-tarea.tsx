@@ -14,10 +14,12 @@ function PreguntaResultado({
   p,
   i,
   respuesta,
+  dibujo,
 }: {
   p: PreguntaSnapshot
   i: number
   respuesta: string | undefined
+  dibujo: string | undefined
 }) {
   const esSeleccion = p.tipo === 'seleccion_multiple'
   const tieneCorrecta = !!p.correcta?.trim()
@@ -102,8 +104,15 @@ function PreguntaResultado({
         ) : (
           <>
             <p className="whitespace-pre-wrap rounded-md border border-border bg-background p-2 text-sm">
-              {respuesta || 'No respondiste esta pregunta.'}
+              {respuesta || (dibujo ? '(ver dibujo abajo)' : 'No respondiste esta pregunta.')}
             </p>
+            {dibujo ? (
+              <img
+                src={imageUrl(dibujo)}
+                alt="Tu desarrollo dibujado"
+                className="w-full max-w-md rounded-md border border-border bg-white object-contain"
+              />
+            ) : null}
             <p className="text-xs text-muted-foreground">La revisará tu profesor.</p>
           </>
         )}
@@ -154,7 +163,13 @@ export function ResultadoTarea({
           {t.preguntas.map((p) => {
             const i = indice++
             return (
-              <PreguntaResultado key={i} p={p} i={i} respuesta={tarea.respuestas[String(i)]} />
+              <PreguntaResultado
+                key={i}
+                p={p}
+                i={i}
+                respuesta={tarea.respuestas[String(i)]}
+                dibujo={tarea.dibujos[String(i)]}
+              />
             )
           })}
         </div>
@@ -163,7 +178,13 @@ export function ResultadoTarea({
       {tarea.contenido.preguntas.map((p) => {
         const i = indice++
         return (
-          <PreguntaResultado key={i} p={p} i={i} respuesta={tarea.respuestas[String(i)]} />
+          <PreguntaResultado
+            key={i}
+            p={p}
+            i={i}
+            respuesta={tarea.respuestas[String(i)]}
+            dibujo={tarea.dibujos[String(i)]}
+          />
         )
       })}
 

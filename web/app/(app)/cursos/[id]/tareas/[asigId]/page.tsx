@@ -3,7 +3,10 @@ import { requireActor } from '@/lib/authz'
 import { cargarResultados } from '@/lib/queries/resultados'
 import { aplanarPreguntas } from '@/lib/tareas/contenido'
 import { LETRAS } from '@/lib/validation/pregunta'
+import { imageUrl } from '@/lib/storage/blob'
 import { cn } from '@/lib/utils'
+
+/* eslint-disable @next/next/no-img-element */
 
 // Los resultados cambian con cada entrega nueva: siempre frescos.
 export const dynamic = 'force-dynamic'
@@ -101,6 +104,7 @@ export default async function ResultadosPage({
                 <div className="mt-3 flex flex-col gap-3">
                   {preguntas.map((p, i) => {
                     const respuesta = (entrega.respuestas[String(i)] ?? '').trim()
+                    const dibujo = entrega.dibujos[String(i)]
                     const esSeleccion = p.tipo === 'seleccion_multiple'
                     const tieneCorrecta = !!p.correcta?.trim()
                     return (
@@ -140,9 +144,18 @@ export default async function ResultadosPage({
                             ) : null}
                           </div>
                         ) : (
-                          <p className="mt-2 whitespace-pre-wrap rounded-md border border-border bg-background p-2 text-sm text-foreground">
-                            {respuesta || 'No respondió esta pregunta.'}
-                          </p>
+                          <>
+                            <p className="mt-2 whitespace-pre-wrap rounded-md border border-border bg-background p-2 text-sm text-foreground">
+                              {respuesta || (dibujo ? '(ver dibujo abajo)' : 'No respondió esta pregunta.')}
+                            </p>
+                            {dibujo ? (
+                              <img
+                                src={imageUrl(dibujo)}
+                                alt={`Desarrollo dibujado de ${f.nombre}`}
+                                className="mt-2 w-full max-w-md rounded-md border border-border bg-white object-contain"
+                              />
+                            ) : null}
+                          </>
                         )}
                       </div>
                     )
