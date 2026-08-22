@@ -6,7 +6,7 @@ import { listarAsignacionesDeCurso } from '@/lib/queries/resultados'
 import { Card, CardContent } from '@/components/ui/card'
 import { CopiarCodigo } from '@/components/cursos/copiar-codigo'
 import { QuitarAlumno } from '@/components/cursos/quitar-alumno'
-import { EliminarAsignacion } from '@/components/cursos/eliminar-asignacion'
+import { FilaAsignacion } from '@/components/cursos/fila-asignacion'
 
 // El detalle depende de inscripciones/tareas que cambian con frecuencia
 // (nuevo alumno, nueva entrega): siempre fresco.
@@ -105,25 +105,15 @@ export default async function CursoPage({
         ) : (
           <div className="flex flex-col gap-2">
             {asignaciones.map((a) => (
-              <Card key={a.id}>
-                <CardContent className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <Link
-                      href={`/cursos/${curso.id}/tareas/${a.id}`}
-                      className="truncate font-medium text-foreground hover:underline"
-                    >
-                      {a.titulo}
-                    </Link>
-                    <p className="text-xs text-muted-foreground">
-                      {a.nEntregas}/{a.nAlumnos} entregadas
-                      {a.fechaLimite
-                        ? ` · hasta el ${a.fechaLimite.toLocaleDateString('es-CL', { timeZone: 'America/Santiago' })}`
-                        : ''}
-                    </p>
-                  </div>
-                  <EliminarAsignacion id={a.id} />
-                </CardContent>
-              </Card>
+              <FilaAsignacion
+                key={a.id}
+                id={a.id}
+                cursoId={curso.id}
+                titulo={a.titulo}
+                fechaLimite={a.fechaLimite}
+                nEntregas={a.nEntregas}
+                nAlumnos={a.nAlumnos}
+              />
             ))}
           </div>
         )}
