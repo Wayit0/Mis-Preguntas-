@@ -10,7 +10,7 @@ vi.mock('@/lib/get-session', () => ({
 }))
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }))
 
-const { asignarPruebaACurso, eliminarAsignacion } = await import('@/lib/actions/asignaciones')
+const { asignarPruebaACurso, eliminarAsignacion, editarAsignacion } = await import('@/lib/actions/asignaciones')
 
 async function crearUsuario(prefijo: string, role = 'teacher') {
   const email = `${prefijo}-${Date.now()}-${Math.random().toString(36).slice(2)}@x.cl`
@@ -70,5 +70,43 @@ describe('asignarPruebaACurso (contra Postgres)', () => {
 
     expect(await eliminarAsignacion(asigId)).toEqual({ ok: true })
     expect(await db.select().from(entregas).where(eq(entregas.asignacionId, asigId))).toHaveLength(0)
+  })
+})
+
+describe('editarAsignacion (contra Postgres)', () => {
+  it('cambia título y fecha límite; null borra la fecha límite', async () => {
+    const { prof, prueba, curso } = await fixtures()
+    currentUserId = prof.id
+    const res = await asignarPruebaACurso({ pruebaId: prueba.id, cursoId: curso.id })
+    const asigId = 'ok' in res ? res.id : 0
+
+    const nuevaFecha = new Date('2030-01-01T12:00:00.000Z')
+    const editado = await editarAsignacion(asigId, {
+      titulo: 'Prueba renombrada',
+      fechaLimite: nuevaFecha.toISOString(),
+    })
+    expect(editado).toEqual({ ok: true })
+
+    const [asig1] = await db.select().from(asignaciones).where(eq(asignaciones.id, asigId))
+    expect(asig1.titulo).toBe('Prueba renombrada')
+    expect(asig1.fechaLimite?.toISOString()).toBe(nuevaFecha.toISOString())
+
+    await editarAsignacion(asigId, { titulo: 'Prueba renombrada', fechaLimite: null })
+    const [asig2] = await db.select().from(asignaciones).where(eq(asignaciones.id, asigId))
+    expect(asig2.fechaLimite).toBeNull()
+  })
+
+  it('rechaza título vacío, fecha inválida y curso ajeno', async () => {
+    const { prof, prueba, curso } = await fixtures()
+    currentUserId = prof.id
+    const res = await asignarPruebaACurso({ pruebaId: prueba.id, cursoId: curso.id })
+    const asigId = 'ok' in res ? res.id : 0
+
+    expect('error' in (await editarAsignacion(asigId, { titulo: '   ' }))).toBe(true)
+    expect('error' in (await editarAsignacion(asigId, { titulo: 'ok', fechaLimite: 'no-es-fecha' }))).toBe(true)
+
+    const otro = await crearUsuario('asig-editor-ajeno')
+    currentUserId = otro.id
+    expect('error' in (await editarAsignacion(asigId, { titulo: 'hackeo' }))).toBe(true)
   })
 })
