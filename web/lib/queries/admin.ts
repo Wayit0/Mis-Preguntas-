@@ -1,6 +1,15 @@
 import { and, asc, count, desc, eq, gte, sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { accesos, colegios, feedback, usosIa, usuarios } from '@/lib/db/schema'
+import {
+  accesos,
+  colaboraciones,
+  colegios,
+  feedback,
+  preguntas,
+  pruebas,
+  usosIa,
+  usuarios,
+} from '@/lib/db/schema'
 
 // ---------------------------------------------------------------------------
 // Lecturas para la administración global (Parte E.2). Son funciones puras: el
@@ -67,6 +76,118 @@ export async function listarUsuarios(): Promise<UsuarioAdmin[]> {
     .from(usuarios)
     .leftJoin(colegios, eq(colegios.id, usuarios.colegioId))
     .orderBy(asc(usuarios.nombre))
+}
+
+/** Conteo de preguntas (banco propio) y de preguntas compartidas, por usuario. */
+export interface ConteoPreguntasUsuario {
+  userId: number
+  total: number
+  compartidas: number
+}
+
+/**
+ * Cuántas preguntas tiene cada usuario en su banco y cuántas de esas ha
+ * marcado como compartidas. Una sola query agregada (GROUP BY), no N+1.
+ * Alimenta la estadística de la pestaña «Usuarios» del panel de admin.
+ */
+export async function contarPreguntasPorUsuario(): Promise<ConteoPreguntasUsuario[]> {
+  return db
+    .select({
+      userId: preguntas.userId,
+      total: sql<number>`count(*)`,
+      compartidas: sql<number>`count(*) filter (where ${preguntas.compartida} = 1)`,
+    })
+    .from(preguntas)
+    .groupBy(preguntas.userId)
+}
+
+/** Cuántas pruebas ha diseñado cada usuario. */
+export interface ConteoPruebasUsuario {
+  userId: number
+  total: number
+}
+
+export async function contarPruebasPorUsuario(): Promise<ConteoPruebasUsuario[]> {
+  return db
+    .select({ userId: pruebas.userId, total: sql<number>`count(*)` })
+    .from(pruebas)
+    .groupBy(pruebas.userId)
+}
+
+/** Un par de la tabla `colaboraciones`: `fromUserId` comparte su banco con `toUserId`. */
+export interface ColaboracionAdmin {
+  fromUserId: number
+  toUserId: number
+}
+
+/**
+ * Todas las colaboraciones (tabla pequeña, se trae completa). Con la lista de
+ * usuarios ya en memoria, el llamador arma «con quién colabora cada uno» sin
+ * más queries.
+ */
+export async function listarColaboracionesAdmin(): Promise<ColaboracionAdmin[]> {
+  return db
+    .select({
+      fromUserId: colaboraciones.fromUserId,
+      toUserId: colaboraciones.toUserId,
+    })
+    .from(colaboraciones)
+}
+
+/** Un colega con el que un usuario colabora (en cualquiera de los dos sentidos). */
+export interface ColegaEstadistica {
+  id: number
+  nombre: string
+}
+
+/** Estadística de actividad de un usuario para la pestaña «Usuarios» del admin. */
+export interface EstadisticaUsuario {
+  preguntas: number
+  preguntasCompartidas: number
+  pruebas: number
+  colaborandoCon: ColegaEstadistica[]
+}
+
+/**
+ * Arma, por usuario, las estadísticas de actividad a partir de las tres
+ * queries agregadas (preguntas, pruebas, colaboraciones) — sin N+1: cada una
+ * es una sola consulta a la BD; esta función solo las combina en memoria.
+ * `colaboraciones` se trata como bidireccional a propósito: "con quién
+ * colabora" incluye tanto a quienes invitó como a quienes lo invitaron a él.
+ */
+export function armarEstadisticasUsuarios(
+  usuarios: UsuarioAdmin[],
+  conteoPreguntas: ConteoPreguntasUsuario[],
+  conteoPruebas: ConteoPruebasUsuario[],
+  colaboracionesAdmin: ColaboracionAdmin[],
+): Map<number, EstadisticaUsuario> {
+  const nombrePorId = new Map(usuarios.map((u) => [u.id, u.nombre]))
+  const preguntasPorId = new Map(conteoPreguntas.map((c) => [c.userId, c]))
+  const pruebasPorId = new Map(conteoPruebas.map((c) => [c.userId, c.total]))
+
+  const colaborandoPorId = new Map<number, ColegaEstadistica[]>()
+  function agregar(id: number, otroId: number) {
+    const nombre = nombrePorId.get(otroId)
+    if (!nombre) return
+    const lista = colaborandoPorId.get(id) ?? []
+    if (!lista.some((c) => c.id === otroId)) lista.push({ id: otroId, nombre })
+    colaborandoPorId.set(id, lista)
+  }
+  for (const c of colaboracionesAdmin) {
+    agregar(c.fromUserId, c.toUserId)
+    agregar(c.toUserId, c.fromUserId)
+  }
+
+  const estadisticas = new Map<number, EstadisticaUsuario>()
+  for (const u of usuarios) {
+    estadisticas.set(u.id, {
+      preguntas: preguntasPorId.get(u.id)?.total ?? 0,
+      preguntasCompartidas: preguntasPorId.get(u.id)?.compartidas ?? 0,
+      pruebas: pruebasPorId.get(u.id) ?? 0,
+      colaborandoCon: colaborandoPorId.get(u.id) ?? [],
+    })
+  }
+  return estadisticas
 }
 
 // ---------------------------------------------------------------------------
