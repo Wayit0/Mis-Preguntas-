@@ -141,15 +141,6 @@ export function ResultadoTarea({
         </p>
       ) : null}
 
-      {puedeRehacer ? (
-        <Link
-          href={`/tareas/${tarea.id}?rehacer=1`}
-          className={buttonVariants({ variant: 'outline', className: 'self-start' })}
-        >
-          🔁 Rehacer evaluación
-        </Link>
-      ) : null}
-
       {tarea.contenido.textos.map((t, ti) => (
         <div key={ti} className="flex flex-col gap-3">
           <Card>
@@ -175,6 +166,15 @@ export function ResultadoTarea({
           <PreguntaResultado key={i} p={p} i={i} respuesta={tarea.respuestas[String(i)]} />
         )
       })}
+
+      {puedeRehacer ? (
+        <Link
+          href={`/tareas/${tarea.id}?rehacer=1`}
+          className={buttonVariants({ variant: 'outline', className: 'self-start' })}
+        >
+          🔁 Rehacer evaluación
+        </Link>
+      ) : null}
     </div>
   )
 }
