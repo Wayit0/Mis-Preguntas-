@@ -107,6 +107,8 @@ describe('tareas del estudiante (contra Postgres)', () => {
     const filas = await db.select().from(entregas).where(eq(entregas.asignacionId, asig.id))
     expect(filas).toHaveLength(1)
     expect(filas[0].respuestas).toEqual({ '0': 'B' })
+    // 2 intentos: la primera entrega y el rehacer (estadística de admin).
+    expect(filas[0].intentos).toBe(2)
 
     const vencida = await fixtures(new Date('2020-01-01'))
     currentUserId = vencida.est.id

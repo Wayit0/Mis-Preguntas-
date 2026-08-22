@@ -1,14 +1,14 @@
-import type { EstadisticaUsuario } from '@/lib/queries/admin'
+import type { EstadisticaProfesor, EstadisticaEstudiante } from '@/lib/queries/admin'
 
 /**
- * Fila compacta con la actividad de un usuario: preguntas en su banco (y
- * cuántas compartió), pruebas diseñadas y con quién colabora. Se usa tanto en
- * `FilaUsuario` (profesores) como en `FilaEstudiante`.
+ * Fila compacta con la actividad de un profesor: preguntas en su banco (y
+ * cuántas compartió), pruebas diseñadas y con quién colabora. Usada por
+ * `FilaUsuario`.
  */
-export function EstadisticaActividad({
+export function EstadisticaProfesorVista({
   estadistica,
 }: {
-  estadistica: EstadisticaUsuario
+  estadistica: EstadisticaProfesor
 }) {
   return (
     <div className="flex flex-col gap-1 rounded-md bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
@@ -28,6 +28,33 @@ export function EstadisticaActividad({
         {estadistica.colaborandoCon.length === 0
           ? 'nadie'
           : estadistica.colaborandoCon.map((c) => c.nombre).join(', ')}
+      </span>
+    </div>
+  )
+}
+
+/**
+ * Fila compacta con la actividad de un estudiante: cuántos documentos
+ * (tareas/evaluaciones) ha entregado y cuántas veces entregó cada uno
+ * (`intentos` sube con cada "rehacer", ver entregarTarea). Usada por
+ * `FilaEstudiante`.
+ */
+export function EstadisticaEstudianteVista({
+  estadistica,
+}: {
+  estadistica: EstadisticaEstudiante
+}) {
+  return (
+    <div className="flex flex-col gap-1 rounded-md bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
+      <span>
+        📄 {estadistica.documentos}{' '}
+        {estadistica.documentos === 1 ? 'documento entregado' : 'documentos entregados'}
+      </span>
+      <span>
+        🔁 Repeticiones por documento:{' '}
+        {estadistica.detalle.length === 0
+          ? '—'
+          : estadistica.detalle.map((d) => `${d.titulo} (${d.intentos})`).join(', ')}
       </span>
     </div>
   )

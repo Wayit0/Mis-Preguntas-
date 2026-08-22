@@ -482,6 +482,10 @@ export const entregas = pgTable(
     // Puntaje de alternativas (las de desarrollo no puntúan).
     puntaje: integer('puntaje').notNull(),
     total: integer('total').notNull(),
+    // Cuántas veces se entregó esta tarea (1 = solo la primera vez; sube en
+    // cada "rehacer", ver entregarTarea). Alimenta la estadística de admin de
+    // repeticiones por documento entregado.
+    intentos: integer('intentos').notNull().default(1),
     enviadoEl: timestamp('enviado_el').defaultNow().notNull(),
   },
   (t) => [unique('entregas_asignacion_estudiante').on(t.asignacionId, t.estudianteId)],

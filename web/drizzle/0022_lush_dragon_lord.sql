@@ -1,0 +1,1 @@
+ALTER TABLE "entregas" ADD COLUMN "intentos" integer DEFAULT 1 NOT NULL;

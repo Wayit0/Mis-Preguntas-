@@ -11,8 +11,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import type { UsuarioAdmin, EstadisticaUsuario } from '@/lib/queries/admin'
-import { EstadisticaActividad } from '@/components/admin/estadistica-actividad'
+import type { UsuarioAdmin, EstadisticaProfesor } from '@/lib/queries/admin'
+import { EstadisticaProfesorVista } from '@/components/admin/estadistica-actividad'
 
 const ETIQUETA_ROL: Record<string, string> = {
   global_admin: 'Admin global',
@@ -39,7 +39,7 @@ export function FilaUsuario({
 }: {
   usuario: UsuarioAdmin
   colegios: { id: number; nombre: string }[]
-  estadistica: EstadisticaUsuario
+  estadistica: EstadisticaProfesor
 }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
@@ -163,7 +163,7 @@ export function FilaUsuario({
           </Button>
         </div>
 
-        <EstadisticaActividad estadistica={estadistica} />
+        <EstadisticaProfesorVista estadistica={estadistica} />
 
         {error ? (
           <p role="alert" className="text-xs text-destructive">

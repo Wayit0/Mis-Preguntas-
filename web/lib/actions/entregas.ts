@@ -1,6 +1,6 @@
 'use server'
 
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { asignaciones, borradoresTarea, entregas, inscripciones } from '@/lib/db/schema'
@@ -66,7 +66,8 @@ function requireEstudianteActor(actor: Actor | null): { error: string } | null {
  * alternativas contra el snapshot del servidor y persiste. El estudiante puede
  * rehacerla mientras no venza el plazo: `onConflictDoUpdate` sobre el unique
  * (asignacionId, estudianteId) sobrescribe la entrega anterior (respuestas,
- * puntaje y fecha) en vez de fallar por duplicado. Los dibujos NO viajan como
+ * puntaje y fecha) en vez de fallar por duplicado, e incrementa `intentos`
+ * (cuántas veces se entregó esta tarea — estadística de admin). Los dibujos NO viajan como
  * parámetro (ya se subieron al Blob uno por uno desde `guardarDibujoTarea`):
  * se toman tal cual del borrador vigente. El borrador se borra al entregar:
  * ya cumplió su propósito y no debe convivir con la entrega final.
@@ -111,7 +112,14 @@ export async function entregarTarea(
         })
         .onConflictDoUpdate({
           target: [entregas.asignacionId, entregas.estudianteId],
-          set: { respuestas: limpias, dibujos, puntaje, total, enviadoEl: new Date() },
+          set: {
+            respuestas: limpias,
+            dibujos,
+            puntaje,
+            total,
+            enviadoEl: new Date(),
+            intentos: sql`${entregas.intentos} + 1`,
+          },
         })
       await tx
         .delete(borradoresTarea)
