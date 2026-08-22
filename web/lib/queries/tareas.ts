@@ -92,14 +92,14 @@ export type TareaEstudiante =
     })
 
 /**
- * Carga una tarea PARA el estudiante: null si la asignación no existe o él no
- * está inscrito en su curso. Sin entrega, el contenido va SIN correctas ni
- * explicaciones; con entrega, va completo más sus respuestas y puntaje.
+ * Fila cruda de la asignación (guard de inscripción incluido), compartida por
+ * `cargarTareaParaEstudiante` y `cargarTareaParaRehacer`. Null si la asignación
+ * no existe o el estudiante no está inscrito en su curso.
  */
-export async function cargarTareaParaEstudiante(
+async function cargarFilaAsignacion(
   asignacionId: number,
   estudianteId: number,
-): Promise<TareaEstudiante | null> {
+): Promise<(TareaBase & { contenido: ContenidoAsignacion }) | null> {
   if (!Number.isFinite(asignacionId)) return null
   const [fila] = await db
     .select({
@@ -118,6 +118,19 @@ export async function cargarTareaParaEstudiante(
     ))
     .where(eq(asignaciones.id, asignacionId))
     .limit(1)
+  return fila ?? null
+}
+
+/**
+ * Carga una tarea PARA el estudiante: null si la asignación no existe o él no
+ * está inscrito en su curso. Sin entrega, el contenido va SIN correctas ni
+ * explicaciones; con entrega, va completo más sus respuestas y puntaje.
+ */
+export async function cargarTareaParaEstudiante(
+  asignacionId: number,
+  estudianteId: number,
+): Promise<TareaEstudiante | null> {
+  const fila = await cargarFilaAsignacion(asignacionId, estudianteId)
   if (!fila) return null
 
   const [entrega] = await db.select().from(entregas).where(and(
@@ -142,5 +155,28 @@ export async function cargarTareaParaEstudiante(
     respuestas: entrega.respuestas,
     puntaje: entrega.puntaje,
     total: entrega.total,
+  }
+}
+
+/**
+ * Carga una tarea YA entregada para rehacerla: mismo guard de inscripción,
+ * pero el contenido siempre va SIN correctas ni explicaciones (como una tarea
+ * nueva), ignorando la entrega previa que se sobrescribirá al reenviar. El
+ * llamador (la página) es responsable de no ofrecer esto si el plazo venció.
+ */
+export async function cargarTareaParaRehacer(
+  asignacionId: number,
+  estudianteId: number,
+): Promise<(TareaBase & { entregada: false; contenido: ContenidoEstudiante }) | null> {
+  const fila = await cargarFilaAsignacion(asignacionId, estudianteId)
+  if (!fila) return null
+  return {
+    id: fila.id,
+    titulo: fila.titulo,
+    instrucciones: fila.instrucciones,
+    fechaLimite: fila.fechaLimite,
+    curso: fila.curso,
+    entregada: false,
+    contenido: sinRespuestas(fila.contenido),
   }
 }

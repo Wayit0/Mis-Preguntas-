@@ -1,4 +1,6 @@
+import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
+import { buttonVariants } from '@/components/ui/button'
 import { LatexText } from '@/components/preguntas/latex-text'
 import { LETRAS } from '@/lib/validation/pregunta'
 import { imageUrl } from '@/lib/storage/blob'
@@ -112,8 +114,10 @@ function PreguntaResultado({
 
 export function ResultadoTarea({
   tarea,
+  puedeRehacer,
 }: {
   tarea: Extract<TareaEstudiante, { entregada: true }>
+  puedeRehacer: boolean
 }) {
   // Contador global: mismo orden que aplanarPreguntas() del servidor (textos
   // primero, luego sueltas) — el índice es la clave de `tarea.respuestas`.
@@ -135,6 +139,15 @@ export function ResultadoTarea({
         <p className="font-heading text-lg font-semibold text-foreground">
           Tu resultado: {tarea.puntaje}/{tarea.total}
         </p>
+      ) : null}
+
+      {puedeRehacer ? (
+        <Link
+          href={`/tareas/${tarea.id}?rehacer=1`}
+          className={buttonVariants({ variant: 'outline', className: 'self-start' })}
+        >
+          🔁 Rehacer evaluación
+        </Link>
       ) : null}
 
       {tarea.contenido.textos.map((t, ti) => (

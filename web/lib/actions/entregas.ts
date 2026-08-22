@@ -8,9 +8,11 @@ import { getActor } from '@/lib/authz'
 import { aplanarPreguntas, corregir } from '@/lib/tareas/contenido'
 
 /**
- * Entrega única de una tarea: valida rol student + inscripción + plazo, corrige
- * las alternativas contra el snapshot del servidor y persiste. El unique
- * (asignacionId, estudianteId) garantiza un intento aunque haya doble submit.
+ * Entrega de una tarea: valida rol student + inscripción + plazo, corrige las
+ * alternativas contra el snapshot del servidor y persiste. El estudiante puede
+ * rehacerla mientras no venza el plazo: `onConflictDoUpdate` sobre el unique
+ * (asignacionId, estudianteId) sobrescribe la entrega anterior (respuestas,
+ * puntaje y fecha) en vez de fallar por duplicado.
  */
 export async function entregarTarea(
   asignacionId: number,
@@ -50,20 +52,20 @@ export async function entregarTarea(
 
   const { puntaje, total } = corregir(asig.contenido, limpias)
   try {
-    await db.insert(entregas).values({
-      asignacionId: asig.id,
-      estudianteId: actor.userId,
-      respuestas: limpias,
-      puntaje,
-      total,
-    })
+    await db
+      .insert(entregas)
+      .values({
+        asignacionId: asig.id,
+        estudianteId: actor.userId,
+        respuestas: limpias,
+        puntaje,
+        total,
+      })
+      .onConflictDoUpdate({
+        target: [entregas.asignacionId, entregas.estudianteId],
+        set: { respuestas: limpias, puntaje, total, enviadoEl: new Date() },
+      })
   } catch (e) {
-    // Violación del unique = ya entregó.
-    const err = e as { code?: string; cause?: { code?: string } }
-    const code = err?.code || err?.cause?.code
-    if (code === '23505') {
-      return { error: 'Ya entregaste esta tarea.' }
-    }
     console.error('[entregas]', e)
     return { error: 'No se pudo guardar tu entrega. Intenta de nuevo.' }
   }

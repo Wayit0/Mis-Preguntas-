@@ -138,7 +138,7 @@ export function ResponderTarea({
 
   async function onEnviar() {
     if (pendiente) return
-    if (!confirm('¿Enviar tus respuestas? No podrás cambiarlas después.')) return
+    if (!confirm('¿Enviar tus respuestas?')) return
     setPendiente(true)
     setError(null)
     try {
