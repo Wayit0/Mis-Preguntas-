@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { CheckCircle2, FileText, Loader2 } from 'lucide-react'
+import { CheckCircle2, FileText, ImagePlus, Loader2 } from 'lucide-react'
 
 import { guardarPreguntasImportadas } from '@/lib/actions/import'
 import {
@@ -30,7 +30,12 @@ import type { ImagenExtraida } from '@/lib/docparse/extract'
 import type { Carpeta } from '@/lib/queries/carpetas'
 import { opcionesIndentadas } from '@/components/carpetas/mover-a-carpeta'
 import { ASIGNATURAS } from '@/components/shell/subjects'
-import { DialogoRecorte } from '@/components/import/dialogo-recorte'
+import {
+  ACCEPT_IMAGEN,
+  MAX_BYTES_IMAGEN,
+  DialogoRecorte,
+  blobAImagen,
+} from '@/components/import/dialogo-recorte'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -160,6 +165,62 @@ function MiniaturaImagen({
           Quitar imagen
         </Button>
       </div>
+    </div>
+  )
+}
+
+/**
+ * Botón para subir a mano una imagen (enunciado o alternativa) cuando la IA no
+ * detectó ninguna. Lee el archivo a base64 en el navegador y lo entrega al
+ * padre, que la asigna y abre el recorte.
+ */
+function AgregarImagen({
+  id,
+  onCargada,
+}: {
+  id: string
+  onCargada: (imagen: ImagenParaGuardar) => void
+}) {
+  const [error, setError] = useState<string | null>(null)
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label
+        htmlFor={id}
+        className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-border bg-muted/30 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/60 hover:text-foreground"
+      >
+        <ImagePlus className="size-3.5" aria-hidden />
+        Agregar imagen
+      </label>
+      <input
+        id={id}
+        type="file"
+        accept={ACCEPT_IMAGEN}
+        className="sr-only"
+        onChange={async (e) => {
+          const input = e.currentTarget
+          const archivo = input.files?.[0]
+          // Limpiar para que volver a elegir el mismo archivo dispare onChange.
+          input.value = ''
+          if (!archivo) return
+          setError(null)
+          if (archivo.size > MAX_BYTES_IMAGEN) {
+            setError('La imagen supera los 10 MB.')
+            return
+          }
+          const imagen = await blobAImagen(archivo)
+          if (!imagen) {
+            setError('Formato no soportado. Usa PNG, JPG, GIF o WEBP.')
+            return
+          }
+          onCargada(imagen)
+        }}
+      />
+      {error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
     </div>
   )
 }
@@ -457,6 +518,20 @@ export function ImportarDocumento({
     setPreguntas((prev) =>
       prev.map((p) => (p.id === id ? { ...p, ...cambios } : p)),
     )
+  }
+
+  /**
+   * Imagen subida a mano: queda como imagen del campo Y como su original (así
+   * «Restaurar original» vuelve a la subida, no a una detectada antes), y se
+   * abre el recorte de inmediato.
+   */
+  function asignarImagenSubida(
+    id: string,
+    campo: CampoImagen,
+    imagen: ImagenParaGuardar,
+  ) {
+    actualizar(id, { [campo]: imagen, [`${campo}Original`]: imagen })
+    setRecortando({ id, campo })
   }
 
   // Auto-guardado del borrador: 3 s después del último cambio en revisión.
@@ -782,7 +857,14 @@ export function ImportarDocumento({
                           setRecortando({ id: p.id, campo: 'imagenPregunta' })
                         }
                       />
-                    ) : null}
+                    ) : (
+                      <AgregarImagen
+                        id={`imagen-enunciado-${p.id}`}
+                        onCargada={(imagen) =>
+                          asignarImagenSubida(p.id, 'imagenPregunta', imagen)
+                        }
+                      />
+                    )}
                   </div>
 
                   {esSeleccion ? (
@@ -817,7 +899,14 @@ export function ImportarDocumento({
                                   setRecortando({ id: p.id, campo: campoImagen })
                                 }
                               />
-                            ) : null}
+                            ) : (
+                              <AgregarImagen
+                                id={`imagen-alt-${p.id}-${letra}`}
+                                onCargada={(imagen) =>
+                                  asignarImagenSubida(p.id, campoImagen, imagen)
+                                }
+                              />
+                            )}
                           </div>
                         )
                       })}
