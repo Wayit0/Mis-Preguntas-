@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ImagePlus } from 'lucide-react'
+import { Crop, ImagePlus } from 'lucide-react'
 import { crearPregunta, actualizarPregunta } from '@/lib/actions/preguntas'
 import type { ResultadoPregunta } from '@/lib/actions/pregunta-fields'
 import {
@@ -30,6 +30,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  DialogoRecorte,
+  MAX_BYTES_IMAGEN,
+  blobAImagen,
+  imagenAArchivo,
+} from '@/components/import/dialogo-recorte'
+import type { ImagenParaGuardar } from '@/lib/validation/import'
 import { LatexText } from './latex-text'
 import { InsertarEcuacion } from './insertar-ecuacion'
 
@@ -50,9 +57,56 @@ function CampoImagen({
   label: string
   existente?: string | null
 }) {
+  const inputRef = useRef<HTMLInputElement>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [nombreArchivo, setNombreArchivo] = useState<string | null>(null)
+  // Imagen desde la que se recorta (siempre la completa: re-recortar no
+  // degrada). `desdeArchivo` distingue una subida nueva de la ya guardada.
+  const [original, setOriginal] = useState<{
+    imagen: ImagenParaGuardar
+    nombre: string
+    desdeArchivo: boolean
+  } | null>(null)
+  const [recortando, setRecortando] = useState(false)
+  const [cargando, setCargando] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const src = preview ?? (existente ? urlImagen(existente) : null)
+
+  /** Pone un archivo en el input real (así viaja en el FormData al guardar). */
+  function fijarArchivo(archivo: File | null) {
+    const input = inputRef.current
+    if (!input) return
+    const dt = new DataTransfer()
+    if (archivo) dt.items.add(archivo)
+    input.files = dt.files
+  }
+
+  function mostrar(imagen: ImagenParaGuardar | null, nombre: string | null) {
+    setPreview(imagen ? `data:${imagen.mediaType};base64,${imagen.base64}` : null)
+    setNombreArchivo(nombre)
+  }
+
+  async function abrirRecorte() {
+    setError(null)
+    if (original) {
+      setRecortando(true)
+      return
+    }
+    if (!existente) return
+    // Imagen ya guardada: traerla para recortar en el navegador.
+    setCargando(true)
+    try {
+      const res = await fetch(urlImagen(existente))
+      const imagen = res.ok ? await blobAImagen(await res.blob()) : null
+      if (!imagen) throw new Error()
+      setOriginal({ imagen, nombre: existente, desdeArchivo: false })
+      setRecortando(true)
+    } catch {
+      setError('No se pudo cargar la imagen para recortarla.')
+    } finally {
+      setCargando(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -66,32 +120,93 @@ function CampoImagen({
           className="max-h-28 w-fit rounded-md border border-border object-contain"
         />
       ) : null}
-      {/* Botón claro de subida; el input real queda oculto (sr-only) pero
-          dentro del form, así el archivo viaja igual en el FormData. */}
-      <label
-        htmlFor={name}
-        className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-border bg-muted/30 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/60 hover:text-foreground"
-      >
-        <ImagePlus className="size-3.5" aria-hidden />
-        {src ? 'Cambiar imagen' : 'Agregar imagen'}
-      </label>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {/* Botón claro de subida; el input real queda oculto (sr-only) pero
+            dentro del form, así el archivo viaja igual en el FormData. */}
+        <label
+          htmlFor={name}
+          className="inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md border border-dashed border-border bg-muted/30 px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted/60 hover:text-foreground"
+        >
+          <ImagePlus className="size-3.5" aria-hidden />
+          {src ? 'Cambiar imagen' : 'Agregar imagen'}
+        </label>
+        {src ? (
+          <button
+            type="button"
+            onClick={abrirRecorte}
+            disabled={cargando}
+            className="inline-flex w-fit items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
+          >
+            <Crop className="size-3.5" aria-hidden />
+            {cargando ? 'Cargando…' : 'Recortar'}
+          </button>
+        ) : null}
+      </div>
       {nombreArchivo ? (
         <span className="max-w-44 truncate text-xs text-muted-foreground">
           {nombreArchivo}
         </span>
       ) : null}
+      {error ? (
+        <p role="alert" className="text-xs text-destructive">
+          {error}
+        </p>
+      ) : null}
       <input
+        ref={inputRef}
         id={name}
         name={name}
         type="file"
         accept="image/png,image/jpeg"
         className="sr-only"
-        onChange={(e) => {
+        onChange={async (e) => {
           const f = e.target.files?.[0]
-          setPreview(f ? URL.createObjectURL(f) : null)
-          setNombreArchivo(f?.name ?? null)
+          setError(null)
+          if (!f) {
+            setOriginal(null)
+            mostrar(null, null)
+            return
+          }
+          setPreview(URL.createObjectURL(f))
+          setNombreArchivo(f.name)
+          if (f.size > MAX_BYTES_IMAGEN) {
+            // Se deja tal cual (sin recorte); el servidor decide si la acepta.
+            setOriginal(null)
+            return
+          }
+          const imagen = await blobAImagen(f)
+          if (!imagen) {
+            setOriginal(null)
+            return
+          }
+          setOriginal({ imagen, nombre: f.name, desdeArchivo: true })
+          setRecortando(true)
         }}
       />
+      {recortando && original ? (
+        <DialogoRecorte
+          original={original.imagen}
+          onAplicar={(imagen) => {
+            const archivo = imagenAArchivo(imagen, original.nombre)
+            fijarArchivo(archivo)
+            mostrar(imagen, archivo.name)
+            setRecortando(false)
+          }}
+          onRestaurar={() => {
+            if (original.desdeArchivo) {
+              const archivo = imagenAArchivo(original.imagen, original.nombre)
+              fijarArchivo(archivo)
+              mostrar(original.imagen, archivo.name)
+            } else {
+              // Volver a la imagen guardada: no se sube nada nuevo.
+              fijarArchivo(null)
+              mostrar(null, null)
+            }
+            setRecortando(false)
+          }}
+          onCerrar={() => setRecortando(false)}
+        />
+      ) : null}
     </div>
   )
 }
